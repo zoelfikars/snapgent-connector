@@ -24,8 +24,8 @@ extension/dist/
 .env
 
 # Build outputs (PyInstaller and release assembly). The Windows .exe files are built by CI, not committed.
-/build/
-/dist/
+/server/build/
+/server/dist/
 /out/
 *.exe
 

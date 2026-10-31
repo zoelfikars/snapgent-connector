@@ -5,6 +5,9 @@ All notable changes to snapgentV3 Free are documented here.
 ## [Unreleased]
 
 ### Build and release
+- **Tidy repository root**: the bridge, the VS Code server, their launchers and PyInstaller specs moved
+  into `server/` (same layout as the release zip); tests moved into `tests/`. Release zips are unchanged.
+  From a clone, run the launchers from `server/`.
 - **CI and automatic releases** (`.github/workflows`): lint, tests on three operating systems, and
   Windows executables built from source on every release tag. `bridge.exe` and `vscode_mcp.exe`
   are no longer committed; this also fixes the Windows executable shipping without the security fixes.

@@ -36,6 +36,19 @@ def _set_server(
     servers[server_id] = {"command": command, "args": args, "env": env}
 
 
+def _runs_bundled_server(entry: Dict[str, object]) -> bool:
+    """Is this the entry we wrote ourselves (so it may be refreshed), as opposed to one the user customised?
+
+    That includes an entry whose script path is stale because the project folder moved or was updated.
+    """
+    command = Path(str(entry.get("command", "")))
+    if command.name in {"", "vscode_mcp.exe", "vscode_mcp.py"}:
+        return True
+    args = entry.get("args")
+    runs_our_script = isinstance(args, list) and bool(args) and Path(str(args[0])).name == "vscode_mcp.py"
+    return runs_our_script or (command.name in {"python", "python3"} and not command.exists())
+
+
 def main() -> int:
     if sys.platform not in {"darwin", "linux"}:
         print("ERROR: setup-config.py supports macOS and Linux.", file=sys.stderr)
@@ -46,16 +59,7 @@ def main() -> int:
         assert isinstance(servers, dict)
 
         vscode = servers.get("vscode")
-        if not isinstance(vscode, dict) or Path(str(vscode.get("command", ""))).name in {
-            "",
-            "vscode_mcp.exe",
-            "vscode_mcp.py",
-        }:
-            _set_server(servers, "vscode", sys.executable, [str(VSCODE_MCP)])
-            print(f"VS Code MCP configured: {VSCODE_MCP}")
-        elif not Path(str(vscode.get("command", ""))).exists() and Path(
-            str(vscode.get("command", ""))
-        ).name in {"python", "python3"}:
+        if not isinstance(vscode, dict) or _runs_bundled_server(vscode):
             _set_server(servers, "vscode", sys.executable, [str(VSCODE_MCP)])
             print(f"VS Code MCP configured: {VSCODE_MCP}")
 

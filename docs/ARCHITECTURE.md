@@ -110,7 +110,7 @@ shippable.
 |---|---|
 | Parser, prompt, feedback, tool formatting, result summaries | **Migrated** to `domain/`, unit-tested |
 | Manifest, host lists, per-browser build | **Migrated** (`sites/`, `build/`) |
-| Bridge origin check | **Done** (`bridge.py`) |
+| Bridge origin check | **Done** (`server/snapgent_bridge`) |
 | Tool execution (`runTool`, catalogue, isolation, `list_commands`, result shaping) | **Migrated** to `application/` + `domain/tools/`, tested with fake ports |
 | Agent loop (`agentLoop`: turn policy, lifecycle, stall watchdog, reminder cadence) | **Migrated** to `domain/agent` + `application/`, scripted-scenario tests |
 | Response watcher (`waitForResponse`: timing gates + reply classification) | **Migrated** to `application/response-watcher` + `domain/agent/reply-classifier`, fake-clock tests |
@@ -147,7 +147,11 @@ shippable.
    request/response correlation) separate from the message router.
 5. **Typing**: JSDoc `@typedef` for ports and messages + `tsc --checkJs` in CI.
 
-## Bridge (`snapgent_bridge/`)
+## Bridge (`server/snapgent_bridge/`)
+
+Everything the user runs lives in `server/`, laid out exactly like the release zip, so the
+launchers work the same from a clone and from a download. Tests live in `tests/` and put
+`server/` on `sys.path`.
 
 `bridge.py` is a three-line entry point (every launcher still runs it); the
 implementation is a package where each module has one reason to change.
@@ -187,7 +191,7 @@ bridge terminal is asked once (`trust.py`, like SSH `known_hosts`); a yes is sto
 no. `ZS_ALLOWED_ORIGINS` pins the exact origin and skips the question. Without this, a hostile extension
 could call tools, add servers (spawn commands) and approve its own confirmation tokens.
 
-## VS Code MCP server (`snapgent_vscode/`)
+## VS Code MCP server (`server/snapgent_vscode/`)
 
 `vscode_mcp.py` is a thin entry point (config files and launchers still point at it).
 
@@ -233,7 +237,7 @@ visible; it is not a sandbox.
 - The `.spec` files collect `websockets` and the package submodules; inside an `.exe`, `config.json`
   and `logs/` live next to the executable, not in PyInstaller's temp unpack folder (`settings.app_root`).
 
-To cut a release: bump the version in `snapgent_bridge/__init__.py`, `extension/package.json` and the
+To cut a release: bump the version in `server/snapgent_bridge/__init__.py`, `extension/package.json` and the
 README badge, add the CHANGELOG section, commit, then `git tag vX.Y.Z && git push --tags`.
 
 ## When a chat site changes its markup

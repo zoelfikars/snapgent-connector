@@ -195,7 +195,7 @@ launcher; Roblox Studio itself may not be available on your Linux distribution.
 
 The extension and the bridge are two separate parts, and each one has to be updated. Reloading only the extension does not update the bridge, and the **Restart** button in the extension popup only restarts the MCP servers, it does not load new bridge code.
 
-1. Get the new version: run `git pull` in the project folder, or download and extract the [latest release](https://github.com/herdodp/snapgent-connector/releases/latest).
+1. Get the new version: run `git pull` in the project folder (the launchers are in its `server` folder), or download and extract the [latest release](https://github.com/herdodp/snapgent-connector/releases/latest).
 2. Stop the old bridge: close the terminal window that is running `start.bat`, `MacOS_Start.command` or `Linux_Start.sh`.
 3. Start the bridge again with the same launcher. The launcher replaces an old bridge still holding port 17613. On Linux it first checks that the process on the port is a Snapgent bridge, and stops with an error if it belongs to another program.
 4. Reload the extension at `chrome://extensions` (or `edge://extensions`), then refresh open chat tabs (F5).
@@ -203,7 +203,7 @@ The extension and the bridge are two separate parts, and each one has to be upda
 
 If the popup shows `bridge old`, the bridge is still running old code: repeat steps 2 and 3. On macOS and Linux, also make sure there is no old executable file named `bridge` in the folder, because the launcher runs it instead of `bridge.py`.
 
-> **Windows note:** releases up to V3.9.3 shipped `bridge.exe`/`vscode_mcp.exe` built before the **origin check that stops websites from controlling the bridge** (and without the V3.9.2 large-response fix). From the next release the executables are built automatically from the same source (see `docs/ARCHITECTURE.md`). Until then, run the Python bridge: install it with `py -3 -m pip install websockets`, close `start.bat`, then run `py -3 bridge.py` in the project folder. macOS and Linux already use `bridge.py` and are not affected.
+> **Windows note:** releases up to V3.9.3 shipped `bridge.exe`/`vscode_mcp.exe` built before the **origin check that stops websites from controlling the bridge** (and without the V3.9.2 large-response fix). From the next release the executables are built automatically from the same source (see `docs/ARCHITECTURE.md`). Until then, run the Python bridge: install it with `py -3 -m pip install websockets`, close `start.bat`, then run `py -3 bridge.py` in the `server` folder. macOS and Linux already use `bridge.py` and are not affected.
 
 ---
 
@@ -254,22 +254,23 @@ snapgent-full/
 │   ├── legacy/                # Code still being migrated (see docs/ARCHITECTURE.md)
 │   ├── build/                 # Manifest generation + bundling -> dist/{chrome,firefox}
 │   └── test/                  # node:test suites (npm test)
+├── server/                    # Everything you run: same layout as the release zip
+│   ├── start.bat              # Windows bridge launcher
+│   ├── MacOS_Start.command    # macOS bridge launcher
+│   ├── Linux_Start.sh         # Linux bridge launcher
+│   ├── setup-config.ps1       # Configures Windows MCP servers
+│   ├── setup-config.py        # Detects MCP servers on macOS and Linux
+│   ├── bridge.py              # Bridge entry point (cross-platform Python)
+│   ├── snapgent_bridge/       # Bridge implementation (protocol, registry, router, trust, server)
+│   ├── vscode_mcp.py          # VS Code MCP server entry point
+│   ├── snapgent_vscode/       # VS Code MCP server implementation (tools, security policy)
+│   ├── bridge.spec            # PyInstaller recipes (the .exe files are built by CI)
+│   └── vscode_mcp.spec
+├── tests/                     # Python tests (python -m unittest discover -s tests -t .)
+├── scripts/                   # package_release.py assembles the release zip
+├── docs/                      # Architecture notes and the project page
 ├── assets/                    # Project images
-├── setup-config.ps1           # Configures Windows MCP servers
-├── setup-config.py            # Detects MCP servers on macOS and Linux
-├── config.json                # Generated locally by launchers (not tracked)
-├── start.bat                  # Windows bridge launcher
-├── MacOS_Start.command        # macOS bridge launcher
-├── Linux_Start.sh             # Linux bridge launcher
-├── bridge.exe                 # Windows local bridge
-├── bridge.py                  # Bridge entry point (cross-platform Python)
-├── snapgent_bridge/           # Bridge implementation (protocol, registry, router, server)
-├── snapgent_vscode/           # VS Code MCP server implementation (tools, security policy)
-├── tests/                     # Bridge + VS Code MCP tests (python -m unittest discover -s tests -t .)
-├── vscode_mcp.exe             # Default VS Code MCP server (28 workspace tools)
-├── vscode_mcp.py              # VS Code MCP server source
-├── test_setup_config.py       # MCP setup helper tests
-└── vscode_mcp.spec            # PyInstaller build recipe
+└── .github/workflows/         # CI and release automation
 ```
 
 ---

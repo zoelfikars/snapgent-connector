@@ -57,11 +57,13 @@ jobs:
           git config --global user.name "CI"
           git config --global user.email "ci@example.invalid"
       - run: python -m unittest discover -s tests -t . -v
-      - run: python -m unittest test_setup_config -v
 
   frozen:
     name: Windows executables build and start
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: server
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

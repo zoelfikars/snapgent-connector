@@ -18,7 +18,7 @@ jobs:
       - id: version
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          code="$(python3 -c 'from snapgent_bridge import BRIDGE_VERSION; print(BRIDGE_VERSION)')"
+          code="$(PYTHONPATH=server python3 -c 'from snapgent_bridge import BRIDGE_VERSION; print(BRIDGE_VERSION)')"
           if [ "$tag" != "$code" ]; then
             echo "Tag v$tag does not match the version in the code ($code)." >&2
             exit 1
@@ -59,13 +59,15 @@ jobs:
       - run: python -m pip install pyinstaller websockets
       - run: python -m unittest discover -s tests -t .
       - run: pyinstaller --noconfirm bridge.spec
+        working-directory: server
       - run: pyinstaller --noconfirm vscode_mcp.spec
+        working-directory: server
       - uses: actions/upload-artifact@v4
         with:
           name: windows-binaries
           path: |
-            dist/bridge.exe
-            dist/vscode_mcp.exe
+            server/dist/bridge.exe
+            server/dist/vscode_mcp.exe
           if-no-files-found: error
 
   publish:

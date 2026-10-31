@@ -16,16 +16,18 @@ from pathlib import Path
 from typing import List
 
 # (source in the repository, destination in the release); folders are copied recursively.
+# Everything the user runs lives in server/ with the same layout as the release, so the launchers work
+# unchanged from a git clone and from the zip.
 SOURCES = [
-    ("bridge.py", "bridge.py"),
-    ("vscode_mcp.py", "vscode_mcp.py"),
-    ("setup-config.py", "setup-config.py"),
-    ("setup-config.ps1", "setup-config.ps1"),
-    ("start.bat", "start.bat"),
-    ("Linux_Start.sh", "Linux_Start.sh"),
-    ("MacOS_Start.command", "MacOS_Start.command"),
-    ("snapgent_bridge", "snapgent_bridge"),
-    ("snapgent_vscode", "snapgent_vscode"),
+    ("server/bridge.py", "bridge.py"),
+    ("server/vscode_mcp.py", "vscode_mcp.py"),
+    ("server/setup-config.py", "setup-config.py"),
+    ("server/setup-config.ps1", "setup-config.ps1"),
+    ("server/start.bat", "start.bat"),
+    ("server/Linux_Start.sh", "Linux_Start.sh"),
+    ("server/MacOS_Start.command", "MacOS_Start.command"),
+    ("server/snapgent_bridge", "snapgent_bridge"),
+    ("server/snapgent_vscode", "snapgent_vscode"),
     ("README.md", "README.md"),
     ("CHANGELOG.md", "CHANGELOG.md"),
     ("LICENSE", "LICENSE"),

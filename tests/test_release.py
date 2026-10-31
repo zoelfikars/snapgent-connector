@@ -8,6 +8,8 @@ import zipfile
 from pathlib import Path
 
 from scripts import package_release as pr
+import subprocess
+
 from snapgent_bridge import BRIDGE_VERSION
 
 REPO = Path(__file__).resolve().parent.parent
@@ -86,6 +88,34 @@ class AssembleTests(ReleaseCase):
         self.assertEqual(code, 0)
         self.assertTrue((self.out / "snapgent-v9.9.9.zip").is_file())
         self.assertEqual(pr.main(["--version", "9.9.9", "--extension-dist", str(self.base / "nope"), "--out", str(self.out)]), 1)
+
+
+class RepositoryLayoutTests(unittest.TestCase):
+    """The repository root stays a table of contents, not a drawer. Add a folder here only on purpose."""
+
+    ALLOWED_ROOT = {
+        ".gitattributes", ".gitignore", "CHANGELOG.md", "LICENSE", "README.md",
+        ".github", ".snapgent", "assets", "docs", "extension", "scripts", "server", "tests",
+    }
+
+    def test_nothing_unexpected_is_tracked_at_the_root(self):
+        try:
+            tracked = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True).stdout.splitlines()
+        except (OSError, subprocess.CalledProcessError):
+            self.skipTest("not a git checkout")
+        at_root = {path.split("/")[0] for path in tracked}
+        self.assertEqual(sorted(at_root - self.ALLOWED_ROOT), [], "move it into server/, extension/, docs/ or scripts/")
+
+    def test_every_release_input_exists_in_the_repository(self):
+        for source, _destination in pr.SOURCES:
+            self.assertTrue((REPO / source).exists(), source)
+
+    def test_no_compiled_binaries_are_tracked(self):
+        try:
+            tracked = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True, text=True, check=True).stdout.splitlines()
+        except (OSError, subprocess.CalledProcessError):
+            self.skipTest("not a git checkout")
+        self.assertEqual([p for p in tracked if p.endswith((".exe", ".dll", ".pyc"))], [])
 
 
 class VersionTests(unittest.TestCase):

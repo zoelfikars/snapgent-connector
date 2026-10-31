@@ -15,7 +15,7 @@ try:
 except ImportError:
     websockets = None
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent / "server"
 
 
 def free_port() -> int:

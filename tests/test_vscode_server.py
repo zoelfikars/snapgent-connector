@@ -10,7 +10,7 @@ from snapgent_vscode.server import McpServer
 from snapgent_vscode.workspace import Workspace
 from tests.vscode_support import WorkspaceCase
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent / "server"
 
 
 class ProtocolTests(unittest.TestCase):
