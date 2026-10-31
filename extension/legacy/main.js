@@ -421,14 +421,9 @@
     diag,
   };
   const catalogue = new ToolCatalogue({ bridge: bridgePort, session: sessionPort, diag });
-  // Risky actions (delete, commit, arbitrary commands, reading secrets) need the user's approval. A native
-  // dialog is deliberately blunt: it cannot be styled or auto-clicked by the page, and if the browser
-  // suppresses it the answer is "no", which is the safe default.
-  const confirmPort = {
-    ask: async ({ description }) => {
-      try { return window.confirm(`snapgentV3 - the AI wants to:\n\n${description}\n\nAllow this?`); } catch { return false; }
-    },
-  };
+  // Risky actions (delete, commit, arbitrary commands, reading secrets) need the user's approval
+  // (src/ui/confirm-dialog.js: a top-layer dialog in a closed shadow root that ignores synthetic clicks).
+  const confirmPort = ZSUi.createConfirmDialog();
   const toolRunner = new ToolRunner({
     bridge: bridgePort, catalogue, session: sessionPort, visibility: visibilityPort, sink: sinkPort, confirm: confirmPort,
   });

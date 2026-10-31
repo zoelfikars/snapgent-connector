@@ -15,5 +15,8 @@ globalThis.ZSApp = { AgentLoop, MessageSender, PromptResender, ResponseWatcher, 
 globalThis.ZSDomain = { SKILL_MAX_BYTES, bareToolName, countSinceLastMarker, feedbackIsError };
 
 // Shared chat-adapter primitives (see infrastructure/chat/). Adapters load after this script.
+import { createConfirmDialog } from "../ui/confirm-dialog.js";
 import * as chat from "../infrastructure/chat/index.js";
 globalThis.ZSChat = chat;
+
+globalThis.ZSUi = { createConfirmDialog };

@@ -15,17 +15,19 @@ function files(dir) {
 const importsOf = (code) => [...code.matchAll(/(?:import|export)[^"']*?from\s+["']([^"']+)["']/g)].map((m) => m[1]);
 
 // Which layers each layer may import from (besides itself). Dependencies point down.
-const MAY_IMPORT = { domain: [], application: ["domain"] };
+const MAY_IMPORT = { domain: [], application: ["domain"], ui: ["domain"] };
 const PURE = /\b(document|window|chrome|browser|localStorage|fetch|WebSocket|XMLHttpRequest|MutationObserver)\b\s*[.(\[]/;
+// The UI layer draws, so it may use the DOM, but never talks to the browser's extension APIs or the network.
+const NO_PLATFORM = /\b(chrome|browser|localStorage|fetch|WebSocket|XMLHttpRequest)\b\s*[.(\[]/;
 const stripComments = (code) => code.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 
 describe("layering rules", () => {
   for (const layer of Object.keys(MAY_IMPORT)) {
     const root = join(SRC, layer);
 
-    test(`${layer} touches no DOM, browser API or I/O`, () => {
+    test(`${layer} ${layer === "ui" ? "uses no extension API or network" : "touches no DOM, browser API or I/O"}`, () => {
       for (const file of files(root)) {
-        assert.doesNotMatch(stripComments(readFileSync(file, "utf8")), PURE, relative(SRC, file));
+        assert.doesNotMatch(stripComments(readFileSync(file, "utf8")), layer === "ui" ? NO_PLATFORM : PURE, relative(SRC, file));
       }
     });
 
