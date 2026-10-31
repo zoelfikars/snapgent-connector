@@ -374,31 +374,9 @@ const ZSProvider = (() => {
     // off) without snapgentV3 reverting their choice every frame.
     if (!reason) return composerModeState();
     try {
-      // Pick the most powerful model for the agent: Expert (deep reasoning). In
-      // the current DeepSeek V4 UI, Expert IS the thinking model; the three tabs
-      // are Instant / Expert / Vision and there is no separate DeepThink toggle.
-      // EXCEPTION: if the user deliberately chose the Vision tab, RESPECT it (don't
-      // force Expert back) - that's the only way to feed DeepSeek images, and
-      // supportsVision then flips true so screen_capture is allowed for that turn.
-      // SAME for the Instant tab: it is a legitimate choice (much faster, no
-      // reasoning pass) and forcing Expert over it made Instant impossible to use
-      // with the agent at all - the ready gate below only ever accepted
-      // Expert/Vision, so Start just span. Instant carries NO image support, like
-      // Expert: supportsVision reads the Vision tab only, so it stays false and
-      // screen_capture keeps being refused.
-      if (!isVisionSelected() && !radioOn(findInstantRadio())) {
-        const expert = findExpertRadio();
-        if (expert && expert.getAttribute("aria-checked") !== "true") {
-          try { expert.click(); } catch (e) { diag("mode_fallback", { reason, target: "expert", error: String(e && e.message || e) }); }
-        }
-      }
-
-      // Legacy DeepSeek UI only: if a separate DeepThink toggle still exists, turn
-      // it ON once. We do NOT hide it anymore, so thinking stays user-toggleable.
-      const deepThink = findToggleBy(RE.deepThink);
-      if (deepThink && isPressedOff(deepThink)) {
-        try { deepThink.click(); } catch (e) { diag("mode_fallback", { reason, target: "deepThink", error: String(e && e.message || e) }); }
-      }
+      // The model tab (Instant / Expert / Vision) and the DeepThink toggle are the USER's to choose: we do not click
+      // them. Forcing Expert (= thinking) made it impossible to chat in Instant through the agent.
+      // Vision is what enables image tools: supportsVision reads that tab only.
 
       // Search must be off (it derails the agent). Best-effort; absent in Expert.
       const search = findToggleBy(RE.searchMode);
@@ -421,12 +399,10 @@ const ZSProvider = (() => {
     let state = composerModeState();
     for (let i = 0; i < 12; i++) {
       state = enforceComposer(reason);
-      // Ready as soon as an agent-usable model is on (Expert, or Vision/Instant if
-      // the user chose one) and Search is off. DeepThink is only required if a
-      // legacy toggle is actually present (V4 has none).
+      // Ready as soon as whichever model the user picked is on (or there are no tabs) and Search is off.
       const anyModel = state.expertOn || state.visionOn || state.instantOn ||
         (!state.expertFound && !state.visionFound && !state.instantFound);
-      if (anyModel && state.searchOff && (state.deepThinkOn || !state.deepThinkFound)) break;
+      if (anyModel && state.searchOff) break;
       await sleep(120);
     }
     state = composerModeState();

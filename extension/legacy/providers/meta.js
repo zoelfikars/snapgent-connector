@@ -81,9 +81,8 @@ const ZSProvider = (() => {
       'button[aria-label*="arrêter"]',
     ].join(","),
     newChat: '[data-testid="new-chat-button"]',
-    // Response-mode dropdown: the button shows the current mode ("Instantané" /
-    // "Réflexion"); its menu options are think_fast (Instantané) and think_hard
-    // (Réflexion). We force think_hard - Instantané gives markedly worse replies.
+    // Response-mode dropdown: the button shows the current mode ("Instant" / "Thinking"; "Instantané" /
+    // "Réflexion" in French). Read only - the user picks the mode, we never change it.
     modeBtn: '[data-testid="composer-mode-dropdown-button"]',
     modeOptHard: '[data-testid="composer-mode-option-think_hard"]',
     reasoning: '[data-testid="thinking-status"],[data-testid="subagent-cot-list"]',
@@ -598,8 +597,6 @@ const ZSProvider = (() => {
       } catch (e) { diag("meta.tas.attachErr", { msg: String((e && e.message) || e) }); }
     }
     // Write via the mirror textarea (the controlled input that drives Lexical).
-    // A mode flip started elsewhere (the sweep, an earlier retry) must be over, with its menu closed, before we click send.
-    await waitFor(() => !_modeInFlight && !modeOptionOpen(), 6000);
     const usersBeforeSend = userCount();
     const editor = await writeComposer(text);
     const sendReady = () => {
@@ -615,7 +612,7 @@ const ZSProvider = (() => {
       diag("meta.tas.noSend", {
         buttons, editorSame: composerTarget() === editor, editorConnected: !!editor.isConnected, editorLen: editorText().length,
         lexical: !!lexicalEditor(), mode: (modeBtn() && (modeBtn().textContent || "").trim()) || null,
-        menuOpen: modeOptionOpen(), modeInFlight: _modeInFlight, hasAttachment: hasPendingAttachment(),
+        menuOpen: modeOptionOpen(), hasAttachment: hasPendingAttachment(),
       });
       throw new Error("Meta AI send button did not become available.");
     }
@@ -674,59 +671,16 @@ const ZSProvider = (() => {
     if (b) { try { b.click(); } catch {} }
   }
 
-  // ── Response mode (Instantané vs Réflexion) ─────────────────────────────────
-  // A fresh account defaults to "Instantané" (think_fast), which gives markedly
-  // worse replies; "Réflexion" (think_hard) reasons before answering. Meta REMEMBERS
-  // the last-used mode across chats, so we only need to flip it once when it is on
-  // Instantané - after that new chats open on Réflexion by themselves. The dropdown
-  // is a Radix menu that ignores a plain .click() (it opens on pointerdown), so we
-  // dispatch real pointer events to open it, then click the think_hard option.
+  // ── Response mode (Instant vs Thinking): read only ───────────────────────────
+  // Which mode to chat in is the user's choice. We never open the mode menu or change it; we only read it for
+  // diagnostics, and notice an open menu (a send click that lands on an open Radix menu is swallowed).
   const modeBtn = () => document.querySelector(S.modeBtn);
-  const isReflexion = () => {
-    const b = modeBtn();
-    // The label is localised: "Réflexion" in French, "Thinking" in English (the other mode is "Instant").
-    return !!b && /r[ée]flexion|think/i.test((b.textContent || "") + (b.getAttribute("data-testid") || ""));
-  };
-  let _modeInFlight = false;
   const modeOptionOpen = () => !!document.querySelector(S.modeOptHard);
-  async function ensureThinkMode() {
-    if (_modeInFlight) return;
-    const b = modeBtn();
-    if (!b || isReflexion()) return; // absent or already Réflexion → nothing to do
-    _modeInFlight = true;
-    try {
-      const fire = (el, t) =>
-        el.dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true, pointerId: 1, pointerType: "mouse", button: 0 }));
-      fire(b, "pointerdown"); fire(b, "pointerup"); try { b.click(); } catch {}
-      const opened = await waitFor(() => !!document.querySelector(S.modeOptHard), 2000);
-      if (opened) {
-        const opt = document.querySelector(S.modeOptHard);
-        // Already the selected mode (the button label may use wording isReflexion() does not know): leave it alone.
-        const selected = opt.getAttribute("aria-checked") === "true" || opt.getAttribute("data-state") === "checked";
-        if (!selected) {
-          try { opt.click(); } catch {}
-          await waitFor(isReflexion, 2000);
-        }
-      }
-      // Close the menu if it is still open (Radix closes on select, but be safe).
-      if (document.querySelector(S.modeOptHard)) {
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      }
-      diag("meta.mode.set", { reflexion: isReflexion() });
-    } catch (e) {
-      diag("meta.mode.err", { msg: String((e && e.message) || e) });
-    } finally {
-      _modeInFlight = false;
-    }
-  }
 
   // ── Composer readiness ──────────────────────────────────────────────────────
   function enforceComposer() { if (_locked) applyLock(); return { ready: true }; }
   async function ensureComposerReady(reason) {
-    // Force Réflexion before the session runs (Instantané is much weaker). The flip is best-effort but it
-    // MUST finish before we send: it opens a Radix menu, and a send click that lands while that menu is open
-    // is swallowed (seen live: "did not confirm the message was sent" on every start). It is bounded (~4s).
-    await ensureThinkMode();
+    // The response mode (Instant / Thinking) is the user's to choose: we never open the mode menu or change it.
     diag("mode_ready", { reason, provider: "meta", ready: !!getEditor() });
     return { ready: !!getEditor() };
   }

@@ -15,6 +15,9 @@ All notable changes to snapgentV3 Free are documented here.
 - `scripts/package_release.py` assembles the release zip (tested).
 
 ### Changed
+- **The user chooses the model and the thinking mode, never the extension.** Meta AI no longer switches itself to
+  Thinking on Start, and DeepSeek no longer forces Expert or turns the DeepThink toggle on; whichever Instant /
+  Thinking / Expert / Vision the user picked stays. The extension is only the bridge between the chat and the IDE.
 - **Project is now VS Code only.** Roblox Studio, EffectCraft and Luau (`###LUA###`)
   support was removed from the extension, bridge and setup scripts (`start-effectcraft.ps1`
   is gone). Generic extra MCP servers can still be added.
