@@ -56,8 +56,9 @@ extension/
     application/             AgentLoop · ResponseWatcher (+ WatchState) · MessageSender · SessionStarter
                              ToolRunner · ToolCatalogue · SkillsService · PromptResender (+ SysTally)
                              StallWatchdog · ToolReminder · call-guard · ports (typedefs)
-    ui/                      confirm-dialog · bar-view (pure) · notifications · mcp-settings · skills-settings
-                             popup · html (escaping)
+    ui/                      confirm-dialog · notifications · mcp-settings · skills-settings · setup-card · popup
+                             bar-view · bar-placement · menu-position · cover-geometry · cover-color · page-theme
+                             chip-view · chip-icons · turn-chips · html (escaping) · index
     infrastructure/chat/     chatgpt-layouts (page layouts as data) · dom-diagnostics · waitFor · StreamSampler · dom-helpers (shared by adapters)
     entry/                   background.js · popup.js · legacy-globals.js
   legacy/                    not yet migrated (see Status): main.js, providers/*
@@ -114,8 +115,8 @@ shippable.
 | Agent loop (`agentLoop`: turn policy, lifecycle, stall watchdog, reminder cadence) | **Migrated** to `domain/agent` + `application/`, scripted-scenario tests |
 | Response watcher (`waitForResponse`: timing gates + reply classification) | **Migrated** to `application/response-watcher` + `domain/agent/reply-classifier`, fake-clock tests |
 | Send path (`submitAndGetBase`), session bootstrap (`startSession`), system-prompt re-injection, skills | **Migrated** (`MessageSender`, `SessionStarter`, `PromptResender`/`SysTally`, `SkillsService`), tested with scripted ports |
-| UI: approval dialog, status-bar decision (`computeBarView`), toasts/banners/alerts/screenshots, MCP + Skills popups | **Migrated** to `ui/`, jsdom-tested |
-| `legacy/main.js` (~3.1k lines: chips/camouflage (`decorate`), bar placement/theme/input cover, target + site menus, setup card, wiring) | Next |
+| UI: dialog, bar decision/placement, menus, cover, theme, chips for our own turns, notifications, setup card, popups | **Migrated** to `ui/`, jsdom/unit tested |
+| `legacy/main.js` (~2.8k lines: `decorate.classify` for model turns, bar `build()`, menus, stop button, wiring) | Next, together with per-site DOM fixtures |
 | `legacy/providers/*` (12 adapters, ~8.1k lines) | Shared primitives extracted; adapter family factory next |
 | `entry/background.js` | Bridge client + message router still in one file |
 
@@ -135,10 +136,13 @@ shippable.
 2. **`application/`** *(done)*: `ToolRunner`, `AgentLoop`, `ResponseWatcher`,
    `MessageSender`, `SessionStarter`, `PromptResender`, `SkillsService`. What is
    left in `main.js` is presentation and wiring, which is what `ui/` is for.
-3. **`ui/`** *(in progress)*. Done: the approval dialog, the status-bar decision as a pure
-   function, notifications, and both settings popups. Still in `main.js`: the chip/camouflage
-   renderer (`decorate`, ~560 lines, the riskiest because it fights each site's DOM), bar
-   placement/theme/input cover (page-layout dependent), the target and site menus, and the setup card.
+3. **`ui/`** *(mostly done)*. Extracted and tested: the approval dialog, status-bar decision, bar
+   placement (mode choice + geometry), menu placement, input-cover geometry and colour, page theme,
+   chip drawing and chips for system/result turns, notifications, setup card and both settings
+   popups. What is left in `legacy/main.js` is the part that cannot be judged without each site's DOM:
+   `decorate.classify` for turns the MODEL wrote (command turns depend on streaming state and
+   per-site markup flags), the `build()` of the bar, the "more"/target menus, and the stop button
+   state. They are best moved only together with DOM fixtures for the other sites (see below).
 4. **`infrastructure/bridge/`**: `BridgeClient` (socket, reconnect, heartbeat,
    request/response correlation) separate from the message router.
 5. **Typing**: JSDoc `@typedef` for ports and messages + `tsc --checkJs` in CI.
