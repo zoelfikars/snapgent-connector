@@ -376,10 +376,9 @@
   // ones return images and persist that across reloads: with it, a revisited or
   // reloaded conversation still shows the image-capture chip (not the generic
   // wrench), and the NEXT call of a known image tool is optimistic from the start.
-  // The marker below is the exact tail runTool appends to a feedback that carries
-  // an image (see runTool's r.images branch) - the reload-proof signal, readable
-  // straight from the injected result turn's text even when no loop is running.
-  const IMAGE_FEEDBACK_RE = /image is attached to THIS message/i;
+  // The reload-proof signal is a fixed phrase in the feedback that carries an image (IMAGE_FEEDBACK_RE in
+  // domain/tools/result-feedback.js, read by ui/turn-chips.js), so it is readable from the result turn's
+  // text even when no loop is running.
   function rememberImageTool(name) {
     const bare = bareToolName(name);
     if (!bare || A.imageTools.has(bare)) return;
@@ -1004,57 +1003,30 @@
       // double-checked against the chip actually being present in the DOM.
       const chipGone = !item.querySelector(".zs-chip");
 
-      // 1a. A mid-session RE-STATEMENT of the system prompt. Checked before the
-      //     bootstrap branch because it carries SYS_MARKER too (that marker is
-      //     what hides it), and without this it inherited the bootstrap's
-      //     "Starting Up" gear - which reads as if the agent restarted, exactly
-      //     the confusion Seb reported. Never animated: nothing is starting.
-      if (txt.includes(ZS.RESEND_MARKER)) {
-        if (item.dataset.zs !== "resend" || chipGone) {
-          // The rider travels ON a tool result, so this one turn is both things.
-          // Name the tool in the detail rather than dropping it - otherwise that
-          // result is the only one in the conversation with no visible outcome.
-          const m = txt.match(/Output of '([^']+)'/);
-          this.chip(item, {
-            label: "Reminder",
-            detail: m ? `with ${m[1]} result` : "",
-            category: "remind", phase: "remind", cls: "sys", whole: true,
-          });
-          item.dataset.zs = "resend";
-          item.dataset.zphase = "remind";
+      // 1. Turns WE wrote: the system prompt (and its mid-session re-statements) and injected tool
+      //    results. What chip they get is decided from their text alone (src/ui/turn-chips.js).
+      const systemTurn = ZSUi.describeSystemTurn(txt, { starting: A.starting });
+      if (systemTurn) {
+        if (systemTurn.kind === "resend") {
+          if (item.dataset.zs !== "resend" || chipGone) {
+            this.chip(item, systemTurn.chip);
+            item.dataset.zs = "resend";
+            item.dataset.zphase = "remind";
+          }
+        } else if (item.dataset.zs !== "sys" || item.dataset.zphase !== systemTurn.phase || chipGone) {
+          this.chip(item, systemTurn.chip);
+          item.dataset.zphase = systemTurn.phase;
         }
         return;
       }
-
-      // 1. System-prompt bootstrap turn → animated while starting, gear when done.
-      if (txt.includes(ZS.SYS_MARKER)) {
-        const phase = A.starting ? "run" : "sys";
-        if (item.dataset.zs !== "sys" || item.dataset.zphase !== phase || chipGone) {
-          this.chip(item, { label: "Starting Up", category: "tool", phase, cls: "sys", whole: true });
-          item.dataset.zphase = phase;
-        }
-        return;
-      }
-
-      // 2. Injected result / ERROR / note turns. ALWAYS a user turn we sent,
-      //    keyed off our fixed output shapes (never command keywords).
-      if (P.isUserItem(item) && ZSParse.isInjectedFeedback(txt)) {
-        const m = txt.match(/Output of '([^']+)'/);
-        const isErr = /^\s*ERROR\b/.test(txt);
-        // Reload-proof image detection: a feedback carrying an image ends with the
-        // IMAGE_FEEDBACK_RE marker. Learn the tool (persisted) so its command turn
-        // above AND its next call get the "screen" chip even with no loop running.
-        const hasImg = !isErr && IMAGE_FEEDBACK_RE.test(txt);
-        if (hasImg && m) rememberImageTool(m[1]);
-        const sig = (m ? m[1] : "note") + "|" + (isErr ? "err" : hasImg ? "img" : "result");
-        if (item.dataset.zsig !== sig || !item.classList.contains("zs-hidden") || chipGone) {
-          this.chip(item, {
-            label: m ? `${m[1]} · result` : "result",
-            category: hasImg ? "screen" : m ? ZS.toolCategory(m[1]) : "tool",
-            body: txt, phase: isErr ? "err" : "result",
-            cls: isErr ? "err" : "result", whole: true,
-          });
-          item.dataset.zsig = sig;
+      const resultTurn = P.isUserItem(item) ? ZSUi.describeResultTurn(txt) : null;
+      if (resultTurn) {
+        // A feedback that carried an image is learned (persisted) so its command turn above AND the next
+        // call of that tool get the "screen" chip even with no loop running.
+        if (resultTurn.hasImage && resultTurn.toolName) rememberImageTool(resultTurn.toolName);
+        if (item.dataset.zsig !== resultTurn.signature || !item.classList.contains("zs-hidden") || chipGone) {
+          this.chip(item, resultTurn.chip);
+          item.dataset.zsig = resultTurn.signature;
         }
         return;
       }

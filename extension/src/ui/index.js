@@ -12,3 +12,4 @@ export { computeMenuPlacement, applyMenuPlacement, viewportOf } from "./menu-pos
 export { createSetupCard, shouldShowSetup } from "./setup-card.js";
 export { computeCoverRect, measureClippingAncestors, boxOf } from "./cover-geometry.js";
 export { anchoredGeometry, chooseBarMode, floatingGeometry, pillPosition } from "./bar-placement.js";
+export { describeResultTurn, describeSystemTurn } from "./turn-chips.js";

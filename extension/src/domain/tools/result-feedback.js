@@ -6,6 +6,11 @@ import { bareToolName } from "./names.js";
 
 // An MCP server may report a missing/invalid parameter as a SUCCESS whose text is
 // just the complaint (e.g. "path is required"). Treat that as the error it is.
+// The sentence that tells the model an image rides on this message. The page recognises image results
+// after a reload by this exact phrase, so the two must never drift apart (see IMAGE_FEEDBACK_RE).
+const IMAGE_NOTE = "image is attached to THIS message";
+export const IMAGE_FEEDBACK_RE = new RegExp(IMAGE_NOTE, "i");
+
 const PARAM_COMPLAINT_RE = /^[\w .'"-]{0,60}\bis (required|not available|invalid)\b[\w .'"-]{0,80}$/i;
 
 /**
@@ -29,7 +34,7 @@ export function toFeedback(result, { name, supportsVision, timeoutSeconds = 120 
     if (images) {
       const caption = body || `${images.length} image(s) captured.`;
       return {
-        text: `Output of '${name}':\n${caption}\n(The image is attached to THIS message - you can see it directly. Analyse it and continue.)`,
+        text: `Output of '${name}':\n${caption}\n(The ${IMAGE_NOTE} - you can see it directly. Analyse it and continue.)`,
         images,
       };
     }
