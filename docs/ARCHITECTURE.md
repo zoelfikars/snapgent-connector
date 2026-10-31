@@ -116,7 +116,7 @@ shippable.
 | Response watcher (`waitForResponse`: timing gates + reply classification) | **Migrated** to `application/response-watcher` + `domain/agent/reply-classifier`, fake-clock tests |
 | Send path (`submitAndGetBase`), session bootstrap (`startSession`), system-prompt re-injection, skills | **Migrated** (`MessageSender`, `SessionStarter`, `PromptResender`/`SysTally`, `SkillsService`), tested with scripted ports |
 | UI: dialog, bar decision/placement, menus, cover, theme, chips for our own turns, notifications, setup card, popups | **Migrated** to `ui/`, jsdom/unit tested |
-| `legacy/main.js` (~2.8k lines: `decorate.classify` for model turns, bar `build()`, menus, stop button, wiring) | Next, together with per-site DOM fixtures |
+| `legacy/main.js` (~2.8k lines: `decorate.classify` for model turns, bar `build()`, menus, stop button, wiring) | Next; the per-site DOM fixtures it needs now exist (below) |
 | `legacy/providers/*` (12 adapters, ~8.1k lines) | Shared primitives extracted; adapter family factory next |
 | `entry/background.js` | Bridge client + message router still in one file |
 
@@ -142,7 +142,7 @@ shippable.
    popups. What is left in `legacy/main.js` is the part that cannot be judged without each site's DOM:
    `decorate.classify` for turns the MODEL wrote (command turns depend on streaming state and
    per-site markup flags), the `build()` of the bar, the "more"/target menus, and the stop button
-   state. They are best moved only together with DOM fixtures for the other sites (see below).
+   state. They are best moved only together with DOM fixtures for the other sites (now in place, see below).
 4. **`infrastructure/bridge/`**: `BridgeClient` (socket, reconnect, heartbeat,
    request/response correlation) separate from the message router.
 5. **Typing**: JSDoc `@typedef` for ports and messages + `tsc --checkJs` in CI.
@@ -253,8 +253,12 @@ visible and cheap to fix.
 2. **Layouts are data.** ChatGPT's turn selectors, role, reply container and id live in
    `src/infrastructure/chat/chatgpt-layouts.js`, one entry per layout; the adapter uses the first
    one that matches the page.
-3. **Fixtures pin it.** Save the captured markup in `test/fixtures/`, add a test in
-   `test/chatgpt-layouts.test.js`; `test/content-script.test.js` runs the whole extension on it.
+3. **Fixtures pin it.** Every adapter has one in `test/fixtures/sites/` and runs the same contract in
+   `test/sites-contract.test.js` (counts, reading the tool call, ignoring reasoning and page chrome, finding the
+   composer, hiding the block, Stop control). Those fixtures are written from each adapter's selectors, because
+   logged-in captures are not available, so they guard the adapter logic, not drift in the live site: when a site
+   changes, replace its file with a real capture and the same contract applies. ChatGPT's captured layouts
+   live in `test/fixtures/` with their own tests in `test/chatgpt-layouts.test.js`; `test/content-script.test.js` runs the whole extension on it.
 
 Automatic discovery of turns by anchoring on known text was considered and deliberately not built:
 a wrong guess hides or targets the wrong element silently, which is worse than failing loudly.
