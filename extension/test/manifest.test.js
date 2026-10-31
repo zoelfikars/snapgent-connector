@@ -48,6 +48,14 @@ describe("manifest generation", () => {
     assert.equal(chrome.browser_specific_settings, undefined);
   });
 
+  test("extension pages never carry upgrade-insecure-requests (Firefox MV3 default), which turns ws://127.0.0.1 into wss://", () => {
+    for (const manifest of [chrome, firefox]) {
+      const csp = manifest.content_security_policy.extension_pages;
+      assert.doesNotMatch(csp, /upgrade-insecure-requests/);
+      assert.match(csp, /script-src 'self'/);
+    }
+  });
+
   test("version is injected and unknown targets are rejected", () => {
     assert.equal(chrome.version, "9.9.9");
     assert.throws(() => buildManifest(base, { target: "safari", version: "1" }));
