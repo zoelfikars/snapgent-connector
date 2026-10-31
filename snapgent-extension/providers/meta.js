@@ -736,7 +736,7 @@ const ZSProvider = (() => {
   // subtree on stream settle and on the next send, so also mark the assistant body
   // (its identity survives) with .zs-cmd-mask; the overlay.css rule keeps recreated
   // code wrappers hidden.
-  const CMD_SHAPE = /"(?:command|tool)"\s*:\s*"|###\s*lua|###mcp_tool###/i;
+  const CMD_SHAPE = /"(?:command|tool)"\s*:\s*"|###mcp_tool###/i;
   function findToolBlockSpot(item /*, chip */) {
     const b = bodyOf(item);
     if (!b) return null;
@@ -764,7 +764,7 @@ const ZSProvider = (() => {
       // matter its size (execute_luau payloads run thousands of chars); the
       // 600-char cap only guards blocks where the shape appears mid-text.
       const t0 = t.replace(/^json\s*/i, "");
-      const startsAsCmd = /^\{\s*"(?:command|tool)"\s*:/.test(t0) || /^###\s*(?:lua|mcp_tool)/i.test(t0);
+      const startsAsCmd = /^\{\s*"(?:command|tool)"\s*:/.test(t0) || /^###\s*(?:mcp_tool)/i.test(t0);
       if ((startsAsCmd || t.length < 600) && CMD_SHAPE.test(t) && /^[{#]/.test(t0)) {
         el.classList.add("zs-tool-hide");
         hidAny = hidAny || { parent: el.parentElement, ref: el };

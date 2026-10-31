@@ -16,14 +16,10 @@ function render(s) {
   const list = s.servers || [];
   const up = list.filter((x) => x.alive).length;
   const mcpOk = s.connected && (s.mcpAlive || up > 0 || s.tools > 0);
-  const studioOff = mcpOk && s.studio === false; // MCP up but no Studio attached
-  const ok = mcpOk && !studioOff;
   const dot = document.getElementById("dot");
-  dot.className = "dot " + (!s.connected ? "bad" : ok ? "ok" : "warn");
+  dot.className = "dot " + (!s.connected ? "bad" : mcpOk ? "ok" : "warn");
   state.textContent = s.connected
-    ? (ok ? "Connected"
-        : studioOff ? "No Studio"
-        : "Open Studio")
+    ? (mcpOk ? "Connected" : "MCP server down")
     : "Bridge offline";
   const ver = document.getElementById("ver");
   const extVer = chrome.runtime.getManifest().version;

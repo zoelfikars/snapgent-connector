@@ -821,10 +821,10 @@ const ZSProvider = (() => {
   //
   // Why ChatGPT needs the image rule and the others don't: ChatGPT reaches for
   // its own image GENERATION on any turn that carries an image, and answers by
-  // producing a new picture instead of doing the Roblox work the image was
+  // producing a new picture instead of doing the coding work the image was
   // meant to illustrate. Its native image tool also runs in the sandbox that
   // cannot touch the user's project, so a generated image is a dead end here.
-  const PROMPT_EXTRA = `- WHEN THE USER SENDS AN IMAGE: by default it is REFERENCE MATERIAL for the work they want done in their project - a screenshot of a bug, a mockup of the UI they want, a photo of the thing to build, a picture of what is wrong in Studio. Look at it, use it to understand what they want, and then do that work with the snapgentV3 commands. Do NOT generate a new image from it, and do NOT treat it as an image-editing request. Only generate an image when the user EXPLICITLY asks you to create, generate, draw or edit one ("make me an image of...", "generate a texture", "edit this picture"). If what they want from the image is genuinely unclear, ask them in one short sentence rather than guessing - and never guess "they want a picture".`;
+  const PROMPT_EXTRA = `- WHEN THE USER SENDS AN IMAGE: by default it is REFERENCE MATERIAL for the work they want done in their project - a screenshot of a bug, a mockup of the UI they want, a photo of the thing to build, a picture of what is wrong in the app. Look at it, use it to understand what they want, and then do that work with the snapgentV3 commands. Do NOT generate a new image from it, and do NOT treat it as an image-editing request. Only generate an image when the user EXPLICITLY asks you to create, generate, draw or edit one ("make me an image of...", "generate a texture", "edit this picture"). If what they want from the image is genuinely unclear, ask them in one short sentence rather than guessing - and never guess "they want a picture".`;
 
   // ── User-send interception ────────────────────────────────────────────────
   function installSendHooks(handlers) {
@@ -891,11 +891,11 @@ const ZSProvider = (() => {
   // catches a stray inline one). React re-creates these nodes on every token, so
   // - like Gemini - we also mark the .markdown container with .zs-cmd-mask; the
   // overlay.css rule keeps every recreated <pre> hidden with no flash.
-  const CMD_SHAPE = /"(?:command|tool)"\s*:\s*"|###\s*lua|###mcp_tool###/i;
+  const CMD_SHAPE = /"(?:command|tool)"\s*:\s*"|###mcp_tool###/i;
   // Marker pair, for the UNFENCED case below. Kept separate from CMD_SHAPE so the
   // opener test can't also match the closer.
-  const CMD_OPEN = /###\s*(?:LUA|MCP_TOOL)\s*###/i;
-  const CMD_CLOSE = /###\s*END_(?:LUA|MCP_TOOL)\s*###/i;
+  const CMD_OPEN = /###\s*MCP_TOOL\s*###/i;
+  const CMD_CLOSE = /###\s*END_MCP_TOOL\s*###/i;
 
   function findToolBlockSpot(item /*, chip */) {
     const replies = replyNodes(item);

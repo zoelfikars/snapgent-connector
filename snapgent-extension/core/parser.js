@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // core/parser.js - snapgentV3 command parsing. PURE string logic, zero DOM:
 // the provider extracts a turn's text from the site's DOM; everything here
-// operates on that text. The command formats (###LUA### blocks, {"command":…}
+// operates on that text. The command formats (###MCP_TOOL### blocks, {"command":…}
 // JSON) are defined by OUR system prompt, so they are the same on every AI site
 // - only the way a site's markdown may mangle them differs (the regexes below
 // are whitespace/dash tolerant for that reason).
@@ -11,45 +11,6 @@ const ZSParse = (() => {
 
   const START_M = "###MCP_TOOL###";
   const END_M = "###END_MCP_TOOL###";
-  // Whitespace-tolerant markers: site markdown can insert spaces around the
-  // hashes (e.g. "### LUA ###") or render END_LUA with a dash. These regexes
-  // match those variants so a marker mangled by markdown still parses.
-  // The optional `:Edit|:Server|:Client` suffix selects the Roblox datamodel
-  // execute_luau runs against (the MCP REQUIRES datamodel_type; a bare
-  // ###LUA### defaults to "Edit" so the model never has to think about it
-  // outside play-testing).
-  const LUA_START_RE = /###\s*lua(?:\s*[:\-_ ]\s*(edit|client|server))?\s*(?:###|---)/i;
-  const LUA_END_RE = /###\s*end[_\- ]?lua\s*###/i;
-  const LUA_DEFAULT_DM = "Edit";
-  const dmName = (m) => (m ? m[0].toUpperCase() + m.slice(1).toLowerCase() : LUA_DEFAULT_DM);
-
-  // Find the first LUA start marker at or after `from`. Returns { pos, len, dm }
-  // where len is the marker's own length to skip past it and dm the requested
-  // datamodel ("Edit" when unspecified).
-  function findLuaStart(text, from = 0) {
-    const m = LUA_START_RE.exec(text.slice(from));
-    return m ? { pos: from + m.index, len: m[0].length, dm: dmName(m[1]) } : { pos: -1, len: 0, dm: LUA_DEFAULT_DM };
-  }
-
-  // Find the first LUA end marker at or after `from`. Returns its start index or -1.
-  function findLuaEnd(text, from = 0) {
-    const m = LUA_END_RE.exec(text.slice(from));
-    return m ? from + m.index : -1;
-  }
-
-  // Strip a code-block UI label (the "Copy" button caption, or a leftover fence
-  // language token like "json") that some sites bleed into the block's text
-  // right after the opening marker. Seen live on Kimi: its code-block chrome
-  // renders as `###lua### Copy <code>`, so the bare-marker slice below would
-  // capture `Copy task.wait(...)` as the Lua code - not valid Lua, so StudioMCP
-  // rejects it with "Failed to parse command code". The JSON path already does
-  // this at line ~206; mirror it for the raw ###LUA### extraction. Requires
-  // trailing whitespace (\s+) so it never eats a legitimate identifier like
-  // `Copy(x)` that a script might genuinely start with.
-  function stripCodeChrome(code) {
-    return code.replace(/^(?:json|copy)\s+/i, "");
-  }
-
   // A command is `{"command":"name", ...}` (or "tool"). The params/arguments
   // object is OPTIONAL: paramless commands like list_commands are written as
   // `{"command":"list_commands"}`, so requiring "params" too would MISS them
@@ -82,18 +43,15 @@ const ZSParse = (() => {
     return (
       r.includes(START_M) ||
       r.includes("MCP_TOOL") ||
-      LUA_START_RE.test(r) ||
       CMD_KEY_RE.test(r)
     );
   }
 
   // True if the reply contains a tool block that has STARTED but not yet CLOSED
-  // (a ###LUA### / ###MCP_TOOL### opener with no matching end marker). Used by the
+  // (a ###MCP_TOOL### opener with no matching end marker). Used by the
   // response watcher to avoid finalizing a command that is still being streamed.
   function hasOpenToolBlock(r) {
     if (!r) return false;
-    const { pos: ls, len } = findLuaStart(r);
-    if (ls !== -1 && findLuaEnd(r, ls + len) === -1) return true;
     const sm = r.indexOf(START_M);
     if (sm !== -1) {
       const low = r.toLowerCase();
@@ -228,13 +186,6 @@ const ZSParse = (() => {
       const em = findEndM(sm);
       if (em === -1) break;
       const body = r.slice(sm + START_M.length, em);
-      const { pos: ls, len: luaLen, dm } = findLuaStart(body);
-      const le = findLuaEnd(body, ls === -1 ? 0 : ls + luaLen);
-      if (ls !== -1 && le !== -1 && le > ls) {
-        out.push({ tool: "execute_luau", arguments: { code: stripCodeChrome(body.slice(ls + luaLen, le).trim()), datamodel_type: dm } });
-        from = em + END_M.length;
-        continue;
-      }
       for (const sub of body.split(START_M)) {
         const cleaned = sub.trim().replace(/^(?:json|JSON|Copy|copy)\s*/i, "").trim();
         if (!cleaned) continue;
@@ -243,43 +194,11 @@ const ZSParse = (() => {
       }
       from = em + END_M.length;
     }
-    // Prefer a JSON command envelope when one is present: a model may wrap
-    // execute_luau as {"command":"execute_luau","params":{"code":"###LUA###…"}},
-    // and the bare-marker fallback below would slice the still-ESCAPED JSON
-    // source (literal \n, \") instead of the decoded code. extractToolAnywhere
-    // JSON-decodes it; cleanLuaCall (applied at the end) then strips the markers.
     if (out.length === 0) {
       const f = extractToolAnywhere(r);
       if (f) out.push(f);
     }
-    // Bare ###LUA### … ###END_LUA### block with no JSON envelope at all.
-    if (out.length === 0) {
-      const { pos: ls, len: luaLen, dm } = findLuaStart(r);
-      const le = findLuaEnd(r, ls === -1 ? 0 : ls + luaLen);
-      if (ls !== -1 && le !== -1 && le > ls) {
-        out.push({ tool: "execute_luau", arguments: { code: stripCodeChrome(r.slice(ls + luaLen, le).trim()), datamodel_type: dm } });
-      }
-    }
-    return out.map(cleanLuaCall);
-  }
-
-  // Some models (seen live on GLM) wrap execute_luau in the JSON envelope AND
-  // keep the ###LUA### / ###END_LUA### markers INSIDE the code string, e.g.
-  //   {"command":"execute_luau","params":{"code":"###LUA###\n<lua>\n###END_LUA###"}}
-  // Once JSON-decoded the code still starts with the literal markers, which the
-  // MCP rejects ("Failed to parse command code"). Strip a leading start marker
-  // and a trailing end marker from execute_luau's code, and adopt the marker's
-  // datamodel when none was given. No-op for a clean code string.
-  function cleanLuaCall(call) {
-    if (!call || call.tool !== "execute_luau") return call;
-    const code = call.arguments && call.arguments.code;
-    if (typeof code !== "string") return call;
-    const s = findLuaStart(code);
-    if (s.pos === -1) return call;
-    const e = findLuaEnd(code, s.pos + s.len);
-    call.arguments.code = code.slice(s.pos + s.len, e === -1 ? code.length : e).trim();
-    if (!call.arguments.datamodel_type) call.arguments.datamodel_type = s.dm;
-    return call;
+    return out;
   }
 
   // Last-resort salvage of a CUT-OFF JSON command: the model hit its output
@@ -327,7 +246,7 @@ const ZSParse = (() => {
       if (!/["}\]0-9]$|(?:true|false|null)$/.test(body)) return null; // value incomplete
       try {
         const call = normalizeCall(parseLoose(body + stack.reverse().join("")));
-        if (call) return cleanLuaCall(call);
+        if (call) return call;
       } catch {}
       return null;
     }
@@ -344,7 +263,6 @@ const ZSParse = (() => {
     // through to the placeholder below instead.
     const m = txt.match(/"(?:command|tool)"\s*:\s*"([^"]*)/);
     if (m && m[1].trim()) return m[1].trim();
-    if (txt.includes("execute_luau") || LUA_START_RE.test(txt)) return "execute_luau";
     return "command";
   }
 
@@ -358,7 +276,7 @@ const ZSParse = (() => {
            /^\s*\(System note:/.test(txt);
   }
 
-  // The assistant emitted a snapgentV3 command (JSON or a ###LUA### block), or a
+  // The assistant emitted a snapgentV3 command (JSON or an ###MCP_TOOL### block), or a
   // command-turn ATTEMPT the camouflage sweep should still mask. DSML counts:
   // the turn IS the model calling a tool, just in the wrong dialect, so it gets a
   // chip like any other command turn instead of dumping raw markup at the user
@@ -369,14 +287,13 @@ const ZSParse = (() => {
   // to parseToolCalls, which cannot read it.
   function hasCommandShape(txt) {
     return txt.includes(START_M) ||
-           LUA_START_RE.test(txt) ||
            DSML_RE.test(txt) ||
            CMD_KEY_RE.test(txt); // command/tool with OR without params (e.g. list_commands)
   }
 
   return {
-    START_M, END_M, LUA_START_RE, LUA_END_RE, CMD_KEY_RE, DSML_RE,
-    findLuaStart, findLuaEnd, matchBrace, extractJson, normalizeCall,
+    START_M, END_M, CMD_KEY_RE, DSML_RE,
+    matchBrace, extractJson, normalizeCall,
     hasToolSignature, hasOpenToolBlock, parseToolCalls, salvageCutOff, toolNameFromText,
     isInjectedFeedback, hasCommandShape,
   };
