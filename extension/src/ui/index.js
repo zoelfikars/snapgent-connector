@@ -10,3 +10,4 @@ export { applyTheme } from "./page-theme.js";
 export { opaqueBg } from "./cover-color.js";
 export { computeMenuPlacement, applyMenuPlacement, viewportOf } from "./menu-position.js";
 export { createSetupCard, shouldShowSetup } from "./setup-card.js";
+export { computeCoverRect, measureClippingAncestors, boxOf } from "./cover-geometry.js";
