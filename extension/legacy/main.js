@@ -1684,9 +1684,6 @@
       const server = mergedMcpServers().find((item) => item.id === id);
       return server ? server.name : id;
     }
-    const targetNameHtml = () =>
-      getTargetName().replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
-
     function setTarget(id = selectedTargetId) {
       if (!targetSelect) return;
       const options = [
@@ -2026,94 +2023,25 @@
     function renderBar() {
       if (!bar) return;
       setTarget(selectedTargetId);
-      // indicator = an optional leading spinner; msg = the wrappable text.
-      let toneClass = "standby", indicator = "", msg = "", label = "", kind = "", disabled = false, warn = false;
-      // Orphaned page: check FIRST and return. Nothing below can be true any
-      // more - the status poll is stopped, so every value it would render (the
-      // connected state, "Agent active", and the tool count) is a frozen snapshot of a
-      // build this page no longer talks to. Leaving those up contradicted the
-      // "reload this page" banner sitting right next to them, which is exactly
-      // the confusing state Seb caught on 2026-08-14.
-      // No action button here: the banner already carries the Reload one.
-      if (A.staleExtension) {
-        toneClass = "warn"; warn = true;
-        msg = `<b>Disconnected</b> · reload page`;
-      }
-      // Show "Starting…" for the whole bootstrap. If the user actually leaves for
-      // a new (empty) chat, syncSessionState clears A.starting, so this naturally
-      // falls back to that chat's own state - no fragile per-key check here (fresh
-      // chats share a key, and the conversation id only appears mid-bootstrap).
-      else if (A.starting) {
-        toneClass = "starting";
-        indicator = `<span class="zs-spin"></span>`;
-        msg = `Starting…`;
-        label = "Starting…"; kind = "starting"; disabled = true;
-      } else if (A.started) {
-        const server = (A.bridge.servers || []).find((item) => item.id === selectedTargetId);
-        const tools = activeTools().length || (server && server.tools) || 0;
-        if (!A.bridge.connected) {
-          toneClass = "warn"; warn = true;
-          msg = `<b>Active</b> · start the bridge`;
-        } else if (!bridgeOk) {
-          toneClass = "warn"; warn = true;
-          msg = `<b>Active</b> · ${targetNameHtml()} offline`;
-        } else {
-          toneClass = "active";
-          msg = `<b>Active</b>${tools ? ` · ${tools} tools` : ""} · ${targetNameHtml()}`;
-        }
-      } else if (P.isFreshChat() || P.chatIsEmpty()) {
-        // Treat ANY empty chat (no turns yet) as the standby/start case - not just
-        // the strict fresh-chat match. isFreshChat() also requires an exact root
-        // path AND the editor already mounted; on a cold load (e.g. arriving from a
-        // search-engine link) the SPA can show pathname/editor before they settle,
-        // which used to drop into the discouraging "No agent here" branch on a page
-        // that is actually empty and startable. "No agent here" is only correct for
-        // an EXISTING conversation (one that has turns) we did not start.
-        const selectedServer = (A.bridge.servers || []).find((item) => item.id === selectedTargetId);
-        const vscodeWorkspaceMissing = selectedTargetId === "vscode" &&
-          !!A.bridge.connected && !!selectedServer && !!selectedServer.alive &&
-          !(selectedServer.tools > 0);
-        if (!bridgeOk || (selectedTargetId === "vscode" && !workspaceReady)) {
-          toneClass = "warn"; warn = true;
-          msg = !A.bridge.connected
-            ? `Start the <b>bridge</b>`
-            : selectedTargetId === "vscode" && (bridgeOk || vscodeWorkspaceMissing)
-              ? workspaceProbePending
-                ? `Checking <b>VS Code workspace</b>…`
-                : `Open a <b>folder in VS Code</b>`
-              : `<b>${targetNameHtml()} unavailable</b>`;
-          label = `▶︎ Start`; kind = "start"; disabled = true;
-        } else {
-          toneClass = "standby";
-          msg = `Ready.`;
-          label = `▶︎ Start`; kind = "start";
-        }
-      } else {
-        toneClass = "noagent";
-        msg = `No agent. Open a new chat.`;
-      }
-      // Parked on visibility: the loop is alive but deliberately frozen because
-      // this tab is not the foreground tab of its window. Say so explicitly -
-      // otherwise the bar keeps claiming "Agent active" while nothing advances,
-      // which reads as a hang (and is what users reported as "it died in the
-      // background"). No red warn tone: this is a normal, recoverable pause.
-      if (A.parked && (A.running || A.starting)) {
-        toneClass = "warn"; warn = false;
-        msg = `<b>Paused</b> · open this tab`;
-      }
-      // Provider mode guard: some sites (e.g. Arena) only work in one chat mode.
-      // When the provider reports the current mode is unsupported, override the
-      // bar into a visible warning and disable Start until the user switches back.
-      // Skipped once a session is started/starting (the mode is fixed for the
-      // conversation by then). Reactive: renderBar runs on every sweep, so the
-      // warning appears/clears the instant the user changes the mode dropdown.
-      if (!A.started && !A.starting && P.modeWarning) {
-        const modeWarn = P.modeWarning();
-        if (modeWarn) {
-          toneClass = "warn"; warn = true; msg = modeWarn;
-          if (kind === "start") disabled = true;
-        }
-      }
+      // The decision (what the bar says, which tone, which action) is a pure function: src/ui/bar-view.js.
+      const view = ZSUi.computeBarView({
+        staleExtension: A.staleExtension,
+        starting: A.starting,
+        started: A.started,
+        running: A.running,
+        parked: A.parked,
+        blankChat: !A.started && !A.starting && !A.staleExtension && (P.isFreshChat() || P.chatIsEmpty()),
+        bridge: A.bridge,
+        bridgeOk,
+        target: { id: selectedTargetId, name: getTargetName() },
+        activeToolCount: activeTools().length,
+        workspaceReady,
+        workspaceProbePending,
+        modeWarning: !A.started && !A.starting && P.modeWarning ? P.modeWarning() : null,
+      });
+      const toneClass = view.tone, msg = view.message, label = view.label, kind = view.kind;
+      const disabled = view.disabled, warn = view.warn;
+      const indicator = view.spinner ? `<span class="zs-spin"></span>` : "";
       // Only touch the DOM when something actually changed. renderBar runs on
       // every sweep; rewriting stateEl.innerHTML each time recreated the spinner
       // <span> and RESTARTED its CSS animation, so "Starting…" appeared to stutter.
