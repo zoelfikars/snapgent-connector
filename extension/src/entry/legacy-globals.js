@@ -15,15 +15,8 @@ globalThis.ZSApp = { AgentLoop, MessageSender, PromptResender, ResponseWatcher, 
 globalThis.ZSDomain = { SKILL_MAX_BYTES, bareToolName, countSinceLastMarker, feedbackIsError };
 
 // Shared chat-adapter primitives (see infrastructure/chat/). Adapters load after this script.
-import { computeBarView } from "../ui/bar-view.js";
-import { createConfirmDialog } from "../ui/confirm-dialog.js";
-import { createNotifications } from "../ui/notifications.js";
-import { openMcpSettings } from "../ui/mcp-settings.js";
-import { openSkillsSettings } from "../ui/skills-settings.js";
-import { paintChip } from "../ui/chip-view.js";
-import { applyTheme } from "../ui/page-theme.js";
-import { opaqueBg } from "../ui/cover-color.js";
+import * as ui from "../ui/index.js";
 import * as chat from "../infrastructure/chat/index.js";
 globalThis.ZSChat = chat;
 
-globalThis.ZSUi = { computeBarView, createConfirmDialog, createNotifications, openMcpSettings, openSkillsSettings, paintChip, applyTheme, opaqueBg };
+globalThis.ZSUi = ui;

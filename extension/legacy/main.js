@@ -1408,27 +1408,12 @@
     let bridgeOk = false, workspaceReady = false, workspaceProbePending = false, workspaceProbeAt = 0;
     let wasConnected = false;
 
+    // Placement maths lives in src/ui/menu-position.js; these only measure and apply.
     function positionMenu(anchor) {
       if (!menuEl || menuEl.hidden) return;
-      const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
-      const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
-      const menuWidth = Math.min(menuEl.offsetWidth || 274, viewportWidth - 16);
-      const left = Math.max(8, Math.min(anchor.right - menuWidth, viewportWidth - menuWidth - 8));
-      const spaceAbove = anchor.top - 16;
-      if (spaceAbove >= 180 || spaceAbove >= viewportHeight - anchor.bottom - 16) {
-        menuEl.style.left = `${Math.round(left)}px`;
-        menuEl.style.right = "auto";
-        menuEl.style.top = "auto";
-        menuEl.style.bottom = `${Math.round(viewportHeight - anchor.top + 6)}px`;
-        menuEl.style.maxHeight = `${Math.max(100, Math.min(spaceAbove, viewportHeight - 16))}px`;
-      } else {
-        const top = Math.min(viewportHeight - 108, anchor.bottom + 6);
-        menuEl.style.left = `${Math.round(left)}px`;
-        menuEl.style.right = "auto";
-        menuEl.style.top = `${Math.round(top)}px`;
-        menuEl.style.bottom = "auto";
-        menuEl.style.maxHeight = `${Math.max(100, viewportHeight - top - 8)}px`;
-      }
+      ZSUi.applyMenuPlacement(menuEl, ZSUi.computeMenuPlacement({
+        anchor, menuWidth: menuEl.offsetWidth, defaultWidth: 274, viewport: ZSUi.viewportOf(document, window), align: "right", roomAbove: 180,
+      }));
     }
 
     function build() {
@@ -1679,24 +1664,10 @@
 
     function positionTargetMenu() {
       if (!targetMenuEl || targetMenuEl.hidden || !targetBtn) return;
-      const a = targetBtn.getBoundingClientRect();
-      const vw = document.documentElement.clientWidth || window.innerWidth;
-      const vh = document.documentElement.clientHeight || window.innerHeight;
-      const w = Math.min(targetMenuEl.offsetWidth || 220, vw - 16);
-      const left = Math.max(8, Math.min(a.left, vw - w - 8));
-      const spaceAbove = a.top - 16;
-      targetMenuEl.style.left = `${Math.round(left)}px`;
-      targetMenuEl.style.right = "auto";
-      if (spaceAbove >= 160 || spaceAbove >= vh - a.bottom - 16) {
-        targetMenuEl.style.top = "auto";
-        targetMenuEl.style.bottom = `${Math.round(vh - a.top + 6)}px`;
-        targetMenuEl.style.maxHeight = `${Math.max(100, Math.min(spaceAbove, vh - 16))}px`;
-      } else {
-        const top = Math.min(vh - 108, a.bottom + 6);
-        targetMenuEl.style.top = `${Math.round(top)}px`;
-        targetMenuEl.style.bottom = "auto";
-        targetMenuEl.style.maxHeight = `${Math.max(100, vh - top - 8)}px`;
-      }
+      ZSUi.applyMenuPlacement(targetMenuEl, ZSUi.computeMenuPlacement({
+        anchor: targetBtn.getBoundingClientRect(), menuWidth: targetMenuEl.offsetWidth, defaultWidth: 220,
+        viewport: ZSUi.viewportOf(document, window), align: "left", roomAbove: 160,
+      }));
     }
     // ── The "more" menu (⋯) ─────────────────────────────────────────────────
     // One popover holding every secondary control. Opens above the bar.
