@@ -1743,78 +1743,27 @@
       if (starBtn) starBtn.addEventListener("click", (e) => { e.stopPropagation(); menuEl.hidden = true; openSkillsSettings(); });
     }
 
-    // ── First-time onboarding card (bridge missing) ─────────────────────────
-    let setupCard = null, setupSeen = false, setupRaf = null;
+    // ── First-time onboarding card (src/ui/setup-card.js) ───────────────────
+    let setupSeen = false;
     try {
       chrome.storage.local.get("zsSetupSeen", (r) => {
         if (r && r.zsSetupSeen) setupSeen = true;
       });
     } catch {}
-
-    function buildSetup() {
-      setupCard = document.createElement("div");
-      setupCard.id = "zs-setup";
-      setupCard.hidden = true;
-      setupCard.innerHTML =
-        `<div id="zs-setup-head"><span id="zs-setup-logo">snapgentV3</span><span id="zs-setup-tag">Setup</span></div>` +
-        `<div id="zs-setup-sub">3 quick steps.</div>` +
-        `<ol id="zs-setup-steps">` +
-          `<li>Open <b>Settings</b></li>` +
-          `<li>Run <code>start.bat</code></li>` +
-          `<li>Press <b>Start</b></li>` +
-        `</ol>` +
-        `<div class="zs-setup-copy-row">` +
-          `<input type="text" id="zs-setup-link" readonly value="${GITHUB_URL}">` +
-          `<button id="zs-setup-copy">Copy</button>` +
-        `</div>` +
-        `<button id="zs-setup-dismiss">OK</button>`;
-      document.documentElement.appendChild(setupCard);
-
-      setupCard.querySelector("#zs-setup-copy").addEventListener("click", () => {
-        try { navigator.clipboard.writeText(GITHUB_URL); } catch {
-          const inp = setupCard.querySelector("#zs-setup-link");
-          inp.select(); try { document.execCommand("copy"); } catch {}
-        }
-        const btn = setupCard.querySelector("#zs-setup-copy");
-        btn.textContent = "Copied!";
-        setTimeout(() => { btn.textContent = "Copy"; }, 1600);
-      });
-
-      setupCard.querySelector("#zs-setup-dismiss").addEventListener("click", () => {
+    const setupCard = ZSUi.createSetupCard({
+      document,
+      githubUrl: GITHUB_URL,
+      onDismiss: () => {
         setupSeen = true;
         try { chrome.storage.local.set({ zsSetupSeen: true }); } catch {}
-        hideSetup();
-      });
-    }
-
-    // The onboarding card is pinned to the top-right corner (via CSS), out of the
-    // way of the composer; nothing to reposition per frame.
-    function placeSetup() {}
-
-    function showSetup() {
-      if (!setupCard) buildSetup();
-      if (setupCard.hidden) {
-        setupCard.hidden = false;
-        cancelAnimationFrame(setupRaf);
-        placeSetup();
-      }
-    }
-
-    function hideSetup() {
-      if (setupCard) setupCard.hidden = true;
-      cancelAnimationFrame(setupRaf);
-    }
+      },
+    });
 
     function refreshSetup(bridgeConnected) {
-      if (setupSeen || bridgeConnected) { hideSetup(); return; }
-      // Bridge is down, but if the user is just READING an existing
-      // conversation with no snapgentV3 session (the "No agent here" state),
-      // a "bridge down" onboarding popup is pure noise - they may not want an
-      // agent here at all (user request). Keep it for the states where the
-      // bridge actually matters: a fresh/empty chat (the Start affordance is
-      // showing) or a conversation with a live/starting session.
-      if (!A.started && !A.starting && !P.chatIsEmpty()) { hideSetup(); return; }
-      showSetup();
+      const show = ZSUi.shouldShowSetup({
+        dismissed: setupSeen, bridgeConnected, hasSession: A.started || A.starting, chatIsEmpty: P.chatIsEmpty(),
+      });
+      if (show) setupCard.show(); else setupCard.hide();
     }
 
     // The single source of truth for the bar's content. Decides the status tone,

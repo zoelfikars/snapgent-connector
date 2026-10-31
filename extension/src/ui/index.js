@@ -9,3 +9,4 @@ export { paintChip } from "./chip-view.js";
 export { applyTheme } from "./page-theme.js";
 export { opaqueBg } from "./cover-color.js";
 export { computeMenuPlacement, applyMenuPlacement, viewportOf } from "./menu-position.js";
+export { createSetupCard, shouldShowSetup } from "./setup-card.js";
