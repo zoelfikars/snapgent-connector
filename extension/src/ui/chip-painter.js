@@ -12,10 +12,12 @@ import { paintChip } from "./chip-view.js";
  * @param {{ document: Document, provider: object, diag?: (event: string, data?: object) => void }} deps
  * @returns {{ chip: Function, ensureOwnedChip: Function, toolBox: Function }}
  */
-export function createChipPainter({ document, provider, diag = () => {} }) {
+export function createChipPainter({ document, provider, diag = () => {}, plain = false }) {
   // Core renderer. opts: {label, detail, body, category, phase, cls, whole}
   function chip(item, opts) {
     const { cls, whole } = opts;
+    // Plain mode: the chat is left exactly as the site draws it; only the bookkeeping the agent loop reads is kept.
+    if (plain) { item.dataset.zs = cls || "1"; item.__zsChip = { ...opts }; return null; }
     // Drawing lives in ui/chip-view.js (paintChip). It rebuilds the inner markup only when the
     // signature changes, so the streaming spinner keeps animating. Re-anchoring + masking below
     // still run on every pass.
@@ -75,7 +77,7 @@ export function createChipPainter({ document, provider, diag = () => {} }) {
   // so we rebuild from the stored opts rather than re-running classification.
   function ensureOwnedChip(item) {
     const opts = item.__zsChip;
-    if (!opts) return;
+    if (!opts || plain) return;
     const chipEl = item.querySelector(".zs-chip");
     const chipGone = !chipEl;
     let rawVisible = false;

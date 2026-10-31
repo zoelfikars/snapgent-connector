@@ -55,7 +55,9 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     const item = lastAssistant();
     return { present: !!item, reply: item ? readText(bodyOf(item)).trim() : "", thinking: "", item };
   };
-  const chatIsEmpty = () => allItems().length === 0;
+  // A chat has begun when a message of the user's is on the page: the home page's cards, a greeting or an overlay that happens
+  // to look like an AI turn do not make an empty chat look started.
+  const chatIsEmpty = () => userTurns().length === 0;
   // A chat with no turns has no identity yet: its URL is a placeholder (Gemini's is /app) that every new chat shares, and
   // remembering a started session under it would make every new chat look started.
   const conversationKey = () => (chatIsEmpty() || location.pathname === "/" ? "" : location.pathname);
@@ -322,6 +324,16 @@ export function createCalibratedProvider({ document, location, profile, diag = (
       return `${part} not found`;
     },
     health, describeLayout: health, testWrite, review,
+    // What the profile finds right now, for a bug report: elements and sizes, never any text of the conversation.
+    diagnose() {
+      const matches = (selector) => find(selector).slice(0, 8).map((el) => ({ el, shown: visible(el), chars: readText(el).trim().length }));
+      return {
+        profile, health: health(), chatIsEmpty: chatIsEmpty(), isFreshChat: !!(chatIsEmpty() && getEditor()), key: conversationKey(), path: location.pathname,
+        composer: getEditor(), card: composerFrame(), send: sendButton(),
+        assistant: matches(profile.assistant.turn), user: matches(profile.user.turn),
+        assistantCount: assistantCount(), userCount: userCount(),
+      };
+    },
     get needsCalibration() { return !health().ok; },
 
     allItems, isUserItem, isAssistantItem, itemText, classifyText, assistantCount, userCount, lastAssistant,

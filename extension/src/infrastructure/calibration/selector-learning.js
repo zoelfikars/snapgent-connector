@@ -32,10 +32,12 @@ const all = (scope, selector) => { try { return [...scope.querySelectorAll(selec
  * @param {Element} target
  * @param {{ avoid?: Element[], scope?: ParentNode, onlyVisible?: boolean, unique?: boolean }} [options]
  *   `unique`: among the (visible) matches the target must be the only one.
+ *   `within`: every visible match must lie inside this element (the chat's own scrolling area): a class shared with the
+ *   sidebar, the home page cards or the text box's overlay does not make a turn.
  *   `keepOut`: elements (the text box, the send button) no match may contain or sit inside: a turn is never the composer or around it.
  * @returns {string|null}
  */
-export function learnSelector(target, { avoid = [], scope = target.ownerDocument, onlyVisible = false, unique = false, keepOut = [] } = {}) {
+export function learnSelector(target, { avoid = [], scope = target.ownerDocument, onlyVisible = false, unique = false, keepOut = [], filled = false, within = null } = {}) {
   const candidates = candidatesFor(target);
   const tag = target.localName;
   const options = [...candidates, ...candidates.flatMap((one) => (one.startsWith(".") || one.startsWith("[") ? [`${tag}${one}`] : []))];
@@ -43,11 +45,24 @@ export function learnSelector(target, { avoid = [], scope = target.ownerDocument
   for (let i = 0; i < Math.min(candidates.length, 4); i++) {
     for (let j = i + 1; j < Math.min(candidates.length, 4); j++) options.push(candidates[i] + candidates[j]);
   }
+  // Sites that only have generic utility classes (Tailwind): all of the element's classes together, and the same under the
+  // nearest ancestor that has a name of its own, which is what tells a reply from the many boxes sharing one class.
+  const classes = stableClasses(target);
+  if (classes.length > 1) {
+    const signature = tag + classes.map((cls) => `.${escapeClass(cls)}`).join("");
+    options.push(signature);
+    for (let up = target.parentElement, hops = 0; up && hops < 8; up = up.parentElement, hops++) {
+      const named = stableAttributes(up).find(({ value }) => !isInstanceSpecific(value));
+      if (named) { options.push(`[${named.name}="${esc(named.value)}"] ${signature}`); break; }
+    }
+  }
   for (const selector of options) {
     const matches = all(scope, selector);
     if (!matches.includes(target)) continue;
     if (avoid.some((other) => matches.includes(other))) continue;
     if (keepOut.some((other) => matches.some((m) => m.contains(other) || other.contains(m)))) continue;
+    if (within && matches.some((m) => visible(m) && !within.contains(m))) continue;
+    if (filled && matches.some((m) => visible(m) && !m.textContent.trim() && !m.querySelector("img, svg, canvas, video"))) continue;
     if (unique && (onlyVisible ? matches.filter(visible) : matches).length !== 1) continue;
     return selector;
   }
@@ -68,6 +83,19 @@ const chainBelow = (el, ancestor) => {
 };
 
 /**
+ * The scrolling area a chat's turns live in: the nearest ancestor that scrolls. Null when none does (a short page).
+ * The sidebar, the home page and the text box are never inside it.
+ */
+export function chatRegion(el) {
+  const win = el.ownerDocument.defaultView;
+  for (let n = el.parentElement; n && n !== el.ownerDocument.body && n !== el.ownerDocument.documentElement; n = n.parentElement) {
+    const overflow = win.getComputedStyle(n).overflowY;
+    if (overflow === "auto" || overflow === "scroll" || overflow === "overlay") return n;
+  }
+  return null;
+}
+
+/**
  * From one assistant reply and one user message the user clicked, the selectors of the two kinds of turn.
  * The turn is the OUTERMOST element around the click that can be told apart from the other kind of turn; wrappers
  * both kinds share (same generated class) cannot, so the search goes inward until something does.
@@ -76,11 +104,12 @@ const chainBelow = (el, ancestor) => {
 export function learnTurnSelectors(assistantPick, userPick, keepOut = []) {
   const top = commonAncestor(assistantPick, userPick);
   if (!top || top === assistantPick || top === userPick) return { error: "The reply and the message must be different turns." };
+  const within = chatRegion(top);
   const assistantChain = chainBelow(assistantPick, top);
   const userChain = chainBelow(userPick, top);
   const find = (chain, otherChain) => {
     for (const el of chain) {
-      const selector = learnSelector(el, { avoid: otherChain, keepOut });
+      const selector = learnSelector(el, { avoid: otherChain, keepOut, filled: true, within });
       if (selector) return { selector, el };
     }
     return null;

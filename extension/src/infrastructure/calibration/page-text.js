@@ -2,11 +2,13 @@
 // Reading text out of a chat page the way a person sees it: blocks on their own lines, <br> as a line break, and
 // our own chips (and anything else the caller names) left out.
 
+// What a page hides from the eye but keeps for screen readers ("You said", "Gemini said"): not part of the message.
+const NOT_READ = ".cdk-visually-hidden, .visually-hidden, .sr-only, .screen-reader-only, script, style, template";
 const BLOCK = /^(ADDRESS|ARTICLE|BLOCKQUOTE|DIV|LI|P|PRE|SECTION|UL|OL|H[1-6])$/;
 
 export function readText(root, excludeSelector = "") {
   if (!root) return "";
-  const skip = [".zs-chip", excludeSelector].filter(Boolean).join(",");
+  const skip = [".zs-chip", NOT_READ, excludeSelector].filter(Boolean).join(",");
   let text = "";
   const TEXT = 3;
   const ELEMENT = 1;

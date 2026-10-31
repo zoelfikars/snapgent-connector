@@ -153,7 +153,7 @@ describe("content script with a stored profile", () => {
     try {
       assert.deepEqual(page.warnings, []);
       assert.doesNotMatch(page.document.getElementById("zs-state").textContent, /Not calibrated/);
-      assert.ok(page.count(".zs-chip") >= 1, "the command in the reply gets a chip");
+      assert.equal(page.count(".zs-chip"), 0, "the chat is left as the site draws it");
     } finally {
       page.window.close();
     }

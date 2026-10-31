@@ -821,9 +821,13 @@
     delete item.__zsChip;
   }
 
+  // The chat is shown exactly as the site draws it (no chips, nothing hidden): what matters is that replies reach the tools
+  // and results come back. Chips and hiding raw command blocks are per-site fragile and are off.
+  const DECORATE = false;
+
   // Placing and rebuilding chips: src/ui/chip-painter.js. decorate adds the classification that decides what each turn shows.
   const decorate = {
-    ...ZSUi.createChipPainter({ document, provider: P, diag }),
+    ...ZSUi.createChipPainter({ document, provider: P, diag, plain: !DECORATE }),
 
     classify(item, next) {
       if (item.dataset.zloop) { this.ensureOwnedChip(item); return; } // loop owns it
@@ -1052,7 +1056,18 @@
       }
     },
 
+    // Takes off anything an earlier version painted, once; after that the page is not touched.
+    undecorateAll() {
+      if (this.cleaned) return;
+      this.cleaned = true;
+      for (const el of document.querySelectorAll(".zs-chip, .zs-hidden, .zs-tool-hide, .zs-cmd-mask")) {
+        if (el.classList.contains("zs-chip")) el.remove();
+        else el.classList.remove("zs-hidden", "zs-tool-hide", "zs-cmd-mask");
+      }
+    },
+
     sweep() {
+      if (!DECORATE) { this.undecorateAll(); return; }
       // Pass each turn's FOLLOWING turn too: a command chip needs it to know
       // whether its injected result was an ERROR (error-aware settle above).
       const items = P.allItems();
@@ -1357,6 +1372,25 @@
       link.remove();
       setTimeout(() => URL.revokeObjectURL(link.href), 1000);
     }
+    // What a bug report needs: what the profile finds on this page right now (elements, sizes, counts), never the chat's text.
+    async function copyDiagnostics() {
+      const chain = (el) => { const out = []; for (let n = el; n && n.nodeType === 1 && out.length < 4; n = n.parentElement) out.push(ZSChat.describeElement(n)); return out.join(" < "); };
+      const rect = (el) => { const r = el.getBoundingClientRect(); return `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`; };
+      const lines = [`snapgent diagnostics`, `site: ${location.hostname}${location.pathname}`, `calibrated: ${!P.needsCalibration}`,
+        `session: started=${A.started} starting=${A.starting} running=${A.running} target=${selectedTargetId}`];
+      if (P.diagnose) {
+        const d = P.diagnose();
+        lines.push(`profile: ${JSON.stringify(d.profile)}`, `health: ${JSON.stringify(d.health)}`,
+          `chatIsEmpty=${d.chatIsEmpty} isFreshChat=${d.isFreshChat} key="${d.key}" turns: ${d.userCount} yours, ${d.assistantCount} AI`);
+        for (const [label, el] of [["composer", d.composer], ["card", d.card], ["send", d.send]]) lines.push(`${label}: ${el ? `${rect(el)} ${chain(el)}` : "-"}`);
+        for (const role of ["user", "assistant"]) {
+          lines.push(`${role} matches (first 8):`);
+          for (const m of d[role]) lines.push(`  ${m.shown ? "shown" : "hidden"} ${m.chars} chars ${rect(m.el)} ${chain(m.el)}`);
+        }
+      }
+      try { await navigator.clipboard.writeText(lines.join("\n")); notifications.toast("Diagnostics copied."); }
+      catch { notifications.toast("Could not copy to the clipboard."); }
+    }
     function importCalibration() {
       const input = document.createElement("input");
       input.type = "file";
@@ -1373,7 +1407,7 @@
     function buildMenu() {
       menuEl.innerHTML = ZSUi.switchMenuHtml(AI_SITES, P.displayName, { calibration: true });
       const open = (url) => { try { window.open(url, "_blank", "noopener"); } catch {} menuEl.hidden = true; };
-      menuEl.querySelectorAll("button.zs-site-opt, .zs-tip-opt").forEach((b) =>
+      menuEl.querySelectorAll("button.zs-site-opt[data-u], .zs-tip-opt[data-u]").forEach((b) =>
         b.addEventListener("click", () => open(b.dataset.u)));
       const gear = menuEl.querySelector("#zs-mcp-settings");
       if (gear) gear.addEventListener("click", (e) => { e.stopPropagation(); menuEl.hidden = true; openMcpSettings(); });
@@ -1386,6 +1420,7 @@
       calibration("#zs-cal-start", () => openCalibration(null));
       calibration("#zs-cal-export", exportCalibration);
       calibration("#zs-cal-import", importCalibration);
+      calibration("#zs-cal-diag", copyDiagnostics);
       calibration("#zs-cal-remove", async () => { await profileStore.remove(location.hostname); notifications.toast("Calibration removed."); });
     }
 
@@ -1925,6 +1960,7 @@
   // so the class lands before that first paint; the full sweep still runs after
   // to build the actual chip.
   function preHideWholeItems() {
+    if (!DECORATE) return;
     const items = P.allItems();
     // Optimistic pre-hide of a freshly injected result turn (armed in
     // submitAndGetBase). The text-based match below can only fire once the

@@ -23,6 +23,7 @@ const CALIBRATION_SECTION = `
            <button class="zs-site-opt" id="zs-cal-start" type="button"><span class="zs-site-name"><span>Calibrate this site</span><span class="zs-site-host">teach it where the text box, send button and replies are</span></span></button>
            <button class="zs-site-opt" id="zs-cal-export" type="button"><span class="zs-site-name"><span>Export calibration</span></span></button>
            <button class="zs-site-opt" id="zs-cal-import" type="button"><span class="zs-site-name"><span>Import calibration</span></span></button>
+           <button class="zs-site-opt" id="zs-cal-diag" type="button"><span class="zs-site-name"><span>Copy diagnostics</span><span class="zs-site-host">what it finds on this page, no text of the chat</span></span></button>
            <button class="zs-site-opt" id="zs-cal-remove" type="button"><span class="zs-site-name"><span>Remove calibration</span></span></button>
          </section>`;
 
