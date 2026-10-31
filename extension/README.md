@@ -12,7 +12,7 @@ VS Code is the default **MCP target**. The bridge can start before VS Code, but 
 1. Go to `edge://extensions` (Edge) or `chrome://extensions` (Chrome)
 2. Enable **Developer mode** (top right toggle)
 3. Click **Load unpacked**
-4. Select the `snapgent-extension` folder
+4. Select `dist/chrome` (run `npm install && npm run build` first)
 5. The extension is now active
 
 **Then set up the Bridge:**

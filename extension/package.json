@@ -1,0 +1,17 @@
+{
+  "name": "snapgent-extension",
+  "version": "3.9.3",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "build": "node build/build.mjs all",
+    "build:chrome": "node build/build.mjs chrome",
+    "build:firefox": "node build/build.mjs firefox",
+    "test": "node --test test/",
+    "run:firefox": "web-ext run --source-dir dist/firefox"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}

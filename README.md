@@ -89,7 +89,7 @@ VS Code's MCP server is configured locally by `start.bat`; it detects the open V
 | **Meta AI** | `meta.ai` | ✅ Supported | |
 | **Ptero** | `ptero.pro` | ✅ Supported | |
 
-> Provider activation is configured in `manifest.json` (`content_scripts` and `host_permissions`) and `PROVIDER_URLS` in `background.js`.
+> Add a site in `extension/src/sites/registry.js`; the manifest, background worker and popup are generated from it.
 
 ---
 
@@ -110,8 +110,13 @@ VS Code's MCP server is configured locally by `start.bat`; it detects the open V
 1. Download and extract the [latest SnapgentV3 release](https://github.com/herdodp/snapgent-connector/releases/tag/V3.9.3).
 2. Open `edge://extensions` (Edge) or `chrome://extensions` (Chrome).
 3. Enable **Developer mode**.
-4. Click **Load unpacked** and select the `snapgent-extension` folder.
+4. Click **Load unpacked** and select the `chrome` folder of the release (or `extension/dist/chrome` if you built from source).
 5. The snapgentV3 icon appears in your browser toolbar.
+
+**Firefox (128+):** open `about:debugging` → *This Firefox* → *Load Temporary Add-on* and pick `manifest.json` from the `firefox` folder
+(or `extension/dist/firefox`). Firefox may ask you to grant the site permissions from the extension's *Permissions* tab.
+
+**Building from source:** `cd extension && npm install && npm run build` produces `dist/chrome` and `dist/firefox`.
 
 **② Set up the MCP target**
 
@@ -202,15 +207,15 @@ The AI sends commands, snapgentV3 runs them in the selected target (VS Code by d
 
 ## `06` &nbsp; Architecture
 
-The extension is split into a **provider-agnostic core** and **per-site providers**. The core talks to each AI site through the `ZSProvider` interface.
+The extension is split into a **pure domain layer**, a **provider-agnostic core** and **per-site providers**. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for layers, rules and the migration roadmap.
 
 ```
-core/config.js              system prompt, feedback, tool categories
-core/parser.js              snapgentV3 command parsing
-core/main.js                agent loop, UI, session state
-providers/<site>.js         site-specific selectors and chat integration
-background.js               WebSocket connection to the local bridge
-manifest.json               browser permissions and content scripts
+src/domain/                 pure logic: command parsing, system prompt, tool formatting
+src/sites/registry.js       the one list of supported AI sites
+src/entry/                  background worker, popup, legacy globals bridge
+legacy/main.js              agent loop, UI, session state (being split up)
+legacy/providers/<site>.js  site-specific selectors and chat integration
+build/                      per-browser manifest generation and bundling
 ```
 
 The bridge routes commands to the configured MCP servers. Windows uses the
@@ -223,12 +228,11 @@ Python.
 
 ```
 snapgent-full/
-├── snapgent-extension/        # Load this folder as an unpacked extension
-│   ├── core/                  # Shared prompt, parser, agent loop, and UI
-│   ├── providers/             # Per-AI-site integrations
-│   ├── background.js          # Local bridge connection
-│   ├── manifest.json          # Manifest V3 configuration
-│   └── test-*.js              # Smoke tests
+├── extension/                 # Browser extension source (Chrome/Edge and Firefox)
+│   ├── src/                   # Domain logic, site registry, entry points
+│   ├── legacy/                # Code still being migrated (see docs/ARCHITECTURE.md)
+│   ├── build/                 # Manifest generation + bundling -> dist/{chrome,firefox}
+│   └── test/                  # node:test suites (npm test)
 ├── assets/                    # Project images
 ├── setup-config.ps1           # Configures Windows MCP servers
 ├── setup-config.py            # Detects MCP servers on macOS and Linux

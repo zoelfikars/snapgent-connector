@@ -15,6 +15,7 @@
   "use strict";
   const P = ZSProvider;
   const T = P.timings;
+  const { formatCatalogue, argSummary, outSummary, feedbackIsError, stripOutputPrefix } = ZSDomain;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const log = (...a) => console.log("[snapgentV3]", ...a);
 
@@ -969,37 +970,8 @@
       if (!scoped.length) {
         return `Output of '${name}':\nERROR: the selected server "${requested}" has no commands available (it may be offline). Do NOT try other servers; tell the user to check the target in the snapgentV3 selector.`;
       }
-      const lines = scoped.map((t) => {
-        const props = (t.inputSchema && t.inputSchema.properties) || {};
-        const req = new Set((t.inputSchema && t.inputSchema.required) || []);
-        // Two buckets: simple scalar params get packed onto ONE compact line;
-        // params that need real explanation (array-of-object shape, or a long
-        // description) keep their own line so nothing structurally important
-        // gets flattened away.
-        const compact = [];
-        const detailed = [];
-        for (const [k, v] of Object.entries(props)) {
-          const items = v.items && typeof v.items === "object" ? v.items : null;
-          const itemProps = items && items.properties;
-          const mark = req.has(k) ? "" : "?";
-          if (v.type === "array" && itemProps) {
-            const itemReq = new Set(items.required || []);
-            const fields = Object.entries(itemProps).map(([ik, iv]) => {
-              const en = Array.isArray(iv.enum) && iv.enum.length <= 12 ? `(${iv.enum.join("|")})` : (iv.type || "any");
-              return `${ik}${itemReq.has(ik) ? "" : "?"}:${en}`;
-            });
-            detailed.push(`    ${k}${mark}: array [each item: {${fields.join(", ")}}]${v.description ? " - " + v.description : ""}`);
-          } else if (v.description && v.description.length > 45) {
-            detailed.push(`    ${k}${mark}: ${v.type || "any"} - ${v.description}`);
-          } else {
-            const ty = Array.isArray(v.enum) && v.enum.length <= 8 ? `(${v.enum.join("|")})` : (v.type || "any");
-            compact.push(`${k}${mark}:${ty}${v.description ? ` "${v.description}"` : ""}`);
-          }
-        }
-        const paramLines = [compact.length ? `    ${compact.join(", ")}` : "", ...detailed].filter(Boolean).join("\n");
-        return `${t.name}: ${(t.description || "").split("\n")[0]}${paramLines ? "\n" + paramLines : ""}`;
-      });
-      return `Output of '${name}':\n${requested} commands (${scoped.length}):\n\n${lines.join("\n\n")}`;
+      const catalogue = formatCatalogue(scoped);
+      return `Output of '${name}':\n${requested} commands (${scoped.length}):\n\n${catalogue}`;
     }
     // Isolation: execution is hard-limited to the server selected in the dropdown.
     // 1) the selected target must be toggled on,
@@ -1088,81 +1060,6 @@
       return `ERROR: tool '${name}' timed out after 120s.\n${r.error}\nTry a shorter/simpler call.`;
     }
     return `ERROR calling '${name}': ${r.error}\nRead the error carefully, fix the call or try a different approach.`;
-  }
-
-  function argSummary(call) {
-    if (!call) return "";
-    const a = call.arguments || {};
-    const k = Object.keys(a)[0];
-    if (!k) return "";
-    let v = String(a[k]);
-    if (v.length > 34) v = v.slice(0, 31) + "…";
-    return `${k}: ${v}`;
-  }
-
-  // An MCP tool can report its OWN failure as a NORMAL result ("Output of '…':
-  // Error executing code: …") instead of our ERROR wrapper - so a
-  // startsWith("ERROR") test alone paints a FAILED call ✓ green and shows the
-  // error as its summary (it will hit EVERY MCP server the same way). Treat a result whose FIRST
-  // line opens with an error lead-in as failed too. Deliberately PHRASE-based,
-  // not the bare words "error"/"failed", so a genuine success line like
-  // "Failed: 0" / "Error count: 0" is NOT misread as a failure.
-  const BODY_ERR_RE =
-    /^\s*(error executing|error:|erreur|exception|traceback|communication error|failed to|could ?not|cannot |unable to|fatal)\b/i;
-  const stripOutputPrefix = (feedback) => feedback.replace(/^Output of '[^']*':\n?/, "");
-  function bodyLooksFailed(feedback) {
-    if (!feedback || feedback.startsWith("ERROR")) return false; // wrapper already flags it
-    const first = stripOutputPrefix(feedback).split("\n").map((s) => s.trim()).find(Boolean) || "";
-    return BODY_ERR_RE.test(first);
-  }
-  // True failure = OUR wrapper prefix OR an MCP tool's in-body error lead-in.
-  const feedbackIsError = (feedback) => feedback.startsWith("ERROR") || bodyLooksFailed(feedback);
-
-  // Some tools answer with raw JSON on one line, and a 44-char slice of it makes
-  // a chip that says nothing, e.g. `{"files":[{"path":"src/a`. Summarise the SHAPE instead,
-  // in the same spirit as the boot chip's "25 commands". Returns null when the
-  // body isn't JSON, so plain-text outputs keep their first line unchanged.
-  function jsonSummary(body) {
-    if (!/^[[{]/.test(body) || body.length > 200000) return null;
-    let v;
-    try { v = JSON.parse(body); } catch { return null; }
-    if (Array.isArray(v)) return `${v.length} item${v.length === 1 ? "" : "s"}`;
-    if (!v || typeof v !== "object") return null;
-    const keys = Object.keys(v);
-    // The common MCP shape: one wrapper key holding the list. Its name is already
-    // plural ("files", "matches"), so it reads correctly as-is - just drop the
-    // trailing "s" when there is exactly one, so it says "1 file".
-    if (keys.length === 1 && Array.isArray(v[keys[0]])) {
-      const n = v[keys[0]].length;
-      const word = n === 1 ? keys[0].replace(/s$/, "") : keys[0];
-      return `${n} ${word}`;
-    }
-    // Otherwise show the scalar fields - that's what a human would read off.
-    const scalars = keys
-      .filter((k) => v[k] === null || typeof v[k] !== "object")
-      .map((k) => `${k}: ${v[k]}`);
-    if (scalars.length) return scalars.join(", ").slice(0, 44);
-    return `${keys.length} field${keys.length === 1 ? "" : "s"}`;
-  }
-
-  function outSummary(feedback) {
-    if (!feedback) return "";
-    const isErr = feedbackIsError(feedback);
-    const body = stripOutputPrefix(feedback).trim();
-    if (!body) return "";
-    // Errors are prose and read fine as-is; only reshape successful JSON.
-    if (!isErr) { const j = jsonSummary(body); if (j) return j; }
-    const all = body.split("\n").map((l) => l.trim()).filter(Boolean);
-    const lines = all.length;
-    // On SUCCESS, skip a leading non-fatal warning/note some MCP tools print
-    // before the real status so the chip shows the useful line, not the noise.
-    let first = all[0] || "";
-    if (!isErr && lines > 1 && /^(warning|warn|note|deprecat|info)\b/i.test(first)) {
-      first = all.find((l) => !/^(warning|warn|note|deprecat|info)\b/i.test(l)) || first;
-    }
-    first = first.slice(0, 44);
-    if (isErr) return first;
-    return lines > 1 ? `${first} · ${lines} lines` : first;
   }
 
   // Full args / code, shown in a tool chip's expandable body.

@@ -1,4 +1,4 @@
-// Quick Node smoke test for providers/chatgpt.js (run: node test-chatgpt.js).
+// Quick Node smoke test for providers/chatgpt.js (run: node --test test/).
 // Not shipped.
 //
 // Why this exists: every ChatGPT bug fixed in 1.5.1 was a READING bug, not a
@@ -14,9 +14,7 @@
 // walks. No jsdom, no npm install: the repo has no dependencies and this test
 // keeps it that way.
 const fs = require("fs");
-const ZSParse = new Function(
-  fs.readFileSync(__dirname + "/core/parser.js", "utf8") + "; return ZSParse;"
-)();
+const ZSParse = require("../src/domain/parser/index.js");
 
 // ── Stub DOM ────────────────────────────────────────────────────────────────
 // el("div", {class, attrs}, children) / txt("…"). Only the members textWithout
@@ -95,7 +93,7 @@ global.CustomEvent = class { constructor(t) { this.type = t; } };
 global.MutationObserver = class { observe() {} disconnect() {} };
 global.getComputedStyle = () => ({});
 const P = new Function(
-  fs.readFileSync(__dirname + "/providers/chatgpt.js", "utf8") + "; return ZSProvider;"
+  fs.readFileSync(__dirname + "/../legacy/providers/chatgpt.js", "utf8") + "; return ZSProvider;"
 )();
 
 const ok = (name, cond) => { console.log((cond ? "PASS" : "FAIL") + "  " + name); if (!cond) process.exitCode = 1; };

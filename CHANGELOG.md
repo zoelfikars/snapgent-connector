@@ -4,6 +4,22 @@ All notable changes to snapgentV3 Free are documented here.
 
 ## [Unreleased]
 
+### Changed
+- **Project is now VS Code only.** Roblox Studio, EffectCraft and Luau (`###LUA###`)
+  support was removed from the extension, bridge and setup scripts (`start-effectcraft.ps1`
+  is gone). Generic extra MCP servers can still be added.
+- **Firefox support.** One source tree builds both browsers (`npm run build` in
+  `extension/` -> `dist/chrome`, `dist/firefox`). Firefox gets an event-page
+  background and a gecko id; Chrome keeps the service worker.
+- **New layered structure** (`docs/ARCHITECTURE.md`): parser, prompt and tool
+  formatting moved into a pure, unit-tested domain layer; the supported-site list
+  lives in one registry that generates the manifest, background and popup.
+  `bridge.exe` / `vscode_mcp.exe` are not rebuilt by this change.
+
+### Fixed
+- The system prompt for the VS Code target did not carry the session marker, so the
+  bootstrap turn was not recognised for camouflage and session detection.
+
 ### Security
 - **Bridge now rejects connections that do not come from a browser extension.**
   Any website could previously open `ws://127.0.0.1:17613` and call tools such as

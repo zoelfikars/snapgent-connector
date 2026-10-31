@@ -1,4 +1,4 @@
-// Quick Node regression test for providers/meta.js (run: node test-meta.js).
+// Quick Node regression test for providers/meta.js (run: node --test test/).
 // Not shipped.
 const fs = require("fs");
 const assert = require("assert");
@@ -75,7 +75,7 @@ global.document = {
 global.location = { pathname: "/" };
 
 const provider = new Function(
-  fs.readFileSync(__dirname + "/providers/meta.js", "utf8") + "; return ZSProvider;"
+  fs.readFileSync(__dirname + "/../legacy/providers/meta.js", "utf8") + "; return ZSProvider;"
 )();
 
 (async () => {

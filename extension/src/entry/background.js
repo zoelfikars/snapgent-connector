@@ -7,13 +7,12 @@
 // Contract with content.js: every sendMessage ALWAYS gets a response object,
 // even when the bridge is offline. The agentic loop must never hang waiting.
 
-const PORT = 17613;
-const URL = `ws://127.0.0.1:${PORT}`;
+import { BRIDGE_PORT as PORT, allMatches } from "../sites/registry.js";
 
-// Chat sites where a snapgentV3 provider content script runs. Status pushes go
-// to every tab matching these. Add the new provider's URL pattern here (and in
-// manifest.json content_scripts + host_permissions) when integrating another AI.
-const PROVIDER_URLS = ["https://chat.deepseek.com/*", "https://chatgpt.com/*", "https://chat.openai.com/*", "https://claude.ai/*", "https://gemini.google.com/*", "https://www.kimi.ai/*", "https://kimi.ai/*", "https://chat.z.ai/*", "https://chat.qwen.ai/*", "https://arena.ai/*", "https://www.meta.ai/*", "https://meta.ai/*", "https://ptero.pro/*", "https://grok.com/*", "https://chat.mistral.ai/*"];
+const BRIDGE_URL = `ws://127.0.0.1:${PORT}`;
+
+// Status pushes go to every tab a content script runs on (see sites/registry.js).
+const PROVIDER_URLS = allMatches();
 
 const RECONNECT_MIN = 1000;
 const RECONNECT_MAX = 5000;
@@ -48,7 +47,7 @@ function connect() {
   }
   clearTimeout(reconnectTimer);
   try {
-    ws = new WebSocket(URL);
+    ws = new WebSocket(BRIDGE_URL);
   } catch (e) {
     log("WebSocket ctor failed", e);
     scheduleReconnect();
