@@ -18,7 +18,7 @@ export function setNativeValue(el, value, win = window) {
   const setter = ctor && Object.getOwnPropertyDescriptor(ctor.prototype, "value");
   if (setter && setter.set) setter.set.call(el, value);
   else el.value = value;
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new win.Event("input", { bubbles: true }));
 }
 
 const IMAGE_EXTENSIONS = [["png", "png"], ["webp", "webp"], ["gif", "gif"]];

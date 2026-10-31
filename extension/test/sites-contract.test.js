@@ -1,5 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import * as ZSParse from "../src/domain/parser/index.js";
 import { fixture, loadProvider } from "./support/jsdom-provider.js";
 
@@ -70,3 +71,23 @@ for (const site of SITES) {
     });
   });
 }
+
+describe("chips stay in the reply column on sites whose turn element is wider than it", () => {
+  const css = readFileSync(new URL("../static/overlay.css", import.meta.url), "utf8");
+  const rule = (selector) => {
+    const start = css.indexOf(selector + " {");
+    return start < 0 ? "" : css.slice(start, css.indexOf("}", start));
+  };
+
+  test("Gemini: the model turn's chip is re-seated onto the centered 708px column", () => {
+    const body = rule("html.zs-site-gemini model-response > .zs-chip");
+    assert.match(body, /margin-left:\s*max\(0px,\s*calc\(\(100% - 708px\) \/ 2\)\)/);
+    assert.match(body, /max-width:\s*708px/);
+  });
+
+  test("the page gets the zs-site-<id> class the rule keys on", () => {
+    const main = readFileSync(new URL("../legacy/main.js", import.meta.url), "utf8");
+    assert.match(main, /classList\.add\(`zs-site-\$\{P\.id\}`\)/);
+    assert.match(readFileSync(new URL("../legacy/providers/gemini.js", import.meta.url), "utf8"), /id:\s*"gemini"/);
+  });
+});

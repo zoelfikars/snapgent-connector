@@ -537,6 +537,8 @@ const ZSProvider = (() => {
       } catch (e) { diag("meta.tas.attachErr", { msg: String((e && e.message) || e) }); }
     }
     // Write via the mirror textarea (the controlled input that drives Lexical).
+    // A mode flip started elsewhere (the sweep, an earlier retry) must be over, with its menu closed, before we click send.
+    await waitFor(() => !_modeInFlight && !modeOptionOpen(), 6000);
     const editor = writeEl();
     if (!editor) throw new Error("Meta AI input box not found");
     const usersBeforeSend = userCount();
@@ -593,6 +595,7 @@ const ZSProvider = (() => {
     return !!b && /r[ée]flexion|think.?hard/i.test((b.textContent || "") + (b.getAttribute("data-testid") || ""));
   };
   let _modeInFlight = false;
+  const modeOptionOpen = () => !!document.querySelector(S.modeOptHard);
   async function ensureThinkMode() {
     if (_modeInFlight) return;
     const b = modeBtn();
@@ -605,8 +608,12 @@ const ZSProvider = (() => {
       const opened = await waitFor(() => !!document.querySelector(S.modeOptHard), 2000);
       if (opened) {
         const opt = document.querySelector(S.modeOptHard);
-        try { opt.click(); } catch {}
-        await waitFor(isReflexion, 2000);
+        // Already the selected mode (the button label may use wording isReflexion() does not know): leave it alone.
+        const selected = opt.getAttribute("aria-checked") === "true" || opt.getAttribute("data-state") === "checked";
+        if (!selected) {
+          try { opt.click(); } catch {}
+          await waitFor(isReflexion, 2000);
+        }
       }
       // Close the menu if it is still open (Radix closes on select, but be safe).
       if (document.querySelector(S.modeOptHard)) {
@@ -623,9 +630,10 @@ const ZSProvider = (() => {
   // ── Composer readiness ──────────────────────────────────────────────────────
   function enforceComposer() { if (_locked) applyLock(); return { ready: true }; }
   async function ensureComposerReady(reason) {
-    // Force Réflexion before the session runs (Instantané is much weaker). Fire and
-    // forget - readiness never blocks on it (the mode flip is best-effort).
-    ensureThinkMode();
+    // Force Réflexion before the session runs (Instantané is much weaker). The flip is best-effort but it
+    // MUST finish before we send: it opens a Radix menu, and a send click that lands while that menu is open
+    // is swallowed (seen live: "did not confirm the message was sent" on every start). It is bounded (~4s).
+    await ensureThinkMode();
     diag("mode_ready", { reason, provider: "meta", ready: !!getEditor() });
     return { ready: !!getEditor() };
   }

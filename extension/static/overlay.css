@@ -682,6 +682,16 @@ html.zs-site-meta .zs-hidden > .zs-chip {
   max-width: 768px;
 }
 
+/* Gemini: the chip of a model turn is a direct child of <model-response>, which is the FULL page width
+   (~1400px), while the reply itself lives in a centered ~708px column (user turns are already that
+   narrow, so their chips were fine). Left unchecked the command chips sat at the raw page-left edge, far from
+   the result chips and the reply. Same re-seat as Meta: push the left edge in by the column's own centering
+   offset and cap the width to the column; `max()` keeps it sane when the column fills a narrow window. */
+html.zs-site-gemini model-response > .zs-chip {
+  margin-left: max(0px, calc((100% - 708px) / 2));
+  max-width: 708px;
+}
+
 /* Qwen (Ant Design) renders its model / thinking-mode select popup AND the
    composer "+" attachment menu (Upload attachment / Deep Research / Create
    image / Web Dev / Slides / More) at z-index 1050-1150 - far below #zs-root

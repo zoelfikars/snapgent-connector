@@ -16,10 +16,10 @@ Object.defineProperty(StubInput.prototype, "value", {
   set(value) { this._value = String(value); },
 });
 
-global.window = { HTMLTextAreaElement: StubTextArea, HTMLInputElement: StubInput };
+global.Event = class { constructor(type, options) { this.type = type; Object.assign(this, options); } };
+global.window = { HTMLTextAreaElement: StubTextArea, HTMLInputElement: StubInput, Event: global.Event };
 global.HTMLTextAreaElement = StubTextArea;
 global.HTMLInputElement = StubInput;
-global.Event = class { constructor(type, options) { this.type = type; Object.assign(this, options); } };
 
 const editor = Object.assign(new StubTextArea(), {
   tagName: "TEXTAREA",
