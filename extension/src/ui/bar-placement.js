@@ -1,71 +1,48 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Where the status bar sits on a chat page. Pure decisions and geometry; main.js measures the page and
-// does the DOM work (inserting the bar, borrowing the composer's padding).
-//
-// Three ways to seat the bar, best first:
-//   inline    a real node inside the composer, chosen by the site adapter (full width, never overlaps);
-//   anchored  position:fixed hugging the top of an element, with that element's top padding reserved
-//             (for composers owned by a framework such as Vue, which would swallow a node we insert);
-//   floating  position:fixed just above the editor, centred, for sites with neither.
-// While a bot check or a login/consent modal is on screen the bar steps aside entirely: a full-width
-// transparent bar would silently eat clicks meant for the modal's buttons.
+// Where the control bar sits: in one of two corners of the window (bottom right or top right), beside a small
+// button that shows or hides it. It never attaches to the site's text box, so nothing about a site's layout can
+// squeeze, cover or hide it. Pure geometry: rectangles in, pixel numbers out.
 
-const WINDOW_MARGIN = 24;
-export const BAR_MAX_WIDTH = 560;
-export const BAR_GAP = 8;
-const ANCHOR_PADDING_GAP = 6;
-const DEFAULT_ANCHORED_HEIGHT = 34;
-const DEFAULT_FLOATING_HEIGHT = 40;
-const MIN_TOP = 4;
+export const BAR_WIDTH = 210;
+export const CORNERS = ["bottom", "top"];
+const MARGIN = 16;
+const TOGGLE = 34;       // the show/hide button's size
+const TOGGLE_GAP = 8;
+const MIN_HEIGHT = 40;
 const PILL_GAP = 5;
 const DEFAULT_PILL_HEIGHT = 20;
 
-/** @returns {"hidden"|"inline"|"anchored"|"floating"} */
-export function chooseBarMode({ obstructed, hasInlineMount, hasAnchor }) {
-  if (obstructed) return "hidden";
-  if (hasInlineMount) return "inline";
-  if (hasAnchor) return "anchored";
-  return "floating";
-}
+/** A stored corner, or the default when it is not one of the two. @returns {"bottom"|"top"} */
+export const cornerOf = (value) => (value === "top" ? "top" : "bottom");
 
-/**
- * Hug the top of `rect`. `paddingTop` is the strip to reserve on that element so the bar reads as in-flow.
- * @returns {{ left: number, top: number, width: number, paddingTop: number } | null} null when the anchor has no size
- */
-export function anchoredGeometry(rect, barHeight) {
-  if (!rect.width) return null;
-  const height = barHeight || DEFAULT_ANCHORED_HEIGHT;
-  return { left: Math.round(rect.left), top: Math.round(rect.top), width: Math.round(rect.width), paddingTop: height + ANCHOR_PADDING_GAP };
-}
-
-/** Centre above `rect` (the editor), no wider than BAR_MAX_WIDTH. @returns {{left:number, top:number, width:number}|null} */
-/**
- * Where the bar goes on a page with no known text box (a site that is not calibrated yet, or whose box is gone): centred
- * at the bottom of the window, so the user can always reach Calibrate and the menu.
- */
-export function windowGeometry(viewport, barHeight) {
-  const height = barHeight || DEFAULT_FLOATING_HEIGHT;
-  const width = Math.max(0, Math.min(BAR_MAX_WIDTH, viewport.width - 2 * WINDOW_MARGIN));
+/** The show/hide button, in the right-hand corner. @returns {{ left: number, top: number }} */
+export function toggleGeometry(viewport, corner) {
   return {
-    left: Math.round((viewport.width - width) / 2),
-    top: Math.max(MIN_TOP, Math.round(viewport.height - height - WINDOW_MARGIN)),
-    width,
+    left: Math.round(viewport.width - TOGGLE - MARGIN),
+    top: corner === "top" ? MARGIN : Math.round(viewport.height - TOGGLE - MARGIN),
   };
 }
 
-export function floatingGeometry(rect, barHeight) {
-  if (!rect.width) return null;
-  const width = Math.min(rect.width, BAR_MAX_WIDTH);
-  const height = barHeight || DEFAULT_FLOATING_HEIGHT;
+/**
+ * The bar, a narrow column above the button (bottom corner) or below it (top corner), its right edge in line with the button's.
+ * @returns {{ left: number, top: number, maxHeight: number }}
+ */
+export function barGeometry(viewport, barSize, corner) {
+  const width = barSize.width || BAR_WIDTH;
+  const height = barSize.height || MIN_HEIGHT;
+  const maxHeight = Math.max(MIN_HEIGHT, viewport.height - 2 * MARGIN - TOGGLE - TOGGLE_GAP);
+  const shown = Math.min(height, maxHeight);
   return {
-    left: Math.round(rect.left + (rect.width - width) / 2),
-    top: Math.max(MIN_TOP, Math.round(rect.top - height - BAR_GAP)),
-    width,
+    left: Math.round(viewport.width - MARGIN - width),
+    top: corner === "top" ? MARGIN + TOGGLE + TOGGLE_GAP : Math.round(viewport.height - MARGIN - TOGGLE - TOGGLE_GAP - shown),
+    maxHeight,
   };
 }
 
-/** The "unstable" pill floats just above the bar's left edge. @returns {{left:number, top:number}|null} null = hide it */
-export function pillPosition(barRect, pillHeight) {
+/** The "unstable" pill floats just above (or, in the top corner, below) the bar's left edge. @returns {{left:number, top:number}|null} */
+export function pillPosition(barRect, pillHeight, corner = "bottom") {
   if (!barRect || !barRect.width) return null;
-  return { left: Math.round(barRect.left), top: Math.round(Math.max(MIN_TOP, barRect.top - (pillHeight || DEFAULT_PILL_HEIGHT) - PILL_GAP)) };
+  const height = pillHeight || DEFAULT_PILL_HEIGHT;
+  const top = corner === "top" ? barRect.bottom + PILL_GAP : Math.max(4, barRect.top - height - PILL_GAP);
+  return { left: Math.round(barRect.left), top: Math.round(top) };
 }

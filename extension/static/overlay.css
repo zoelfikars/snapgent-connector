@@ -1124,3 +1124,47 @@ html.zs-light #zs-set-save:hover,
 html.zs-light #zs-mcp-add:hover { background: rgba(0, 0, 0, 0.09); }
 html.zs-light #zs-set-status,
 html.zs-light #zs-mcp-status { color: #6b7280; }
+
+/* ── the show/hide button: always in the window's right-hand corner, the bar sits to its left ── */
+#zs-toggle {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1px solid rgba(129, 140, 248, 0.45);
+  background: rgba(20, 20, 28, 0.97);
+  color: #c7d2fe;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+#zs-toggle:hover { background: rgba(40, 40, 56, 0.98); }
+html.zs-light #zs-toggle { background: rgba(255, 255, 255, 0.97); color: #3730a3; }
+
+/* ── the bar is a narrow column in the corner (overrides the older horizontal layout above) ── */
+html #zs-bar {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 7px;
+  width: 210px;
+  padding: 9px 10px;
+  overflow-y: auto;
+}
+html #zs-bar #zs-state { order: 0; flex: none; min-height: 0; white-space: normal; font-size: 11.5px; line-height: 1.35; }
+html #zs-bar #zs-action, html #zs-bar #zs-stop { order: 1; flex: none; width: 100%; max-width: none; min-height: 32px; justify-content: center; }
+html #zs-bar .zs-target-wrap, html #zs-bar #zs-switch { order: 2; flex: none; width: 100%; max-width: none; min-width: 0; min-height: 30px; box-sizing: border-box; }
+
+/* The MCP target pill is one button, like the Switch AI pill: the whole pill is the hit area and shows the pointer. */
+html #zs-bar .zs-target-wrap { display: flex; padding: 0; transition: background 0.14s ease; }
+html #zs-bar .zs-target-wrap:hover { background: rgba(255, 255, 255, 0.11); }
+html #zs-bar #zs-target-btn { flex: 1 1 auto; align-self: stretch; width: 100%; max-width: none; padding: 0 28px 0 12px; cursor: pointer; }
+html.zs-light #zs-bar .zs-target-wrap:hover { background: rgba(0, 0, 0, 0.06); }
+
+/* The Switch AI pill looks like the MCP pill: name at the left, the arrow at the right edge. */
+html #zs-bar #zs-switch { justify-content: space-between; padding: 0 8px 0 12px; }
+html #zs-bar #zs-switch svg { flex: none; opacity: 0.65; }

@@ -106,13 +106,12 @@ export function createCalibrationWizard({
     for (const m of review.marks) panel.mark(m.name, m.el, m.label, m.kind);
     if (review.warnings.length) error = [error, ...review.warnings].filter(Boolean).join(" ");
     render({
-      text: "Look at the page: green boxes should be your messages, blue boxes the AI replies, “Read from here” the answer, yellow the box the bar sits in.",
+      text: "Look at the page: green boxes should be your messages, blue boxes the AI replies, “Read from here” the answer.",
       preview: review.text,
       buttons: [
         { label: "Looks right", action: "looks-right", primary: !!review.read && !review.warnings.length },
         { label: "Pick just the answer", action: "pick-answer" },
         { label: "Redo the reply", action: "redo-reply" },
-        { label: "Pick the bar's box", action: "pick-card" },
         { label: "Cancel", action: "cancel" },
       ],
     });

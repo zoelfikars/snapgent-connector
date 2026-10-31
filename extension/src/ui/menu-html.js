@@ -30,7 +30,14 @@ const CALIBRATION_SECTION = `
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; } };
 
 /** The Switch AI pop-over: every supported site, the current one badged instead of linked. */
-export function switchMenuHtml(sites, currentName, { calibration = false } = {}) {
+export function switchMenuHtml(sites, currentName, { calibration = false, corner = "bottom" } = {}) {
+  const other = corner === "top" ? "bottom right" : "top right";
+  const barSection = `
+         <section class="zs-menu-sec">
+           <div class="zs-sec-label"><span>This bar</span></div>
+           <button class="zs-site-opt" id="zs-bar-corner" type="button"><span class="zs-site-name"><span>Move to the ${other} corner</span></span></button>
+           <button class="zs-site-opt" id="zs-bar-hide" type="button"><span class="zs-site-name"><span>Hide the bar</span><span class="zs-site-host">the small button in the corner shows it again</span></span></button>
+         </section>`;
   const here = String(currentName || "").toLowerCase();
   const grid = sites.map((site) => {
     const label = `<span class="zs-site-name"><span>${escapeHtml(site.name)}</span><span class="zs-site-host">${escapeHtml(hostOf(site.url))}</span></span>`;
@@ -42,5 +49,5 @@ export function switchMenuHtml(sites, currentName, { calibration = false } = {})
          <section class="zs-menu-sec">
            <div class="zs-sec-label zs-sec-label-row"><span>Switch AI</span><span><button id="zs-skills-settings" class="zs-gear" title="Skills" aria-label="Skills">&#9733;</button><button id="zs-mcp-settings" class="zs-gear" title="MCP settings" aria-label="MCP settings">&#9881;</button></span></div>
            <div class="zs-site-grid">${grid}</div>
-         </section>${calibration ? CALIBRATION_SECTION : ""}`;
+         </section>${barSection}${calibration ? CALIBRATION_SECTION : ""}`;
 }

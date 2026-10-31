@@ -132,32 +132,6 @@ describe("calibration wizard", () => {
     assert.equal(t.panel().querySelectorAll(".mark.pick").length, 1);
   });
 
-  test("the review marks every turn (yours and the AI's), the part read and the bar's box on the page, and clears them after", () => {
-    const t = setup();
-    t.wizard.start();
-    t.walkToPreview();
-    const marks = (kind) => [...t.panel().querySelectorAll(`.mark.${kind}`)];
-    assert.ok(marks("user").length >= 1, "your messages");
-    assert.ok(marks("ai").length >= 1, "the AI replies");
-    assert.equal(marks("card").length, 1, "the box the bar sits in");
-    t.press("looks-right");
-    assert.equal(marks("user").length + marks("ai").length + marks("card").length, 0, "the review marks go away when leaving the review");
-  });
-
-  test("'Pick the bar's box' takes a box that holds the text box, and refuses one that does not", () => {
-    const t = setup();
-    t.wizard.start();
-    t.walkToPreview();
-    t.press("pick-card");
-    t.click(t.q("pre"));
-    assert.match(t.errorText(), /must contain the text box/);
-    t.q("form").setAttribute("data-testid", "composer-card");
-    t.click(t.q("form"));
-    assert.equal(t.wizard.state().step, "preview");
-    t.press("looks-right");
-    return waitFor(() => t.wizard.state().done, 5000).then(() => assert.ok(t.saved[0].card, "the profile keeps the chosen box"));
-  });
-
   test("a click on text that is no button is refused for the send step; a click on the icon finds its button", () => {
     const t = setup();
     t.wizard.start();

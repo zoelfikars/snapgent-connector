@@ -1094,7 +1094,7 @@
   //  UI  (control panel, onboarding, stop button, banners, toast, input cover)
   // ════════════════════════════════════════════════════════════════════════
   const ui = (() => {
-    let root, bar, stateEl, actionBtn, stopBtn, targetSelect, switchBtn, menuEl, unstableEl, notifications;
+    let toggleEl, root, bar, stateEl, actionBtn, stopBtn, targetSelect, switchBtn, menuEl, unstableEl, notifications;
     let targetBtn, targetMenuEl;
     let barRaf;
     let openMenuFn = null; // set by build(); lets the popup force the panel open via runtime message
@@ -1115,6 +1115,17 @@
       ZSUi.applyMenuPlacement(menuEl, ZSUi.computeMenuPlacement({
         anchor, menuWidth: menuEl.offsetWidth, defaultWidth: 274, viewport: ZSUi.viewportOf(document, window), align: "right", roomAbove: 180,
       }));
+    }
+
+    // Where the bar sits (bottom or top right corner) and whether it is shown: the user's choice, the same on every site.
+    let barPrefs = { corner: "bottom", hidden: false };
+    try {
+      chrome.storage.local.get("zsBarPrefs", (r) => { if (r && r.zsBarPrefs) barPrefs = { ...barPrefs, ...r.zsBarPrefs }; });
+      chrome.storage.onChanged.addListener((changes, area) => { if (area === "local" && changes.zsBarPrefs) barPrefs = { ...barPrefs, ...changes.zsBarPrefs.newValue }; });
+    } catch {}
+    function setBarPrefs(change) {
+      barPrefs = { ...barPrefs, ...change };
+      try { chrome.storage.local.set({ zsBarPrefs: barPrefs }); } catch {}
     }
 
     function build() {
@@ -1140,12 +1151,15 @@
           </div>
           <button id="zs-switch" aria-label="Switch AI and options" title="Switch AI and options"><span id="zs-switch-name"></span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
         </div>
+        <button id="zs-toggle" type="button" aria-label="Show or hide snapgent"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
         <div id="zs-menu" hidden></div>
         <div id="zs-target-menu" hidden></div>
         ${P.unstableWarning ? `<button id="zs-unstable" aria-label="Provider may be unstable" hidden>⚠ unstable</button>` : ""}
       `;
       document.documentElement.appendChild(root);
       bar = root.querySelector("#zs-bar");
+      toggleEl = root.querySelector("#zs-toggle");
+      toggleEl.addEventListener("click", (e) => { e.stopPropagation(); setBarPrefs({ hidden: !barPrefs.hidden }); });
       stateEl = root.querySelector("#zs-state");
       actionBtn = root.querySelector("#zs-action");
       stopBtn = root.querySelector("#zs-stop");
@@ -1405,7 +1419,7 @@
     }
 
     function buildMenu() {
-      menuEl.innerHTML = ZSUi.switchMenuHtml(AI_SITES, P.displayName, { calibration: true });
+      menuEl.innerHTML = ZSUi.switchMenuHtml(AI_SITES, P.displayName, { calibration: true, corner: barPrefs.corner });
       const open = (url) => { try { window.open(url, "_blank", "noopener"); } catch {} menuEl.hidden = true; };
       menuEl.querySelectorAll("button.zs-site-opt[data-u], .zs-tip-opt[data-u]").forEach((b) =>
         b.addEventListener("click", () => open(b.dataset.u)));
@@ -1417,6 +1431,8 @@
         const button = menuEl.querySelector(id);
         if (button) button.addEventListener("click", (e) => { e.stopPropagation(); menuEl.hidden = true; action(); });
       };
+      calibration("#zs-bar-corner", () => setBarPrefs({ corner: barPrefs.corner === "top" ? "bottom" : "top" }));
+      calibration("#zs-bar-hide", () => setBarPrefs({ hidden: true }));
       calibration("#zs-cal-start", () => openCalibration(null));
       calibration("#zs-cal-export", exportCalibration);
       calibration("#zs-cal-import", importCalibration);
@@ -1594,7 +1610,7 @@
 
     // Where the bar goes on the page (inline in the composer, anchored above it, floating, or hidden): src/ui/bar-placer.js.
     const barPlacer = ZSUi.createBarPlacer({
-      document, provider: P, parts: () => ({ bar, root, menuEl, unstableEl }), positionMenu,
+      document, provider: P, prefs: () => barPrefs, parts: () => ({ bar, root, menuEl, unstableEl, toggleEl }), positionMenu,
     });
     function placeBar() {
       barRaf = requestAnimationFrame(placeBar); // scheduled first, so a throw below cannot stop the loop

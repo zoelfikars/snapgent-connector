@@ -11,7 +11,7 @@ export { opaqueBg } from "./cover-color.js";
 export { computeMenuPlacement, applyMenuPlacement, viewportOf } from "./menu-position.js";
 export { createSetupCard, shouldShowSetup } from "./setup-card.js";
 export { computeCoverRect, measureClippingAncestors, boxOf } from "./cover-geometry.js";
-export { anchoredGeometry, chooseBarMode, floatingGeometry, pillPosition } from "./bar-placement.js";
+export { barGeometry, cornerOf, pillPosition, toggleGeometry } from "./bar-placement.js";
 export { describeResultTurn, describeSystemTurn } from "./turn-chips.js";
 export { commandPhase, haltState, holdsRegenerateLook, shouldReown } from "./command-phase.js";
 export { switchMenuHtml, targetMenuHtml, targetOptionsHtml } from "./menu-html.js";

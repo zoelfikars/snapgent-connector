@@ -33,7 +33,6 @@ export function reviewOf(provider) {
     ...info.assistants.slice(0, MAX_MARKED).map((el, i) => ({ name: `rv:ai${i}`, el, label: "AI reply", kind: "ai" })),
   ];
   if (info.body) marks.push({ name: "rv:body", el: info.body, label: "Read from here", kind: "body" });
-  if (info.card) marks.push({ name: "rv:card", el: info.card, label: "The bar goes in this box", kind: "card" });
 
   const codeLine = info.codeBlocks ? `\nCode blocks in the last reply: ${info.codeBlocks} (${info.codeBlocksRead} read)` : "";
   const text = `Found ${info.users.length} message(s) of yours and ${info.assistants.length} AI reply(ies):\n${turns.join("\n")}${codeLine}\n\nLast AI reply, as it will be read:\n${shown || "(nothing)"}`;
