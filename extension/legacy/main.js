@@ -114,31 +114,20 @@
     console.warn("[snapgentV3] Could not load selected MCP target:", error);
   }
 
-  // ── MCP enable/disable toggles ──────────────────────────────────────────
-  // Persisted map { serverId: boolean }. A server that was never toggled counts
-  // as enabled. Disabled servers are hidden from the target dropdown AND are
-  // filtered out of everything the AI reads (tool lists, list_mcp_servers,
-  // list_commands) so their tool schemas never cost tokens.
-  const MCP_ENABLED_KEY = "zsMcpEnabled";
-  let mcpEnabled = {};
-  try {
-    chrome.storage.local.get(MCP_ENABLED_KEY, (result) => {
-      const saved = result && result[MCP_ENABLED_KEY];
-      if (saved && typeof saved === "object" && !Array.isArray(saved)) {
-        mcpEnabled = saved;
-        if (typeof ui !== "undefined" && ui.setTarget) ui.setTarget(selectedTargetId);
-      }
-    });
-  } catch (error) {
-    console.warn("[snapgentV3] Could not load MCP toggles:", error);
-  }
-  function isMcpEnabled(id) {
-    return mcpEnabled[id] !== false;
-  }
-  function setMcpEnabled(id, on) {
-    mcpEnabled = { ...mcpEnabled, [id]: !!on };
-    try { chrome.storage.local.set({ [MCP_ENABLED_KEY]: mcpEnabled }); } catch {}
-  }
+  // ── MCP servers: names, enable/disable toggles, custom prompt (src/application/server-directory.js) ──
+  // A server that was never toggled counts as enabled. Disabled servers are hidden from the target dropdown AND
+  // filtered out of everything the AI reads (tool lists, list_mcp_servers, list_commands), so their schemas never cost tokens.
+  const { ServerDirectory } = ZSApp;
+  const serverDirectory = new ServerDirectory({
+    store: {
+      get: (key) => new Promise((resolve) => { try { chrome.storage.local.get(key, (r) => resolve(r && r[key])); } catch { resolve(undefined); } }),
+      set: (key, value) => { try { chrome.storage.local.set({ [key]: value }); } catch {} },
+    },
+    liveServers: () => (A.bridge && A.bridge.servers) || [],
+    onChange: () => { if (typeof ui !== "undefined" && ui.setTarget) ui.setTarget(selectedTargetId); },
+    log: (...args) => console.warn("[snapgentV3]", ...args),
+  });
+  const isMcpEnabled = (id) => serverDirectory.isEnabled(id);
 
   const A = {
     running: false,
@@ -723,7 +712,7 @@
   function systemPrompt() {
     return ZS.buildSystemPrompt({
       siteName: P.displayName,
-      customPrompt: ui.getCustomPrompt(),
+      customPrompt: serverDirectory.customPrompt,
       providerNotes: P.promptExtra || "",
       targetServer: selectedTargetId,
       targetName: ui.getTargetName(),
@@ -1524,78 +1513,10 @@
       if (kind === "start") startSession();
     }
 
-    // ── Custom prompt (persisted) ───────────────────────────────────────────
-    // The user's extra instructions, persisted in chrome.storage.local and
-    // appended UNDER the system prompt at session start. Cached here so
-    // startSession can read it synchronously.
-    let customPrompt = "";
-    try {
-      chrome.storage.local.get("zsCustomPrompt", (r) => {
-        if (r && typeof r.zsCustomPrompt === "string") {
-          customPrompt = r.zsCustomPrompt;
-        }
-      });
-    } catch {}
-    function getCustomPrompt() { return customPrompt; }
-
-    // ── Custom MCP servers (addons) ─────────────────────────────────────────
-    // Cached names for user-added MCP servers. The bridge remains the source of
-    // truth; this cache keeps addon names available in the target selector.
-    let customMcpServers = [];
-    try {
-      chrome.storage.local.get("zsCustomMcpServers", (r) => {
-        if (r && Array.isArray(r.zsCustomMcpServers)) {
-          customMcpServers = r.zsCustomMcpServers;
-        }
-      });
-    } catch {}
-    function saveCustomMcpServers() {
-      try { chrome.storage.local.set({ zsCustomMcpServers: customMcpServers }); } catch {}
-    }
-    // The bridge (config.json + live health) is the SOURCE OF TRUTH for which
-    // addon servers actually exist. Self-heal the local display-name cache when
-    // a configured server isn't already known.
-    function mergedMcpServers() {
-      const live = ((A.bridge && A.bridge.servers) || []).filter((sv) => sv.id !== "vscode");
-      const byId = new Map(customMcpServers.map((s) => [s.id, s]));
-      const merged = live.map((sv) => {
-        const cached = byId.get(sv.id);
-        return {
-          id: sv.id, name: (cached && cached.name) || sv.id, command: cached && cached.command,
-          alive: sv.alive, tools: sv.tools,
-        };
-      });
-      // Self-heal: cache didn't know about a server the bridge actually has.
-      let healed = false;
-      for (const sv of live) {
-        if (!byId.has(sv.id)) { customMcpServers.push({ id: sv.id, name: sv.id }); healed = true; }
-      }
-      if (healed) saveCustomMcpServers();
-      // A server we just added/removed but the bridge hasn't reported back on
-      // yet (mid-restart) - still show it, health unknown, so it doesn't blink
-      // out of the list during the few seconds the bridge is restarting.
-      for (const s of customMcpServers) {
-        if (!merged.some((m) => m.id === s.id)) merged.push({ ...s, alive: undefined, tools: undefined });
-      }
-      return merged;
-    }
-
-    function getTargetName(id = selectedTargetId) {
-      if (id === "vscode") return "VS Code";
-      const server = mergedMcpServers().find((item) => item.id === id);
-      return server ? server.name : id;
-    }
+    const getTargetName = (id = selectedTargetId) => serverDirectory.name(id);
     function setTarget(id = selectedTargetId) {
       if (!targetSelect) return;
-      const options = [
-        { id: "vscode", name: "VS Code" },
-        ...mergedMcpServers()
-          .filter((server) => server.id !== "vscode")
-          .map((server) => ({ id: server.id, name: getTargetName(server.id) })),
-      ].filter((option) => isMcpEnabled(option.id));
-      if (!options.some((option) => option.id === id)) {
-        options.push({ id, name: id });
-      }
+      const options = serverDirectory.targetOptions(id);
       const optionsKey = options.map((option) => `${option.id}:${option.name}`).join("|");
       if (targetSelect.dataset.optionsKey !== optionsKey) {
           targetSelect.innerHTML = options
@@ -1644,29 +1565,21 @@
     // ── The "more" menu (⋯) ─────────────────────────────────────────────────
     // One popover holding every secondary control. Opens above the bar.
     // ── MCP settings popup (toggle which servers are enabled) ───────────────
-    function allMcpOptions() {
-      const base = [{ id: "vscode", name: "VS Code" }];
-      const extra = mergedMcpServers()
-        .filter((s) => !base.some((b) => b.id === s.id))
-        .map((s) => ({ id: s.id, name: getTargetName(s.id) }));
-      return [...base, ...extra];
-    }
-
     // The popup itself is src/ui/mcp-settings.js; what happens when it closes is page policy.
     function openMcpSettings() {
-      const servers = mergedMcpServers();
+      const servers = serverDirectory.servers();
       ZSUi.openMcpSettings({
         document,
-        options: allMcpOptions().map((o) => ({ id: o.id, name: o.name, tools: (servers.find((sv) => sv.id === o.id) || {}).tools })),
+        options: serverDirectory.allOptions().map((o) => ({ id: o.id, name: o.name, tools: (servers.find((sv) => sv.id === o.id) || {}).tools })),
         isEnabled: isMcpEnabled,
-        setEnabled: setMcpEnabled,
+        setEnabled: (id, on) => serverDirectory.setEnabled(id, on),
         // Refresh the dropdown right away so a re-enabled server is selectable without waiting for the popup to close.
         onToggle: () => setTarget(selectedTargetId),
         onClose: () => {
           // If the active target was just disabled, move to the first enabled one and reload so the
           // whole extension restarts against it.
           if (!isMcpEnabled(selectedTargetId)) {
-            const next = allMcpOptions().find((o) => isMcpEnabled(o.id));
+            const next = serverDirectory.firstEnabled();
             if (next) {
               selectedTargetId = next.id;
               const reloadPage = () => { try { location.reload(); } catch {} };
@@ -2134,7 +2047,7 @@
     }
 
     build();
-    return { setStatus, setTarget, getTargetName, staleExtensionAlert, setStarted, setStarting, showStop, markStopping, inputCover, toast: (m) => notifications.toast(m), banner: (kind, title, msg) => notifications.banner(kind, title, msg), showImages: (images, name) => notifications.showImages(images, name), nudgeStart, updateStartGate, refreshSetup, getCustomPrompt, openMenu: (toSupport) => openMenuFn && openMenuFn(toSupport) };
+    return { setStatus, setTarget, getTargetName, staleExtensionAlert, setStarted, setStarting, showStop, markStopping, inputCover, toast: (m) => notifications.toast(m), banner: (kind, title, msg) => notifications.banner(kind, title, msg), showImages: (images, name) => notifications.showImages(images, name), nudgeStart, updateStartGate, refreshSetup, openMenu: (toSupport) => openMenuFn && openMenuFn(toSupport) };
   })();
 
   // ── Live token + timer, shown ONLY on a tool call's chip detail. The

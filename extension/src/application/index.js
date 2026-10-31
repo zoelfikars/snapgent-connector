@@ -12,3 +12,4 @@ export { PromptResender } from "./prompt-resender.js";
 export { MessageSender, resolveRetryLimit } from "./message-sender.js";
 export { SkillsService } from "./skills-service.js";
 export { SessionStarter } from "./session-starter.js";
+export { ServerDirectory } from "./server-directory.js";
