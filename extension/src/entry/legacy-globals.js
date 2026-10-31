@@ -17,9 +17,10 @@ globalThis.ZSDomain = { SKILL_MAX_BYTES, bareToolName, countSinceLastMarker, fee
 // Shared chat-adapter primitives (see infrastructure/chat/). Adapters load after this script.
 import { computeBarView } from "../ui/bar-view.js";
 import { createConfirmDialog } from "../ui/confirm-dialog.js";
+import { createNotifications } from "../ui/notifications.js";
 import { openMcpSettings } from "../ui/mcp-settings.js";
 import { openSkillsSettings } from "../ui/skills-settings.js";
 import * as chat from "../infrastructure/chat/index.js";
 globalThis.ZSChat = chat;
 
-globalThis.ZSUi = { computeBarView, createConfirmDialog, openMcpSettings, openSkillsSettings };
+globalThis.ZSUi = { computeBarView, createConfirmDialog, createNotifications, openMcpSettings, openSkillsSettings };

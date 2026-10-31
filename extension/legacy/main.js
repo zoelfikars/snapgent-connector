@@ -1459,12 +1459,12 @@
   //  UI  (control panel, onboarding, stop button, banners, toast, input cover)
   // ════════════════════════════════════════════════════════════════════════
   const ui = (() => {
-    let root, bar, stateEl, actionBtn, stopBtn, targetSelect, switchBtn, menuEl, unstableEl;
+    let root, bar, stateEl, actionBtn, stopBtn, targetSelect, switchBtn, menuEl, unstableEl, notifications;
     let targetBtn, targetMenuEl;
     let cover, coverRaf, barRaf;
     let openMenuFn = null; // set by build(); lets the popup force the panel open via runtime message
     let bridgeOk = false, workspaceReady = false, workspaceProbePending = false, workspaceProbeAt = 0;
-    let wasConnected = false, bridgeBannerEl = null;
+    let wasConnected = false;
 
     function positionMenu(anchor) {
       if (!menuEl || menuEl.hidden) return;
@@ -1492,6 +1492,7 @@
     function build() {
       root = document.createElement("div");
       root.id = "zs-root";
+      notifications = ZSUi.createNotifications({ root });
       // One consolidated status bar, anchored just above the site's composer
       // (positioned every frame by placeBar). It carries everything: live status,
       // the primary action (Start / Stop) and a "more"
@@ -1576,7 +1577,7 @@
         // text may contain double quotes (e.g. GLM's "No response…"), which would
         // terminate a title="..." attribute early and truncate the tooltip.
         unstableEl.title = P.unstableWarning;
-        unstableEl.addEventListener("click", (e) => { e.stopPropagation(); toast(P.unstableWarning); });
+        unstableEl.addEventListener("click", (e) => { e.stopPropagation(); notifications.toast(P.unstableWarning); });
       }
       buildMenu();
       // Both bar controls open the same panel; the heart lands on the Support
@@ -2021,38 +2022,15 @@
     // button and offers the reload directly rather than telling the user to go
     // restart a bridge that was never down.
     function staleExtensionAlert() {
-      // Latch it BEFORE painting, so the bar drops its frozen "Agent active ·
-      // N tools" in the same pass and never contradicts the banner.
+      // Latch it BEFORE painting, so the bar drops its frozen "Agent active · N tools" in the same pass
+      // and never contradicts the banner.
       A.staleExtension = true;
       renderBar();
-      if (bridgeBannerEl) { bridgeBannerEl.remove(); bridgeBannerEl = null; }
-      if (root.querySelector(".zs-banner.zs-stale")) return;
-      const b = document.createElement("div");
-      b.className = "zs-banner limit zs-stale";
-      b.innerHTML = `<div class="zs-banner-t">⚠ Reload page</div>
-        <div class="zs-banner-m">snapgentV3 was updated. Reload this page to continue.</div>
-        <div class="zs-banner-acts"><button class="zs-banner-reload">Reload page</button></div>`;
-      b.querySelector(".zs-banner-reload").addEventListener("click", () => location.reload());
-      root.appendChild(b);
-      bridgeBannerEl = b;
+      notifications.showStaleExtension();
     }
 
     // Show (on=true) / clear (on=false) the bridge-disconnected red banner.
-    function bridgeAlert(on) {
-      if (!on) {
-        if (bridgeBannerEl) { bridgeBannerEl.remove(); bridgeBannerEl = null; }
-        return;
-      }
-      if (bridgeBannerEl) return; // already shown
-      const b = document.createElement("div");
-      b.className = "zs-banner limit";
-      b.innerHTML = `<div class="zs-banner-t">⚠ snapgentV3 disconnected</div>
-        <div class="zs-banner-m">Bridge stopped. Start the bridge again and keep your project open in VS Code.</div>
-        <div class="zs-banner-acts"><button class="zs-banner-x">Close</button></div>`;
-      b.querySelector(".zs-banner-x").addEventListener("click", () => { b.remove(); if (bridgeBannerEl === b) bridgeBannerEl = null; });
-      root.appendChild(b);
-      bridgeBannerEl = b;
-    }
+    function bridgeAlert(on) { notifications.setBridgeLost(on); }
 
     // Show (v=true) / hide the "■ Stop" button while the agent is busy. The
     // primary action button swaps out for it (handled in renderBar via busy).
@@ -2096,7 +2074,7 @@
       if (A.started || !P.isFreshChat()) return;
       if (!nudged) {
         nudged = true;
-        toast(`Click “▶︎ Start” to begin.`);
+        notifications.toast(`Click “▶︎ Start” to begin.`);
       }
       if (!actionBtn) return;
       actionBtn.classList.add("zs-flash");
@@ -2513,62 +2491,8 @@
       place();
     }
 
-    function toast(msg) {
-      const t = document.createElement("div");
-      t.className = "zs-toast";
-      t.textContent = msg;
-      root.appendChild(t);
-      setTimeout(() => t.classList.add("show"), 10);
-      setTimeout(() => { t.classList.remove("show"); setTimeout(() => t.remove(), 300); }, 3500);
-    }
-
-    function banner(kind, title, msg) {
-      const b = document.createElement("div");
-      b.className = `zs-banner ${kind}`;
-      b.innerHTML = `<div class="zs-banner-t"></div><div class="zs-banner-m"></div>
-        <div class="zs-banner-acts">
-          <button class="zs-banner-x">Close</button>
-        </div>`;
-      b.querySelector(".zs-banner-t").textContent = title;
-      b.querySelector(".zs-banner-m").textContent = msg;
-      b.querySelector(".zs-banner-x").addEventListener("click", () => b.remove());
-      root.appendChild(b);
-    }
-
-    // Left-hand snapgentV3 popup showing the latest screen_capture. Fed from the
-    // in-memory base64 (a data: URL always renders), so it works identically on
-    // every provider and never touches the site's DOM. Only the most recent
-    // capture is kept - a new one replaces the old.
-    function showImages(images, toolName) {
-      root.querySelectorAll(".zs-shot").forEach((e) => e.remove());
-      const wrap = document.createElement("div");
-      wrap.className = "zs-shot";
-      const hdr = document.createElement("div");
-      hdr.className = "zs-shot-hdr";
-      const ttl = document.createElement("span");
-      ttl.className = "zs-shot-ttl";
-      ttl.textContent = `${toolName} · ${images.length} image${images.length > 1 ? "s" : ""}`;
-      const close = document.createElement("button");
-      close.className = "zs-shot-x";
-      close.textContent = "✕";
-      close.addEventListener("click", () => wrap.remove());
-      hdr.appendChild(ttl);
-      hdr.appendChild(close);
-      wrap.appendChild(hdr);
-      const body = document.createElement("div");
-      body.className = "zs-shot-body";
-      for (const img of images) {
-        const el = document.createElement("img");
-        el.className = "zs-shot-img";
-        el.src = `data:${img.mimeType || "image/jpeg"};base64,${img.data}`;
-        body.appendChild(el);
-      }
-      wrap.appendChild(body);
-      root.appendChild(wrap);
-    }
-
     build();
-    return { setStatus, setTarget, getTargetName, staleExtensionAlert, setStarted, setStarting, showStop, markStopping, inputCover, toast, banner, showImages, nudgeStart, updateStartGate, refreshSetup, getCustomPrompt, openMenu: (toSupport) => openMenuFn && openMenuFn(toSupport) };
+    return { setStatus, setTarget, getTargetName, staleExtensionAlert, setStarted, setStarting, showStop, markStopping, inputCover, toast: (m) => notifications.toast(m), banner: (kind, title, msg) => notifications.banner(kind, title, msg), showImages: (images, name) => notifications.showImages(images, name), nudgeStart, updateStartGate, refreshSetup, getCustomPrompt, openMenu: (toSupport) => openMenuFn && openMenuFn(toSupport) };
   })();
 
   // ── Live token + timer, shown ONLY on a tool call's chip detail. The
