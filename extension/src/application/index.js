@@ -2,3 +2,6 @@
 export { ToolCatalogue } from "./tool-catalogue.js";
 export { ToolRunner } from "./tool-runner.js";
 export { callWithGuards } from "./call-guard.js";
+export { AgentLoop } from "./agent-loop.js";
+export { StallWatchdog } from "./stall-watchdog.js";
+export { ToolReminder, REMIND_TOOLS_EVERY } from "./tool-reminder.js";

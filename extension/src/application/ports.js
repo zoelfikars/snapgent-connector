@@ -38,4 +38,42 @@
  * @property {typeof clearInterval} clearInterval
  */
 
+/**
+ * @typedef {Object} ChatTurnsPort  The conversation, as the loop sees it.
+ * @property {(base: *) => Promise<object>} next   Wait for the model's next reply (a classified response).
+ * @property {(text: string, images?: object[]|null) => Promise<*>} submit  Send text; resolves to the new base.
+ * @property {(item: object) => boolean} isHalted    Was this turn halted by a stop?
+ * @property {() => Promise<boolean>} resumeTruncated  Click the site's Continue; true if generation resumed.
+ */
+
+/**
+ * @typedef {Object} LoopViewPort  Everything the loop draws or announces.
+ * @property {(level: string, title: string, text: string) => void} banner
+ * @property {(text: string) => void} toast
+ * @property {() => void} keepCover   Keep the "agent is working" cover up (e.g. while parked).
+ * @property {(chip: {item: object, name: string, detail: string, category: string}) => void} parseErrorChip
+ * @property {(item: object, call: object, category: string, text: {arg: string, body: string}) => void} toolRunning
+ * @property {() => void} toolFinished
+ * @property {(item: object, call: object, category: string) => void} toolStopped
+ * @property {(item: object, call: object, outcome: object) => void} toolSettled
+ */
+
+/**
+ * @typedef {Object} LoopLifecyclePort  Run-state of the loop, owned by the page.
+ * @property {() => void} start   Mark running, lock input, show Stop.
+ * @property {() => void} end     Undo start; always called, even after an error.
+ * @property {() => boolean} isStopped
+ * @property {() => void} halt    Ask the loop to stop (used by the stall watchdog).
+ */
+
+/**
+ * @typedef {Object} LoopToolsPort  Tool-related state the loop reads and updates.
+ * @property {() => boolean} hasCatalogue
+ * @property {(bareName: string) => boolean} isImageTool
+ * @property {(name: string) => void} learnImageTool
+ * @property {() => boolean} hasPendingImages
+ * @property {() => object[]|null} takePendingImages
+ * @property {() => string} reminderText
+ */
+
 export {};

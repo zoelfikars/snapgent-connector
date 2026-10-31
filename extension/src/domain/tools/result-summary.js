@@ -75,3 +75,9 @@ export function outSummary(feedback) {
   if (isErr) return first;
   return lines > 1 ? `${first} · ${lines} lines` : first;
 }
+
+/** Full arguments, shown in a tool chip's expandable body. */
+export function callBody(call) {
+  const args = call.arguments || {};
+  try { return JSON.stringify(args, null, 2); } catch { return String(args); }
+}

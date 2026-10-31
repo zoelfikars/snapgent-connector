@@ -15,7 +15,7 @@
   "use strict";
   const P = ZSProvider;
   const T = P.timings;
-  const { argSummary, outSummary, feedbackIsError, stripOutputPrefix } = ZSDomain;
+  const { feedbackIsError } = ZSDomain;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const log = (...a) => console.log("[snapgentV3]", ...a);
 
@@ -185,7 +185,6 @@
     // Successful tool calls since the last command-list reminder. DeepSeek (and
     // others) can drift away from the exact command names over a long session,
     // so we re-inject the list every REMIND_TOOLS_EVERY calls (see agentLoop).
-    toolCallsSinceReminder: 0,
     // When the system prompt was last re-stated. Diagnostic only - whether one
     // is OWED is derived from the conversation itself, never from a counter
     // (see sinceLastSys / sysResendDue).
@@ -880,288 +879,70 @@
   const runTool = (call) => toolRunner.run(call);
   const activeTools = () => catalogue.active();
 
-  // Full args / code, shown in a tool chip's expandable body.
-  function callBody(call) {
-    const a = call.arguments || {};
-    try { return JSON.stringify(a, null, 2); } catch { return String(a); }
-  }
-
   // ════════════════════════════════════════════════════════════════════════
-  //  AGENTIC LOOP
+  //  AGENTIC LOOP (src/application/agent-loop.js), wired to this page via ports
   // ════════════════════════════════════════════════════════════════════════
-  async function agentLoop(base) {
-    if (A.running) return;
-    A.running = true;
-    A.resumeArmed = false; // loop now owns the turn; drop the regenerate grace
-    A.stop = false;
-    A.stopping = false; // clean slate: never inherit a stale "Stopping…" from a
-                        // Stop click that landed before this loop actually started
-    A.loopKey = null; // pinned by syncSessionState once this chat has an id + content
-    let truncCount = 0;
-    const MAX_TRUNC = 6;
-    // Re-send the command list after this many successful tool calls. Kept high
-    // so the reminder does not bloat the context too often.
-    const REMIND_TOOLS_EVERY = 20;
-    ui.showStop(true);
-    P.setInputLock(true); // prevent user from typing while the agent is active
-    ui.inputCover(true);  // keep the "Agent is working" cover up for the WHOLE loop
-    diag("loop.start", { base });
-    // Watchdog: if the tab is visible, no tool is running and NOTHING has changed
-    // (turn counts, stream length, generating flag) for WD_STALL_MS, the loop is
-    // stuck waiting. Stop it so the cover and Stop button are released by the
-    // finally block below, and tell the user instead of leaving a dead bar.
-    const WD_STALL_MS = 180000;
-    let _wdSig = "", _wdAt = Date.now();
-    const _wd = setInterval(() => {
-      if (!A.running) return;
-      if (document.hidden || A.parked || A.toolRunning || A.injecting) { _wdAt = Date.now(); return; }
-      const sig = [P.assistantCount(), P.userCount(), P.streamLen ? P.streamLen() : 0, P.isGenerating() ? 1 : 0].join("|");
-      if (sig !== _wdSig) { _wdSig = sig; _wdAt = Date.now(); return; }
-      if (Date.now() - _wdAt > WD_STALL_MS) {
-        diag("loop.watchdog", { sig });
-        ui.banner("warn", "Agent stopped waiting", "No progress for 3 min. Send continue to resume.");
-        A.stop = true;
-        _wdAt = Date.now();
-      }
-    }, 5000);
-    try {
-      while (!A.stop) {
-        // Gate the WHOLE cycle on tab visibility. We only advance - read the
-        // reply, PARSE it, EXECUTE a tool, inject the result - while the AI tab
-        // is the FOREGROUND tab of its Edge window. document.visibilityState
-        // (mirrored by document.hidden) is the right signal, NOT window focus:
-        //  - Edge loses OS focus but the AI tab stays the active tab (user is
-        //    working in another app) -> still "visible" -> the agent keeps
-        //    running, exactly as wanted.
-        //  - The AI tab is backgrounded (another tab in front) or the window is
-        //    minimized -> "hidden" -> pause here. Background tabs throttle
-        //    rendering/timers, which made DOM reads unreliable (misparse,
-        //    duplicate sends - see the send-side guard in submitAndGetBase).
-        // Parking here means we never START a parse/exec cycle off-screen; the
-        // send step re-checks too, so a switch-away mid-generation is covered.
-        if (document.hidden && !A.stop) {
-          diag("loop.waitVisible");
-          ui.inputCover(true); // keep the "Agent is working" cover up while parked
-          if (!(await waitVisible()) || A.stop) break; // park (no cap) until foreground; break only on user stop
-          diag("loop.visibleAgain");
-        }
-        const res = await waitForResponse(base);
-        diag("response", { kind: res.kind });
-        if (A.stop || res.kind === "stopped") break;
+  const { AgentLoop, ToolReminder } = ZSApp;
+  const toolReminder = new ToolReminder();
 
-        if (res.kind === "context_limit") {
-          ui.banner("limit", `${P.displayName} reached its context limit`,
-            (res.detail || "") + " New chat.");
-          break;
-        }
-        if (res.kind === "too_long") {
-          ui.banner("limit", "Conversation too long",
-            `Too long. Start a new chat.`);
-          break;
-        }
-        if (res.kind === "timeout") {
-          ui.banner("warn", `No response from ${P.displayName}`,
-            `Timed out. Agent stopped.`);
-          break;
-        }
-        // A genuinely empty turn is effectively never produced (the warm-up guard
-        // waits out slow starts). It DOES happen when the site drops a reply, and
-        // ending the loop silently is what made this the single most confusing
-        // failure: the pending command just settles to a grey "not run" with no
-        // explanation anywhere. Say what happened.
-        if (res.kind === "empty") {
-          diag("empty.end");
-          ui.banner("warn", `${P.displayName} returned an empty reply`,
-            `Nothing received. Try again.`);
-          break;
-        }
+  const loopChat = {
+    next: (base) => waitForResponse(base),
+    submit: (text, images) => submitAndGetBase(text, images),
+    isHalted: (item) => P.turnHalted(item),
+    resumeTruncated: async () => !!(P.clickContinueBtn() && await waitFor(() => P.isGenerating(), 2500)),
+  };
 
-        // The turn stopped with the site's "Continue" affordance.
-        if (res.kind === "truncated") {
-          // If the turn carries the halted marker (a stop - user OR self-halt),
-          // respect it and do NOT auto-resume.
-          if (P.turnHalted(res.item)) { diag("truncated.halted"); break; }
-          // Otherwise it truncated by length → continue the SAME turn. Prefer
-          // the native Continue button; fall back to a continuation message.
-          if (truncCount < MAX_TRUNC) {
-            truncCount++;
-            if (P.clickContinueBtn() && await waitFor(() => P.isGenerating(), 2500)) {
-              diag("truncated.continued");
-              continue; // same turn resumes (base unchanged)
-            }
-            diag("truncated.sendFallback");
-            ui.toast("Resuming…");
-            base = await submitAndGetBase(ZS.FEEDBACK.truncated);
-            continue;
-          }
-          if (res.text) break; // give up resuming; keep what we have as the answer
-          ui.banner("warn", "Reply kept getting cut off",
-            "Too long. Try shorter.");
-          break;
-        }
-        truncCount = 0;
+  const loopView = {
+    banner: (level, title, text) => ui.banner(level, title, text),
+    toast: (text) => ui.toast(text),
+    keepCover: () => ui.inputCover(true),
+    // The command turn ended in a parse error and NEVER ran: paint its chip as an error
+    // (owned, so the sweep will not repaint it with the green check it stamps on any command turn).
+    parseErrorChip: ({ item, name, detail, category }) => decorate.toolBox(item, name, "err", detail, true, "", category),
+    toolRunning(item, call, category, { arg, body }) {
+      decorate.toolBox(item, call.tool, "run", arg, true, body, category);
+      A.toolSettle = null; // a fresh call: no settled outcome yet
+      A.toolRunning = true;
+      A.toolStart = Date.now();
+      A.toolName = call.tool;
+      A.toolItem = item;
+      A.toolArg = arg;
+    },
+    toolFinished: () => { A.toolRunning = false; },
+    toolStopped(item, call, category) {
+      // MARK the turn so the sweep classifier never repaints it done once generation ends.
+      if (item) { item.dataset.zStopped = "1"; rememberHalted(item); }
+      decorate.toolBox(item, call.tool, "err", "stopped", true, "", category);
+    },
+    toolSettled(item, call, outcome) {
+      decorate.toolBox(item, call.tool, outcome.phase, outcome.summary, true, outcome.body, outcome.category);
+      // Snapshot the settled outcome: if the site swaps this turn's DOM node while we wait for the
+      // model's next turn, the sweep re-owns the fresh node with this outcome instead of re-spinning.
+      A.toolSettle = {
+        phase: outcome.phase, detail: outcome.summary, body: outcome.body, category: outcome.category,
+        count: P.assistantCount(),
+        // Node identity of the settled turn (virtualization-proof), when the provider exposes it.
+        id: P.lastAssistantId ? P.lastAssistantId() : undefined,
+      };
+    },
+  };
 
-        if (res.kind === "parse_error") {
-          // The command turn ended in a parse error - it NEVER ran. Paint its chip
-          // as an error (owned, so the sweep won't repaint it the green ✓ "done" it
-          // stamps on any command-shaped turn once generation ends - the misleading
-          // "chip says OK, result says error" state seen live on GLM's truncated
-          // multi-line command).
-          const failName = ZSParse.toolNameFromText(res.raw || "") || "command";
-          if (res.item) {
-            const detail = res.reason === "unclosed" ? "cut off"
-              : res.reason === "envelope" ? "bad format"
-              // DSML is not JSON at all - it is DeepSeek's own markup - so the
-              // default "bad JSON" would send the user (and anyone reading a bug
-              // report) looking for a syntax slip that does not exist.
-              : res.reason === "dsml" ? "wrong format"
-              : "bad JSON";
-            decorate.toolBox(res.item, failName, "err", detail, true, "", ZS.toolCategory(failName));
-          }
-          base = await submitAndGetBase(ZS.FEEDBACK.parseError(res.reason));
-          continue;
-        }
-        if (res.kind === "text") break; // final answer
-
-        if (res.kind === "tool") {
-          const calls = res.calls;
-          if (calls.length > 1) {
-            base = await submitAndGetBase(ZS.FEEDBACK.multiTool(calls.map((c) => c.tool || "?")));
-            continue;
-          }
-          const call = calls[0];
-          // A tool ALREADY seen to return an image this session gets the "screen"
-          // chip optimistically at run time (parity with the known screen_capture),
-          // even though its name alone wouldn't reveal it. First-ever call of an
-          // unknown image tool stays generic here and upgrades at result time below.
-          const learnedImg = A.imageTools.has(bareToolName(call.tool));
-          const category = learnedImg ? "screen" : ZS.toolCategory(call.tool);
-          diag("tool.runCat", { name: call.tool, learnedImg, category });
-
-          // Park BEFORE painting the chip / stamping the clock / marking the turn
-          // dispatched. runTool() gates on visibility too (it is the choke point
-          // that also covers the bootstrap), but parking only there would leave
-          // this block's side effects applied for the whole minimize:
-          //   - the chip spins "running" while nothing actually runs, and
-          //     elapsedOn(zsToolT0) counts the parked time, so a 20-min minimize
-          //     renders a bogus "1200.0s" on the call;
-          //   - rememberExecuted() would mark the turn dispatched before it ever
-          //     ran, so a reload/close while parked loses the command for good -
-          //     the auto-resume watchdog refuses to re-fire an "executed" turn.
-          // Parking first keeps all of that truthful: we only commit once we are
-          // foreground and about to really dispatch.
-          if (document.hidden && !A.stop) {
-            diag("tool.parkBeforeDispatch", { name: call.tool });
-            if (!(await waitVisible()) || A.stop) break;
-          }
-          // Loading chip with the real args (loop owns this item from here).
-          decorate.toolBox(res.item, call.tool, "run", argSummary(call), true, callBody(call), category);
-          A.toolSettle = null; // a fresh call: no settled outcome yet
-          A.toolRunning = true;
-          A.toolStart = Date.now();
-          A.toolName = call.tool;
-          A.toolItem = res.item;
-          A.toolArg = argSummary(call);
-          // Record this turn as dispatched OFF the DOM so the auto-resume
-          // watchdog never re-fires it after a scroll re-render wipes the node's
-          // zloop/zResume markers (see the `executed` map).
-          rememberExecuted(res.item);
-          diag("tool.start", { name: call.tool });
-          const feedback = await runTool(call);
-          A.toolRunning = false;
-          diag("tool.done", { name: call.tool, ok: !feedback.startsWith("ERROR"), out: feedback.slice(0, 50) });
-          if (A.stop) {
-            // User halted mid-tool: settle the spinning chip so it doesn't look
-            // stuck loading forever, and MARK the turn so the sweep classifier
-            // never repaints it ✓ done once generation ends (the real cause of a
-            // stopped call still going green a moment later).
-            if (res.item) { res.item.dataset.zStopped = "1"; rememberHalted(res.item); }
-            decorate.toolBox(res.item, call.tool, "err", "stopped", true, "", category);
-            break;
-          }
-          const isErr = feedbackIsError(feedback);
-          const outBody = stripOutputPrefix(feedback);
-          // Trace the chip's DERIVED phase vs summary. An MCP tool whose
-          // output leads with a warning/diagnostic line resolves ✓ done - the
-          // payload starts "Output of…", not "ERROR" - yet outSummary shows its
-          // FIRST line, which is the warning. Captures firstLine vs a later
-          // success line so we can see the mismatch without guessing.
-          {
-            const lns = outBody.split("\n").map((l) => l.trim()).filter(Boolean);
-            diag("tool.result", { name: call.tool, isErr, phase: isErr ? "err" : "done",
-              summary: outSummary(feedback), lineCount: lns.length,
-              firstLine: (lns[0] || "").slice(0, 90), lastLine: (lns[lns.length - 1] || "").slice(0, 90) });
-          }
-          // A tool (from any MCP server) that actually RETURNED an
-          // image becomes a "screen" chip - even if its name never let us guess.
-          // Reactive, not predictive: A.pendingImages is set by runTool before it
-          // returns. Remember the name so its next call is optimistic (see above).
-          const hasImages = !!(A.pendingImages && A.pendingImages.length);
-          if (hasImages) rememberImageTool(call.tool);
-          const resultCat = hasImages ? "screen" : category;
-          decorate.toolBox(res.item, call.tool, isErr ? "err" : "done", outSummary(feedback),
-            true, outBody, resultCat);
-          // Snapshot the settled outcome. If the site swaps this turn's DOM node
-          // while we wait for the model's next turn (wiping the chip AND the
-          // zloop ownership dataset), the sweep re-owns the fresh node with this
-          // outcome instead of letting branch-3 classification re-spin a "run"
-          // chip on an already-executed call.
-          A.toolSettle = {
-            phase: isErr ? "err" : "done", detail: outSummary(feedback),
-            body: outBody, category: resultCat, count: P.assistantCount(),
-            // Node IDENTITY of the settled turn (virtualization-proof), when the
-            // provider exposes it. The count guard alone misfires on Qwen: the
-            // list virtualizes so assistantCount() doesn't grow for the model's
-            // NEXT turn, and back-to-back calls to the SAME tool defeat the name
-            // guard too - the sweep then re-owned the STREAMING next turn's chip
-            // with the previous done/err outcome (seen live: 5x chip.reown with
-            // gen:true, rp tiny).
-            id: P.lastAssistantId ? P.lastAssistantId() : undefined,
-          };
-
-          // Re-inject the command list every REMIND_TOOLS_EVERY successful calls.
-          // Appended UNDER the tool result and clearly marked as a reminder, so a
-          // model that has drifted from the exact command names gets re-anchored
-          // without it looking like a new result to act on. Errors don't count
-          // (they already restate what's wrong) and list_commands is redundant.
-          let toSend = feedback;
-          if (!isErr && call.tool !== "list_commands" && catalogue.hasAny()) {
-            A.toolCallsSinceReminder++;
-            if (A.toolCallsSinceReminder >= REMIND_TOOLS_EVERY) {
-              A.toolCallsSinceReminder = 0;
-              // Scope the reminder to the selected target, exactly like
-              // list_commands: re-injecting EVERY connected server's tools merged
-              // flat would bloat the model's context.
-              toSend += ZS.toolsReminder(activeTools(), ui.getTargetName(), selectedTargetId);
-              diag("tools.reminder", { after: REMIND_TOOLS_EVERY });
-            }
-          }
-          // This result becomes a turn, so it counts toward the re-statement
-          // budget - context volume is what makes the site summarise, and the
-          // volume is overwhelmingly tool results, not how often the user types.
-          bumpSys("results");
-          // Ride the system-prompt re-statement out on this result if one is due
-          // and it fits (see withSysResend - the result itself is never trimmed).
-          toSend = withSysResend(toSend);
-          const images = A.pendingImages;
-          A.pendingImages = null;
-          diag("images.consumed", { count: images ? images.length : 0 });
-          base = await submitAndGetBase(toSend, images);
-        }
-      }
-    } catch (e) {
-      diag("loop.error", { msg: String((e && e.message) || e) });
-      ui.banner("warn", "Internal loop error", String((e && e.message) || e));
-    } finally {
+  const loopLifecycle = {
+    start() {
+      A.running = true;
+      A.resumeArmed = false; // loop now owns the turn; drop the regenerate grace
+      A.stop = false;
+      A.stopping = false; // never inherit a stale "Stopping…" from a Stop click before the loop started
+      A.loopKey = null; // pinned by syncSessionState once this chat has an id + content
+      ui.showStop(true);
+      P.setInputLock(true); // prevent user from typing while the agent is active
+      ui.inputCover(true); // keep the "Agent is working" cover up for the WHOLE loop
+    },
+    end() {
       A.running = false;
       A.stop = false;
-      // Keep the "Stopping…" state while the site's stream is still draining
-      // after a user stop: the loop often ends BEFORE the native stop takes
-      // effect (loop.end fires with gen still true - seen live on DeepSeek),
-      // and clearing the flag here let the next sweep restore a clickable
-      // "■ Stop" for the last beat of the dying stream (the Stopping… → Stop →
-      // gone bounce). The sweep's self-heal clears it - and retries the native
-      // stop - once the site is actually quiet.
+      // Keep "Stopping…" while the site's stream is still draining after a user stop, otherwise the
+      // next sweep restores a clickable "■ Stop" for the last beat of the dying stream.
       const draining = A.stopping && A.started && P.isHardGenerating();
       if (A.stopping && draining) diag("stop.drain", { keptStopping: true });
       A.stopping = draining;
@@ -1169,12 +950,44 @@
       A.toolSettle = null;
       A.loopKey = null;
       ui.showStop(false);
-      clearInterval(_wd);
       ui.inputCover(false); // lift the "Agent is working" cover when the loop ends
       P.setInputLock(false); // always unlock, even on error or stop
-      diag("loop.end");
-    }
-  }
+    },
+    isStopped: () => A.stop,
+    halt: () => { A.stop = true; },
+  };
+
+  const loopTools = {
+    hasCatalogue: () => catalogue.hasAny(),
+    isImageTool: (bareName) => A.imageTools.has(bareName),
+    learnImageTool: (name) => rememberImageTool(name),
+    hasPendingImages: () => !!(A.pendingImages && A.pendingImages.length),
+    takePendingImages: () => { const images = A.pendingImages; A.pendingImages = null; return images; },
+    // Scoped to the selected target, like list_commands: all servers merged flat would bloat the context.
+    reminderText: () => ZS.toolsReminder(activeTools(), ui.getTargetName(), selectedTargetId),
+  };
+
+  const loop = new AgentLoop({
+    chat: loopChat,
+    view: loopView,
+    lifecycle: loopLifecycle,
+    visibility: visibilityPort,
+    runner: toolRunner,
+    tools: loopTools,
+    memory: { executed: (item) => rememberExecuted(item) },
+    // A result becomes a turn, so it counts toward the system-prompt re-statement budget and may carry it.
+    outbox: { prepare: (text) => { bumpSys("results"); return withSysResend(text); } },
+    reminder: toolReminder,
+    // Nothing observable changing while the tab is visible and no tool runs means the loop is stuck.
+    activity: {
+      signature: () => [P.assistantCount(), P.userCount(), P.streamLen ? P.streamLen() : 0, P.isGenerating() ? 1 : 0].join("|"),
+      isPaused: () => document.hidden || A.parked || A.toolRunning || A.injecting,
+    },
+    timers: window,
+    displayName: () => P.displayName,
+    diag,
+  });
+  const agentLoop = (base) => (A.running ? undefined : loop.run(base));
 
   // Mark the current assistant turn as user-halted so the sweep classifier shows
   // its command chip as "stopped" instead of repainting it ✓ done when
@@ -1626,7 +1439,7 @@
     const myGen = ++A.startGen;   // identity of THIS bootstrap
     A.startingKey = null;          // unknown until the conversation gets an id
     const alive = () => A.startGen === myGen; // false once superseded/aborted
-    A.toolCallsSinceReminder = 0; // fresh reminder cadence for the new session
+    toolReminder.reset(); // fresh reminder cadence for the new session
     ui.setStarting(true);
     ui.updateStartGate(); // refresh the bar into its "starting" state
     P.setInputLock(true); // block user input during bootstrap

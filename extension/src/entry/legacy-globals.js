@@ -3,15 +3,14 @@
 // still read these as globals. Shrinks as legacy code moves behind modules.
 import * as domain from "../domain/index.js";
 import { bareToolName } from "../domain/tools/names.js";
-import { ToolCatalogue, ToolRunner } from "../application/index.js";
-import { formatCatalogue } from "../domain/tools/catalogue.js";
-import { argSummary, outSummary, feedbackIsError, stripOutputPrefix } from "../domain/tools/result-summary.js";
+import { AgentLoop, ToolCatalogue, ToolReminder, ToolRunner } from "../application/index.js";
+import { feedbackIsError } from "../domain/tools/result-summary.js";
 
 const { parser, ...prompt } = domain;
 globalThis.ZSParse = parser;
 globalThis.ZS = prompt;
-globalThis.ZSApp = { ToolCatalogue, ToolRunner };
-globalThis.ZSDomain = { bareToolName, formatCatalogue, argSummary, outSummary, feedbackIsError, stripOutputPrefix };
+globalThis.ZSApp = { AgentLoop, ToolCatalogue, ToolReminder, ToolRunner };
+globalThis.ZSDomain = { bareToolName, feedbackIsError };
 
 // Shared chat-adapter primitives (see infrastructure/chat/). Adapters load after this script.
 import * as chat from "../infrastructure/chat/index.js";

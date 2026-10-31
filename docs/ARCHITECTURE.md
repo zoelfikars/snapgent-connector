@@ -50,8 +50,10 @@ extension/
       prompt/                system-prompt · feedback · reminder
       tools/                 category · catalogue · result-summary · names · isolation
                              virtual-commands · result-feedback
+      agent/                 turn-policy (what to do with each kind of reply)
       constants.js
-    application/             ToolRunner · ToolCatalogue · call-guard · ports (typedefs)
+    application/             AgentLoop · ToolRunner · ToolCatalogue · StallWatchdog · ToolReminder
+                             call-guard · ports (typedefs)
     infrastructure/chat/     waitFor · StreamSampler · dom-helpers (shared by adapters)
     entry/                   background.js · popup.js · legacy-globals.js
   legacy/                    not yet migrated (see Status): main.js, providers/*
@@ -105,7 +107,8 @@ shippable.
 | Manifest, host lists, per-browser build | **Migrated** (`sites/`, `build/`) |
 | Bridge origin check | **Done** (`bridge.py`) |
 | Tool execution (`runTool`, catalogue, isolation, `list_commands`, result shaping) | **Migrated** to `application/` + `domain/tools/`, tested with fake ports |
-| `legacy/main.js` (~4.3k lines: loop + session + chips + UI) | Next: `AgentLoop`, `Session`, then `ui/` |
+| Agent loop (`agentLoop`: turn policy, lifecycle, stall watchdog, reminder cadence) | **Migrated** to `domain/agent` + `application/`, scripted-scenario tests |
+| `legacy/main.js` (~4.1k lines: session bootstrap + response watcher + chips + UI) | Next: `Session`, response watcher, then `ui/` |
 | `legacy/providers/*` (12 adapters, ~8.1k lines) | Shared primitives extracted; adapter family factory next |
 | `entry/background.js` | Bridge client + message router still in one file |
 
@@ -122,10 +125,10 @@ shippable.
    (`getEditor`, `writeText`, `snapshot`, `readAssistant`) becomes a
    `createGenericAdapter(selectors)` factory; the other eight keep their quirks
    behind a documented adapter contract (`ChatPort`).
-2. **`application/`**: `ToolRunner` *(done: isolation checks, `list_commands`,
-   timeout/stop racing, result shaping)*. Still to extract from `main.js`:
-   `AgentLoop` (turn → parse → run → feed back) and `Session` (bootstrap,
-   reminders, re-injection), against the same ports, with fake-port tests.
+2. **`application/`**: `ToolRunner` and `AgentLoop` *(done)*. Still to extract
+   from `main.js`: `Session` (bootstrap, system-prompt re-injection, skills) and
+   the response watcher (`waitForResponse`, ~400 lines of classification), which
+   would complete the `ChatTurnsPort` the loop already depends on.
 3. **`ui/`**: split the ~1.5k-line `ui` IIFE into `bar`, `target-menu`,
    `mcp-settings`, `banners`; split `decorate` (chips) into `chips` + `camouflage`.
    Rendering takes a state object and returns DOM, so view state is testable.
