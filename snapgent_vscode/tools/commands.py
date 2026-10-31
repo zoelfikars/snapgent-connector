@@ -9,6 +9,7 @@ from typing import List, Optional
 from ..context import Context
 from ..limits import COMMAND_TIMEOUT_SECONDS, SAFE_PROJECT_SCRIPTS, SCRIPT_TIMEOUT_SECONDS
 from ..process import run_process
+from ..security.commands import unsafe_for_cmd
 from .registry import EXECUTE, tool
 from .schema import STR, STR_LIST
 
@@ -23,9 +24,17 @@ def package_manager(root: Path) -> str:
     return "npm"
 
 
-def shell_wrap(command: List[str]) -> List[str]:
-    """On Windows, npm/pnpm/... are .cmd shims that need cmd.exe."""
-    return ["cmd.exe", "/c", *command] if os.name == "nt" else command
+def shell_wrap(command: List[str], windows: Optional[bool] = None) -> List[str]:
+    """On Windows, npm/pnpm/... are .cmd shims that need cmd.exe, which would run `& other-command`
+    smuggled into any argument; refuse such arguments instead of trusting the quoting."""
+    if windows is None:
+        windows = os.name == "nt"
+    if not windows:
+        return command
+    unsafe = unsafe_for_cmd(command)
+    if unsafe:
+        raise ValueError(f"Refusing arguments with shell metacharacters on Windows: {unsafe[0][:60]!r}")
+    return ["cmd.exe", "/c", *command]
 
 
 @tool("run_command", "Run a command with the workspace as its working directory.",

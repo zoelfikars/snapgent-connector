@@ -8,6 +8,13 @@ from ..paths import relative, resolve_inside
 from .registry import DESTRUCTIVE, WRITE, tool
 from .schema import BOOL, STR
 
+def _wrote(ctx: Context, path) -> str:
+    """Record that the agent wrote `path` (see SessionState) and return its workspace-relative form."""
+    rel = relative(path, ctx.root)
+    ctx.session.note_write(rel)
+    return rel
+
+
 EDIT_ITEM = {"type": "object", "properties": {"old_text": STR, "new_text": STR}, "required": ["old_text", "new_text"]}
 
 
@@ -20,7 +27,7 @@ def create_file(ctx: Context, path: str, content: str = "") -> str:
             file.write(content)
     except FileExistsError as error:
         raise FileExistsError(f"File already exists: {path}") from error
-    return f"Created {relative(target, ctx.root)}"
+    return f"Created {_wrote(ctx, target)}"
 
 
 @tool("write_file", "Write or replace a UTF-8 text file inside the workspace.", {"path": STR, "content": STR}, ["path", "content"], risk=WRITE)
@@ -28,7 +35,7 @@ def write_file(ctx: Context, path: str, content: str) -> str:
     target = resolve_inside(path, ctx.root)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(content, encoding="utf-8")
-    return f"Saved {relative(target, ctx.root)}"
+    return f"Saved {_wrote(ctx, target)}"
 
 
 @tool("edit_file", "Replace an exact text snippet; by default the snippet must be unique.",
@@ -46,7 +53,7 @@ def edit_file(ctx: Context, path: str, old_text: str, new_text: str, replace_all
     if not replace_all and occurrences != 1:
         raise ValueError(f"old_text occurs {occurrences} times; provide a unique snippet or set replace_all.")
     target.write_text(content.replace(old_text, new_text) if replace_all else content.replace(old_text, new_text, 1), encoding="utf-8")
-    return f"Updated {relative(target, ctx.root)} ({occurrences if replace_all else 1} replacement(s))"
+    return f"Updated {_wrote(ctx, target)} ({occurrences if replace_all else 1} replacement(s))"
 
 
 @tool("apply_patch", "Apply several exact text replacements to one file; each old_text must match exactly once and nothing is written if any edit fails.",
@@ -69,7 +76,7 @@ def apply_patch(ctx: Context, path: str, edits: List[Dict[str, Any]]) -> str:
             raise ValueError(f"Edit {index}: old_text occurs {occurrences} times; it must match exactly once. No changes were written.")
         content = content.replace(old_text, new_text, 1)
     target.write_text(content, encoding="utf-8")  # only reached when every edit applied
-    return f"Patched {relative(target, ctx.root)} ({len(edits)} edit(s))"
+    return f"Patched {_wrote(ctx, target)} ({len(edits)} edit(s))"
 
 
 @tool("create_directory", "Create a directory inside the workspace.", {"path": STR}, ["path"], risk=WRITE)
@@ -96,7 +103,7 @@ def _transfer(ctx: Context, source: str, destination: str):
 def move_file(ctx: Context, source: str, destination: str) -> str:
     source_path, destination_path = _transfer(ctx, source, destination)
     source_path.rename(destination_path)
-    return f"Moved {relative(source_path, ctx.root)} to {relative(destination_path, ctx.root)}"
+    return f"Moved {relative(source_path, ctx.root)} to {_wrote(ctx, destination_path)}"
 
 
 @tool("copy_file", "Copy a file inside the workspace without overwriting a destination.",
@@ -104,7 +111,7 @@ def move_file(ctx: Context, source: str, destination: str) -> str:
 def copy_file(ctx: Context, source: str, destination: str) -> str:
     source_path, destination_path = _transfer(ctx, source, destination)
     shutil.copy2(source_path, destination_path)
-    return f"Copied {relative(source_path, ctx.root)} to {relative(destination_path, ctx.root)}"
+    return f"Copied {relative(source_path, ctx.root)} to {_wrote(ctx, destination_path)}"
 
 
 @tool("delete_file", "Delete one file inside the workspace; directories, the workspace root, and .git are refused.",

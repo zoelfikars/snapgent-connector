@@ -5,14 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
 from ..context import Context
-
-# What a tool can do to the user's machine; the security policy decides per level.
-READ = "read"            # observes the workspace
-WRITE = "write"          # creates or changes files in the workspace
-DESTRUCTIVE = "destructive"  # removes data
-EXECUTE = "execute"      # runs processes
-VCS = "vcs"              # changes git history/index
-
+from ..risk import DESTRUCTIVE, EXECUTE, READ, VCS, WRITE  # noqa: F401  (re-exported for the tool modules)
 
 @dataclass(frozen=True)
 class ToolDef:

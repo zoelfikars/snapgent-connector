@@ -1,11 +1,13 @@
 """The MCP server: reads JSON-RPC requests from stdin, answers on stdout."""
 
 import json
+import os
 import sys
 from typing import Any, Callable, Dict, Optional, TextIO
 
 from . import SERVER_NAME, SERVER_VERSION, protocol
 from .context import Context
+from .security import CONFIRM, DENY, RESERVED_ARGUMENT, ConfirmationStore, Policy, SessionState, decide, policy_from_env
 from .tools import registry
 from .workspace import Workspace
 
@@ -13,10 +15,14 @@ Handler = Callable[[Context, str, Dict[str, Any]], Any]
 
 
 class McpServer:
-    def __init__(self, workspace: Workspace, call: Handler = registry.call, schemas=registry.schemas) -> None:
+    def __init__(self, workspace: Workspace, policy: Optional[Policy] = None, call: Handler = registry.call,
+                 schemas=registry.schemas, confirmations: Optional[ConfirmationStore] = None) -> None:
         self._workspace = workspace
+        self._policy = policy or Policy()
         self._call = call
         self._schemas = schemas
+        self._confirmations = confirmations or ConfirmationStore()
+        self._session = SessionState()
 
     def handle(self, request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """The reply to one request, or None when none is due (notifications)."""
@@ -37,9 +43,18 @@ class McpServer:
         return protocol.error(request_id, protocol.METHOD_NOT_FOUND, f"Method not found: {method}")
 
     def _tools_call(self, request_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+        name = params.get("name", "")
+        arguments = params.get("arguments") or {}
         try:
-            ctx = Context(root=self._workspace.root())
-            output = self._call(ctx, params.get("name", ""), params.get("arguments") or {})
+            ctx = Context(root=self._workspace.root(), policy=self._policy, session=self._session)
+            definition = registry.get(name)
+            decision = decide(self._policy, name, definition.risk, arguments, self._session)
+            if decision.verdict == DENY:
+                return protocol.error(request_id, protocol.INTERNAL_ERROR, decision.reason)
+            if decision.verdict == CONFIRM and not self._confirmations.redeem(arguments.get(RESERVED_ARGUMENT), name, arguments):
+                token = self._confirmations.issue(name, arguments)
+                return protocol.result(request_id, protocol.confirmation_required(decision.reason, token, name, definition.risk))
+            output = self._call(ctx, name, arguments)
             return protocol.result(request_id, protocol.tool_output(output))
         except Exception as error:  # every failure becomes a reply the model can read
             return protocol.error(request_id, protocol.INTERNAL_ERROR, str(error))
@@ -67,4 +82,4 @@ def main() -> None:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except AttributeError:
             pass
-    McpServer(Workspace()).serve(sys.stdin, sys.stdout)
+    McpServer(Workspace(), policy_from_env(os.environ)).serve(sys.stdin, sys.stdout)

@@ -12,7 +12,12 @@ MANIFEST_PATTERNS = ("package.json", "pyproject.toml", "Cargo.toml", "go.mod", "
 
 @tool("get_workspace_info", "Get the active VS Code workspace name, path, and Git status.", risk=READ)
 def get_workspace_info(ctx: Context) -> Dict[str, Any]:
-    return {"name": ctx.root.name, "path": str(ctx.root), "is_git_repository": (ctx.root / ".git").exists()}
+    return {
+        "name": ctx.root.name,
+        "path": str(ctx.root),
+        "is_git_repository": (ctx.root / ".git").exists(),
+        "policy": ctx.policy.mode,
+    }
 
 
 @tool("get_project_info", "Inspect common project manifests and package scripts.", risk=READ)

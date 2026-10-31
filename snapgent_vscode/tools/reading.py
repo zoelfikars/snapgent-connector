@@ -9,6 +9,8 @@ from typing import Any, Dict, List
 from ..context import Context
 from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, MAX_LINES_PER_READ, MAX_RESULTS, MAX_TREE_DEPTH
 from ..paths import iter_files, relative, resolve_inside
+from ..security import TRUSTED
+from ..security.files import is_sensitive
 from .registry import READ, tool
 from .schema import BOOL, STR, STR_LIST, integer
 
@@ -18,6 +20,16 @@ OUTLINE_PATTERNS = (
     r"^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)",
     r"^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:function|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)",
 )
+
+
+def _visible_files(ctx: Context, base: Path):
+    """Files under `base`, minus those that may hold secrets: search results and listings are sent to a
+    third-party website, so they must not surface them. (Reading one is a separate, confirmed action.)"""
+    hide = ctx.policy.mode != TRUSTED
+    for file_path in iter_files(base):
+        if hide and is_sensitive(relative(file_path, ctx.root)):
+            continue
+        yield file_path
 
 
 def _kind(path: Path) -> str:
@@ -68,7 +80,7 @@ def find_files(ctx: Context, path: str = ".", pattern: str = "*") -> List[str]:
         raise NotADirectoryError(f"Not a directory: {path}")
     matches = [
         relative(file_path, ctx.root)
-        for file_path in iter_files(base)
+        for file_path in _visible_files(ctx, base)
         if fnmatch.fnmatch(file_path.name, pattern) or fnmatch.fnmatch(relative(file_path, base), pattern)
     ]
     return matches[:MAX_RESULTS]
@@ -84,7 +96,7 @@ def search_files(ctx: Context, path: str, query: str, file_pattern: str = "*", c
         raise ValueError("Search query cannot be empty.")
     needle = query if case_sensitive else query.lower()
     matches: List[Dict[str, Any]] = []
-    for file_path in ([target] if target.is_file() else iter_files(target)):
+    for file_path in ([target] if target.is_file() else _visible_files(ctx, target)):
         if not fnmatch.fnmatch(file_path.name, file_pattern):
             continue
         try:
