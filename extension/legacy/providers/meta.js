@@ -549,7 +549,19 @@ const ZSProvider = (() => {
       return !!b && !b.disabled && b.getAttribute("aria-disabled") !== "true";
     };
     const ready = await waitFor(sendReady, 30000);
-    if (!ready) throw new Error("Meta AI send button did not become available.");
+    if (!ready) {
+      // Say what the page looked like, so the next report shows WHY (disabled, hidden, replaced composer, mode menu open).
+      const buttons = [...document.querySelectorAll(S.sendBtn)].map((b) => ({
+        disabled: !!b.disabled, ariaDisabled: b.getAttribute("aria-disabled"), shown: b.getClientRects().length > 0, label: b.getAttribute("aria-label"),
+      }));
+      const current = writeEl();
+      diag("meta.tas.noSend", {
+        buttons, editorSame: current === editor, editorConnected: !!editor.isConnected, editorLen: editorText().length,
+        textareaLen: (editor.value || "").length, mode: (modeBtn() && (modeBtn().textContent || "").trim()) || null,
+        menuOpen: modeOptionOpen(), modeInFlight: _modeInFlight, hasAttachment: hasPendingAttachment(),
+      });
+      throw new Error("Meta AI send button did not become available.");
+    }
     // Meta may keep the mirror textarea's value after accepting a send. Treat a
     // new user turn or the stop button as acceptance too; do not click repeatedly,
     // since a delayed composer update could otherwise send the same prompt twice.
