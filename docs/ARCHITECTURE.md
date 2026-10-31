@@ -117,7 +117,7 @@ shippable.
 | Send path (`submitAndGetBase`), session bootstrap (`startSession`), system-prompt re-injection, skills | **Migrated** (`MessageSender`, `SessionStarter`, `PromptResender`/`SysTally`, `SkillsService`), tested with scripted ports |
 | UI: dialog, bar decision/placement, menus, cover, theme, chips for our own turns, notifications, setup card, popups | **Migrated** to `ui/`, jsdom/unit tested |
 | `BridgeMonitor` (is the server usable, workspace probe), `SessionTracker` (is this chat a session, moved-away detection), `ServerDirectory` (server names, toggles, custom prompt), `TurnMemory` (halted/executed turns outside the DOM) | **Migrated** to `application/`, tested with fake ports |
-| `legacy/main.js` (~2.3k lines: `decorate.classify` for model turns, bar `build()`, menus, stop button, wiring) | Next; the per-site DOM fixtures it needs now exist (below) |
+| `legacy/main.js` (~2.1k lines: `decorate.classify` for model turns, bar `build()`, menus, stop button, wiring) | Next; the per-site DOM fixtures it needs now exist (below) |
 | `legacy/providers/*` (12 adapters, ~8.1k lines) | Shared primitives extracted; adapter family factory next |
 | `entry/background.js` | Bridge client + message router still in one file |
 

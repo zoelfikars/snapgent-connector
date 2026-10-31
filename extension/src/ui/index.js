@@ -17,3 +17,4 @@ export { commandPhase, haltState, holdsRegenerateLook, shouldReown } from "./com
 export { switchMenuHtml, targetMenuHtml, targetOptionsHtml } from "./menu-html.js";
 export { createChipPainter } from "./chip-painter.js";
 export { createBarPlacer } from "./bar-placer.js";
+export { createInputCover } from "./input-cover.js";

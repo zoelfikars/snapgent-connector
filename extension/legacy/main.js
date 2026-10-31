@@ -1081,7 +1081,7 @@
   const ui = (() => {
     let root, bar, stateEl, actionBtn, stopBtn, targetSelect, switchBtn, menuEl, unstableEl, notifications;
     let targetBtn, targetMenuEl;
-    let cover, coverRaf, barRaf;
+    let barRaf;
     let openMenuFn = null; // set by build(); lets the popup force the panel open via runtime message
     // Connection health and the VS Code workspace probe: src/application/bridge-monitor.js
     const { BridgeMonitor } = ZSApp;
@@ -1512,84 +1512,9 @@
 
     // Masks the input box while the extension types/sends, so the copied text
     // and the submit aren't visible to the user.
-    // The cover's fill colour is computed by ui/cover-color.js (ZSUi.opaqueBg).
-
-    function inputCover(on) {
-      const ed = P.getEditor();
-      if (!on) {
-        if (cover) { cover.style.display = "none"; cover.dataset.on = ""; }
-        if (ed) ed.classList.remove("zs-typing");
-        cancelAnimationFrame(coverRaf);
-        return;
-      }
-      if (!ed) return;
-      ed.classList.add("zs-typing"); // make the typed text itself invisible
-      if (!cover) {
-        cover = document.createElement("div");
-        cover.id = "zs-input-cover";
-        cover.innerHTML = `<span>Agent is working…</span>`;
-        document.documentElement.appendChild(cover);
-      }
-      cover.dataset.on = "1"; // intent flag: keep the place() loop alive while set
-      cover.style.display = "flex";
-      const place = () => {
-        // Loop runs while the cover is INTENDED on (dataset.on), not while it's
-        // visible - so we can hide it for an overlay and still restore it after.
-        if (!cover || cover.dataset.on !== "1") return;
-        const e = P.getEditor();
-        if (!e) { coverRaf = requestAnimationFrame(place); return; }
-        // Re-assert the typing mask on the CURRENT editor node: sites that
-        // recreate the editor on each inject/clear (Kimi's Vue) drop the class,
-        // which would un-hide the raw text and un-cap its height. Cheap idempotent
-        // add every frame keeps the mask + height cap glued to the live node.
-        if (!e.classList.contains("zs-typing")) e.classList.add("zs-typing");
-        // The cover is SIZED to coverTarget() when a provider supplies one, else
-        // to the editor node itself. Some composers (Meta AI) make the editable a
-        // tiny line inside a much larger rounded card - covering only the editor
-        // left the rest of the card exposed and CLICKABLE (a careful click focused
-        // the editor and let the user type behind the cover). Meta returns its
-        // whole composer card so the cover blankets the entire input band and its
-        // pointer-events:auto blocks every click. The typing mask above still lives
-        // on the real editor node `e`.
-        const covNode = (P.coverTarget && P.coverTarget()) || e;
-        // While a blocking modal (login / consent) or bot-check is up, hide the
-        // cover so it doesn't sit on top of the modal; it reappears once the
-        // overlay clears (the loop keeps running).
-        if (
-          (P.overlayBlocking && P.overlayBlocking()) ||
-          (P.captchaPresent && P.captchaPresent())
-        ) {
-          cover.style.display = "none";
-          coverRaf = requestAnimationFrame(place);
-          return;
-        }
-        cover.style.display = "flex";
-        // All the placement rules (clip to the visible band, stay inside the composer card, pad, minimum
-        // and maximum height) are in src/ui/cover-geometry.js; this only measures the page.
-        const frame = P.composerFrame && P.composerFrame();
-        const rect = ZSUi.computeCoverRect({
-          target: ZSUi.boxOf(covNode.getBoundingClientRect()),
-          ancestors: ZSUi.measureClippingAncestors(covNode, document, getComputedStyle),
-          frame: frame ? ZSUi.boxOf(frame.getBoundingClientRect()) : null,
-          pad: P.coverPad || 0, // some composers (Gemini's Quill) keep text near rounded corners
-          offsetY: P.coverOffsetY || 0,
-          maxHeight: P.coverMaxH || 200,
-        });
-        cover.style.left = rect.left + "px";
-        cover.style.top = rect.top + "px";
-        cover.style.width = rect.width + "px";
-        cover.style.height = rect.height + "px";
-        // Composite the surface BEHIND the cover target so the fill matches what
-        // the user sees (a translucent composer card blends over the page).
-        cover.style.background = ZSUi.opaqueBg(document, covNode);
-        // When the cover blankets a whole composer card (coverTarget), match its
-        // corner radius so the cover's square corners don't poke past the card's
-        // rounded ones. Editor-sized covers keep the CSS default.
-        if (P.coverTarget) cover.style.borderRadius = getComputedStyle(covNode).borderRadius;
-        coverRaf = requestAnimationFrame(place);
-      };
-      place();
-    }
+    // The cover itself (kept on the live editor frame by frame): src/ui/input-cover.js
+    const inputCoverView = ZSUi.createInputCover({ document, provider: P });
+    const inputCover = (on) => inputCoverView.set(on);
 
     build();
     return { setStatus, setTarget, getTargetName, staleExtensionAlert, setStarted, setStarting, showStop, markStopping, inputCover, toast: (m) => notifications.toast(m), banner: (kind, title, msg) => notifications.banner(kind, title, msg), showImages: (images, name) => notifications.showImages(images, name), nudgeStart, updateStartGate, refreshSetup, openMenu: (toSupport) => openMenuFn && openMenuFn(toSupport) };
