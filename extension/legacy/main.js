@@ -1765,153 +1765,41 @@
       return [...base, ...extra];
     }
 
+    // The popup itself is src/ui/mcp-settings.js; what happens when it closes is page policy.
     function openMcpSettings() {
-      const old = document.getElementById("zs-mcp-pop");
-      if (old) old.remove();
-      const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
       const servers = mergedMcpServers();
-      const rows = allMcpOptions().map((o) => {
-        const sv = servers.find((s) => s.id === o.id);
-        const meta = sv && sv.tools ? `${sv.tools} tools` : "";
-        return `<label class="zs-mcp-row"><span class="zs-mcp-row-info"><span class="zs-mcp-row-name">${esc(o.name)}</span><span class="zs-mcp-row-meta">${esc(meta)}</span></span><input type="checkbox" class="zs-mcp-check" data-id="${esc(o.id)}" ${isMcpEnabled(o.id) ? "checked" : ""}><span class="zs-mcp-toggle"></span></label>`;
-      }).join("");
-      const pop = document.createElement("div");
-      pop.id = "zs-mcp-pop";
-      pop.innerHTML =
-        `<div class="zs-mcp-pop-card" role="dialog" aria-label="MCP settings">` +
-          `<div class="zs-mcp-pop-head"><span>MCP servers</span><button class="zs-mcp-pop-close" aria-label="Close">&#10005;</button></div>` +
-          `<div class="zs-mcp-pop-note">Only enabled servers appear in the dropdown and are read by the AI. Disabled servers cost no tokens.</div>` +
-          `<div class="zs-mcp-pop-list">${rows}</div>` +
-        `</div>`;
-      document.documentElement.appendChild(pop);
-
-      const close = () => {
-        pop.remove();
-        // If the active target was just disabled, move to the first enabled one
-        // and reload so the whole extension restarts against it.
-        if (!isMcpEnabled(selectedTargetId)) {
-          const next = allMcpOptions().find((o) => isMcpEnabled(o.id));
-          if (next) {
-            selectedTargetId = next.id;
-            const reloadPage = () => { try { location.reload(); } catch {} };
-            try { chrome.storage.local.set({ [TARGET_STORAGE_KEY]: selectedTargetId }, reloadPage); } catch { reloadPage(); }
-            return;
+      ZSUi.openMcpSettings({
+        document,
+        options: allMcpOptions().map((o) => ({ id: o.id, name: o.name, tools: (servers.find((sv) => sv.id === o.id) || {}).tools })),
+        isEnabled: isMcpEnabled,
+        setEnabled: setMcpEnabled,
+        // Refresh the dropdown right away so a re-enabled server is selectable without waiting for the popup to close.
+        onToggle: () => setTarget(selectedTargetId),
+        onClose: () => {
+          // If the active target was just disabled, move to the first enabled one and reload so the
+          // whole extension restarts against it.
+          if (!isMcpEnabled(selectedTargetId)) {
+            const next = allMcpOptions().find((o) => isMcpEnabled(o.id));
+            if (next) {
+              selectedTargetId = next.id;
+              const reloadPage = () => { try { location.reload(); } catch {} };
+              try { chrome.storage.local.set({ [TARGET_STORAGE_KEY]: selectedTargetId }, reloadPage); } catch { reloadPage(); }
+              return;
+            }
           }
-        }
-        setTarget(selectedTargetId);
-      };
-      pop.addEventListener("click", (e) => { if (e.target === pop) close(); });
-      pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
-      pop.querySelectorAll(".zs-mcp-check").forEach((box) =>
-        box.addEventListener("change", () => {
-          setMcpEnabled(box.dataset.id, box.checked);
-          // Refresh the dropdown right away so a re-enabled server is selectable
-          // without waiting for the popup to close.
           setTarget(selectedTargetId);
-        }));
+        },
+      });
     }
 
-    // ── Skills settings popup (toggle which workspace skills are listed) ────
+    // ── Skills settings popup: src/ui/skills-settings.js ────────────────────
     function openSkillsSettings() {
-      const old = document.getElementById("zs-mcp-pop");
-      if (old) old.remove();
-      const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-      const pop = document.createElement("div");
-      pop.id = "zs-mcp-pop";
-      let mode = "list"; // "list" | "paste" | "review"
-      let draft = "";
-      let importMsg = "";
-      const renderImport = () => {
-        const v = mode === "review" ? skillsService.validate(draft) : null;
-        const body = mode === "paste"
-          ? `<input type="file" id="zs-skill-file" accept=".md,.txt,text/markdown,text/plain" style="margin-bottom:6px;font-size:11px;max-width:100%">` +
-            `<textarea id="zs-skill-text" rows="10" style="width:100%;box-sizing:border-box;font:11px ui-monospace,Consolas,monospace;background:transparent;color:inherit;border:1px solid rgba(128,128,128,.4);border-radius:6px;padding:6px" placeholder="Paste the full SKILL.md here (with --- name / description --- frontmatter)">${esc(draft)}</textarea>` +
-            `<div class="zs-mcp-pop-note" style="color:#ff6b6b">${esc(importMsg)}</div>` +
-            `<div style="display:flex;gap:8px;margin-top:8px"><button id="zs-skill-cancel" class="zs-gear" style="flex:1">Cancel</button><button id="zs-skill-review" class="zs-gear" style="flex:1">Review</button></div>`
-          : `<div class="zs-mcp-pop-note" style="color:#ffb454">Review carefully. Third-party skills can contain instructions that make the AI run commands or change files. It will be saved DISABLED until you turn it on.</div>` +
-            `<div class="zs-mcp-pop-note"><b>${esc(v.name || "")}</b> - ${esc(v.description || "")}</div>` +
-            `<pre style="max-height:220px;overflow:auto;white-space:pre-wrap;font:11px ui-monospace,Consolas,monospace;border:1px solid rgba(128,128,128,.4);border-radius:6px;padding:6px;margin:6px 0">${esc(draft)}</pre>` +
-            `<div class="zs-mcp-pop-note" style="color:#ff6b6b">${esc(importMsg)}</div>` +
-            `<div style="display:flex;gap:8px;margin-top:8px"><button id="zs-skill-back" class="zs-gear" style="flex:1">Back</button><button id="zs-skill-global" class="zs-gear" style="flex:1">Save to global</button><button id="zs-skill-confirm" class="zs-gear" style="flex:1">Confirm import</button></div>`;
-        pop.innerHTML =
-          `<div class="zs-mcp-pop-card" role="dialog" aria-label="Import skill">` +
-            `<div class="zs-mcp-pop-head"><span>Import skill</span><button class="zs-mcp-pop-close" aria-label="Close">&#10005;</button></div>` +
-            body + `</div>`;
-        pop.querySelector(".zs-mcp-pop-close").addEventListener("click", () => pop.remove());
-        const fileInput = pop.querySelector("#zs-skill-file");
-        if (fileInput) fileInput.addEventListener("change", () => {
-          const f = fileInput.files && fileInput.files[0];
-          if (!f) return;
-          if (f.size > ZSDomain.SKILL_MAX_BYTES) { importMsg = "File too large (max 20 KB)."; renderImport(); return; }
-          const reader = new FileReader();
-          reader.onload = () => {
-            draft = String(reader.result || "");
-            importMsg = "";
-            renderImport();
-          };
-          reader.onerror = () => { importMsg = "Could not read the file."; renderImport(); };
-          reader.readAsText(f);
-        });
-        const on = (id, fn) => { const el = pop.querySelector(id); if (el) el.addEventListener("click", fn); };
-        on("#zs-skill-cancel", () => { mode = "list"; importMsg = ""; draft = ""; render(); });
-        on("#zs-skill-review", () => {
-          draft = pop.querySelector("#zs-skill-text").value;
-          const chk = skillsService.validate(draft);
-          if (!chk.ok) { importMsg = chk.error; renderImport(); return; }
-          if (skillsService.all.some((s) => s.name === chk.name)) { importMsg = `A skill named "${chk.name}" already exists.`; renderImport(); return; }
-          importMsg = ""; mode = "review"; renderImport();
-        });
-        on("#zs-skill-back", () => { mode = "paste"; importMsg = ""; renderImport(); });
-        on("#zs-skill-global", () => {
-          const res = skillsService.saveGlobal(draft);
-          if (!res.ok) { importMsg = res.error; renderImport(); return; }
-          mode = "list"; draft = ""; importMsg = "";
-          render();
-        });
-        on("#zs-skill-confirm", async () => {
-          const res = await skillsService.importText(draft);
-          if (!res.ok) { importMsg = res.error; renderImport(); return; }
-          mode = "list"; draft = ""; importMsg = "";
-          await skillsService.load();
-          if (pop.isConnected) render();
-        });
-      };
-      const render = () => {
-        if (mode !== "list") { renderImport(); return; }
-        const rows = skillsService.all.length
-          ? skillsService.all.map((s) => `<label class="zs-mcp-row"><span class="zs-mcp-row-info"><span class="zs-mcp-row-name">${esc(s.name)}</span><span class="zs-mcp-row-meta">${esc(s.description)}</span></span><input type="checkbox" class="zs-mcp-check" data-name="${esc(s.name)}" ${skillsService.isEnabled(s.name) ? "checked" : ""}><span class="zs-mcp-toggle"></span></label>`).join("")
-          : `<div class="zs-mcp-pop-note">No skills found in .snapgent/skills/ (VS Code workspace only).</div>`;
-        pop.innerHTML =
-          `<div class="zs-mcp-pop-card" role="dialog" aria-label="Skills settings">` +
-            `<div class="zs-mcp-pop-head"><span>Skills</span><button class="zs-mcp-pop-close" aria-label="Close">&#10005;</button></div>` +
-            `<div class="zs-mcp-pop-note">Only enabled skills are listed in the prompt. Changes apply to the next chat session.</div>` +
-            `<div class="zs-mcp-pop-list">${rows}</div>` +
-            `<div class="zs-mcp-pop-note" style="margin-top:10px"><b>Global library</b> (stored in this browser; install into a workspace to use)</div>` +
-            (Object.keys(skillsService.globals).length
-              ? Object.keys(skillsService.globals).map((n) => `<div class="zs-mcp-row"><span class="zs-mcp-row-info"><span class="zs-mcp-row-name">${esc(n)}</span><span class="zs-mcp-row-meta">${esc(skillsService.globals[n].description)}</span></span><button class="zs-gear zs-gskill-install" data-name="${esc(n)}">Install</button><button class="zs-gear zs-gskill-del" data-name="${esc(n)}">Delete</button></div>`).join("")
-              : `<div class="zs-mcp-pop-note">Empty. Use "Save to global" while reviewing an import.</div>`) +
-            `<div style="margin-top:8px"><button id="zs-skill-import" class="zs-gear" style="width:100%">+ Import skill</button></div>` +
-          `</div>`;
-        pop.querySelector(".zs-mcp-pop-close").addEventListener("click", () => pop.remove());
-        pop.querySelectorAll(".zs-gskill-install").forEach((b) => b.addEventListener("click", () => {
-          const g = skillsService.globals[b.dataset.name];
-          if (!g) return;
-          draft = g.text; importMsg = "";
-          if (skillsService.all.some((s) => s.name === b.dataset.name)) { importMsg = `A skill named "${b.dataset.name}" already exists in this workspace.`; }
-          mode = "review"; render();
-        }));
-        pop.querySelectorAll(".zs-gskill-del").forEach((b) => b.addEventListener("click", () => {
-          skillsService.removeGlobal(b.dataset.name); render();
-        }));
-        const impBtn = pop.querySelector("#zs-skill-import");
-        if (impBtn) impBtn.addEventListener("click", () => { mode = "paste"; draft = ""; importMsg = ""; render(); });
-        pop.querySelectorAll(".zs-mcp-check").forEach((box) =>
-          box.addEventListener("change", () => skillsService.setEnabled(box.dataset.name, box.checked)));
-      };
-      pop.addEventListener("click", (e) => { if (e.target === pop) pop.remove(); });
-      document.documentElement.appendChild(pop);
-      render();
-      if (selectedTargetId === "vscode") skillsService.load().then(() => { if (pop.isConnected) render(); });
+      ZSUi.openSkillsSettings({
+        document,
+        skills: skillsService,
+        maxFileBytes: ZSDomain.SKILL_MAX_BYTES,
+        loadOnOpen: selectedTargetId === "vscode",
+      });
     }
 
     function buildMenu() {
