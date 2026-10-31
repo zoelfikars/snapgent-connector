@@ -32,9 +32,10 @@ const all = (scope, selector) => { try { return [...scope.querySelectorAll(selec
  * @param {Element} target
  * @param {{ avoid?: Element[], scope?: ParentNode, onlyVisible?: boolean, unique?: boolean }} [options]
  *   `unique`: among the (visible) matches the target must be the only one.
+ *   `keepOut`: elements (the text box, the send button) no match may contain or sit inside: a turn is never the composer or around it.
  * @returns {string|null}
  */
-export function learnSelector(target, { avoid = [], scope = target.ownerDocument, onlyVisible = false, unique = false } = {}) {
+export function learnSelector(target, { avoid = [], scope = target.ownerDocument, onlyVisible = false, unique = false, keepOut = [] } = {}) {
   const candidates = candidatesFor(target);
   const tag = target.localName;
   const options = [...candidates, ...candidates.flatMap((one) => (one.startsWith(".") || one.startsWith("[") ? [`${tag}${one}`] : []))];
@@ -46,6 +47,7 @@ export function learnSelector(target, { avoid = [], scope = target.ownerDocument
     const matches = all(scope, selector);
     if (!matches.includes(target)) continue;
     if (avoid.some((other) => matches.includes(other))) continue;
+    if (keepOut.some((other) => matches.some((m) => m.contains(other) || other.contains(m)))) continue;
     if (unique && (onlyVisible ? matches.filter(visible) : matches).length !== 1) continue;
     return selector;
   }
@@ -71,14 +73,14 @@ const chainBelow = (el, ancestor) => {
  * both kinds share (same generated class) cannot, so the search goes inward until something does.
  * @returns {{ assistant: string, user: string, assistantTurn: Element, userTurn: Element } | { error: string }}
  */
-export function learnTurnSelectors(assistantPick, userPick) {
+export function learnTurnSelectors(assistantPick, userPick, keepOut = []) {
   const top = commonAncestor(assistantPick, userPick);
   if (!top || top === assistantPick || top === userPick) return { error: "The reply and the message must be different turns." };
   const assistantChain = chainBelow(assistantPick, top);
   const userChain = chainBelow(userPick, top);
   const find = (chain, otherChain) => {
     for (const el of chain) {
-      const selector = learnSelector(el, { avoid: otherChain });
+      const selector = learnSelector(el, { avoid: otherChain, keepOut });
       if (selector) return { selector, el };
     }
     return null;

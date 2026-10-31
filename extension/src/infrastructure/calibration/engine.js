@@ -92,7 +92,11 @@ export function createCalibratedProvider({ document, location, profile, diag = (
       const chosen = find(profile.card.selector).find((box) => box.contains(editor));
       if (chosen) return chosen;
     }
+    // A box no bigger than the text field is the field's own wrapper, not the card it sits in.
+    const inner = editor.getBoundingClientRect();
     for (let n = editor.parentElement, i = 0; n && n !== document.body && i < 8; n = n.parentElement, i++) {
+      const box = n.getBoundingClientRect();
+      if (box.width - inner.width < 8 && box.height - inner.height < 8) continue;
       const controls = [...n.querySelectorAll("button, [role=button]")].filter((b) => visible(b) && !b.closest("#zs-root"));
       if (controls.length >= 2) return n;
     }

@@ -11,7 +11,8 @@ export function pageWith(html, url = "https://example.test/") {
   const hiddenAbove = (el) => !el.isConnected || !!el.closest("[hidden], .hidden");
   window.Element.prototype.getClientRects = function () { return hiddenAbove(this) ? [] : [{ width: 100, height: 20 }]; };
   Object.defineProperty(window.HTMLElement.prototype, "offsetParent", { get() { return hiddenAbove(this) ? null : this.ownerDocument.body; } });
-  window.HTMLElement.prototype.getBoundingClientRect = function () { return { width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 }; };
+  // a box is as tall as the controls it holds, so a card is bigger than the text field inside it
+  window.HTMLElement.prototype.getBoundingClientRect = function () { const height = 20 + 12 * this.querySelectorAll("button, [role=button]").length; return { width: 100, height, top: 0, left: 0, right: 100, bottom: height }; };
   window.DataTransfer = class { constructor() { this.data = {}; } setData(type, value) { this.data[type] = value; } getData(type) { return this.data[type] || ""; } };
   window.ClipboardEvent = class extends window.Event { constructor(type, init = {}) { super(type, init); this.clipboardData = init.clipboardData; } };
   window.InputEvent = window.InputEvent || class extends window.Event { constructor(type, init = {}) { super(type, init); Object.assign(this, init); } };

@@ -82,7 +82,10 @@ export function createCalibrationWizard({
     const forReply = { assistant: picks.reply, user: picks.message, assistantInner: picks.assistantInner || null };
     if (flow === "all") {
       learned = calibration.learnProfile({ hostname, name, picks: { composer: picks.composer, send: picks.send || null, ...forReply } });
-    } else if (flow === "reply") learned = calibration.updateProfile(current, "reply", forReply);
+    } else if (flow === "reply") {
+      const known = calibration.createProvider(current).review(); // a turn is never the text box or around it
+      learned = calibration.updateProfile(current, "reply", { ...forReply, keepOut: [known.composer, known.send].filter(Boolean) });
+    }
     else learned = calibration.updateProfile(current, flow, { [flow]: picks[flow] });
     if (learned.error) {
       error = learned.error;

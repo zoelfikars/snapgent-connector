@@ -158,6 +158,26 @@ describe("calibration wizard", () => {
     return waitFor(() => t.wizard.state().done, 5000).then(() => assert.ok(t.saved[0].card, "the profile keeps the chosen box"));
   });
 
+  test("a click on text that is no button is refused for the send step; a click on the icon finds its button", () => {
+    const t = setup();
+    t.wizard.start();
+    t.click(t.q("#line"));
+    t.click(t.q(".whitespace-pre-wrap"));
+    assert.match(t.errorText(), /No button was found/);
+    assert.equal(t.wizard.state().step, "send");
+    t.click(t.q("#icon"));
+    assert.equal(t.wizard.state().step, "reply");
+  });
+
+  test("a turn class shared with the composer's box is not accepted for a turn (Arena: the reply was the composer)", () => {
+    const { document } = pageWith(`<body><ol><li class="turn mine">hello there</li><li class="turn"><p id="ai">Hi, how can I help you today?</p></li></ol>
+      <div class="turn"><form><textarea id="box"></textarea><button id="go">go</button></form></div></body>`);
+    const found = learnProfile({ hostname: "a.test", name: "A", picks: { composer: document.getElementById("box"), send: document.getElementById("go"), assistant: document.getElementById("ai"), user: document.querySelector(".mine") } });
+    if (found.error) return; // refusing is fine; accepting a selector that matches the composer is not
+    assert.equal(document.querySelector(found.profile.assistant.turn).contains(document.getElementById("box")), false);
+    assert.equal([...document.querySelectorAll(found.profile.assistant.turn)].some((el) => el.contains(document.getElementById("box"))), false);
+  });
+
   test("my own message must not be part of the reply", () => {
     const t = setup();
     t.wizard.start();

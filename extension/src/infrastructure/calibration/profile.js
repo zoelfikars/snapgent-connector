@@ -37,7 +37,7 @@ export function learnProfile({ hostname, name, picks }) {
     send = { selector };
   }
 
-  const turns = learnTurnSelectors(picks.assistant, picks.user);
+  const turns = learnTurnSelectors(picks.assistant, picks.user, [picks.composer, picks.send].filter(Boolean));
   if (turns.error) return { error: turns.error };
   const body = learnBodySelector(turns.assistantTurn, picks.assistantInner || null);
   if (picks.assistantInner && !body) warnings.push("Could not describe the part of the reply you chose; the whole reply is read.");
@@ -78,7 +78,7 @@ export function updateProfile(profile, role, picks) {
     return { profile: { ...profile, send: { selector } }, warnings };
   }
   if (role === "reply") {
-    const turns = learnTurnSelectors(picks.assistant, picks.user);
+    const turns = learnTurnSelectors(picks.assistant, picks.user, picks.keepOut || []);
     if (turns.error) return { error: turns.error };
     const body = learnBodySelector(turns.assistantTurn, picks.assistantInner || null);
     if (picks.assistantInner && !body) warnings.push("Could not describe the part of the reply you chose; the whole reply is read.");

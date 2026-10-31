@@ -24,6 +24,21 @@ export function resolveEditable(el) {
   return null;
 }
 
+/**
+ * The button a click means: the button itself or the one it sits in, or the one visible button inside the small box that
+ * was clicked (its icon's wrapper). Null when there is none or several: a bare wrapper is not a send button.
+ */
+export function resolveClickable(el) {
+  const own = el.closest(CLICKABLE);
+  if (own) return own;
+  for (let n = el, level = 0; n && n.nodeType === 1 && level < 2; n = n.parentElement, level++) {
+    const inside = [...n.querySelectorAll(CLICKABLE)].filter(shown);
+    if (inside.length === 1) return inside[0];
+    if (inside.length > 1) return null;
+  }
+  return null;
+}
+
 export const STEPS = {
   composer: {
     text: "Click inside the text box where you type your message to the AI.",
@@ -33,7 +48,8 @@ export const STEPS = {
   send: {
     text: "Click the send button (the arrow or paper plane you press to send).",
     hint: "No button, or it only shows once you have typed something? Choose “Enter sends”.",
-    refine: (el) => el.closest(CLICKABLE) || el,
+    refine: (el) => resolveClickable(el) || el,
+    accept: (el) => (el.matches(CLICKABLE) ? null : "No button was found there. Click right on the send button, or choose “Enter sends”."),
   },
   reply: {
     text: "Click on the WORDS of a reply written by the AI (not a button, not the empty space around it).",
