@@ -2,6 +2,16 @@
 
 All notable changes to snapgentV3 Free are documented here.
 
+## [Unreleased]
+
+### Security
+- **Bridge now rejects connections that do not come from a browser extension.**
+  Any website could previously open `ws://127.0.0.1:17613` and call tools such as
+  `run_command` or `write_file`. The bridge now checks the WebSocket `Origin` and
+  accepts only `chrome-extension://`, `moz-extension://` and `ms-browser-extension://`
+  origins; pages and clients without an Origin are closed with code 1008. Set
+  `ZS_ALLOWED_ORIGINS` (comma separated) to pin the exact extension origin.
+
 ## [V3.9.3] - 2026-10-31
 
 ### Added

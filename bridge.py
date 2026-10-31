@@ -43,6 +43,35 @@ def log(message: str) -> None:
     print(message, flush=True)
 
 
+EXTENSION_ORIGIN_RE = re.compile(r"(chrome|moz|ms-browser)-extension://[A-Za-z0-9._-]+")
+
+
+def origin_allowed(origin: Optional[str], pinned: Optional[List[str]] = None) -> bool:
+    """Only browser extensions may drive the bridge.
+
+    A web page can open ws://127.0.0.1 too, but browsers always attach the
+    page's real Origin and scripts cannot forge it, so rejecting everything
+    that is not an extension origin keeps arbitrary websites out. Set
+    ZS_ALLOWED_ORIGINS (comma separated) to pin specific extension origins.
+    """
+    if not origin:
+        return False
+    if pinned:
+        return origin in pinned
+    return EXTENSION_ORIGIN_RE.fullmatch(origin) is not None
+
+
+def _pinned_origins() -> List[str]:
+    raw = os.environ.get("ZS_ALLOWED_ORIGINS", "")
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _request_origin(websocket: Any) -> Optional[str]:
+    request = getattr(websocket, "request", None)
+    headers = getattr(request, "headers", None) or getattr(websocket, "request_headers", None)
+    return headers.get("Origin") if headers is not None else None
+
+
 def _json_line(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
@@ -380,6 +409,11 @@ class Bridge:
             pass
 
     async def handle_client(self, websocket: Any, _path: Optional[str] = None) -> None:
+        origin = _request_origin(websocket)
+        if not origin_allowed(origin, _pinned_origins()):
+            log(f"rejected connection with origin {origin!r}")
+            await websocket.close(1008, "origin not allowed")
+            return
         async with self._client_lock:
             self.clients.add(websocket)
         log("extension connected")

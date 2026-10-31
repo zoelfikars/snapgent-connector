@@ -116,7 +116,9 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
                         manager.handle_client, "127.0.0.1", 0
                     ) as server:
                         port = server.sockets[0].getsockname()[1]
-                        async with bridge.websockets.connect(f"ws://127.0.0.1:{port}") as client:
+                        async with bridge.websockets.connect(
+                            f"ws://127.0.0.1:{port}", origin="chrome-extension://abcdefghijklmnop"
+                        ) as client:
                             connected = json.loads(await client.recv())
                             self.assertEqual(connected["type"], "connected")
                             self.assertEqual(connected["servers"][0]["id"], "mock")
@@ -142,6 +144,30 @@ class BridgeTests(unittest.IsolatedAsyncioTestCase):
                             self.assertEqual(result["text"], "round trip")
                 finally:
                     await manager.stop_servers()
+
+    def test_origin_allowed(self):
+        self.assertTrue(bridge.origin_allowed("chrome-extension://abc123"))
+        self.assertTrue(bridge.origin_allowed("moz-extension://1f2e3d4c-aaaa-bbbb-cccc-111122223333"))
+        self.assertFalse(bridge.origin_allowed(None))
+        self.assertFalse(bridge.origin_allowed(""))
+        self.assertFalse(bridge.origin_allowed("https://evil.example"))
+        self.assertFalse(bridge.origin_allowed("http://127.0.0.1:8000"))
+        self.assertFalse(bridge.origin_allowed("null"))
+        self.assertFalse(bridge.origin_allowed("chrome-extension://abc.evil.com/x"))
+        self.assertTrue(bridge.origin_allowed("chrome-extension://abc", ["chrome-extension://abc"]))
+        self.assertFalse(bridge.origin_allowed("chrome-extension://other", ["chrome-extension://abc"]))
+
+    @unittest.skipIf(bridge.websockets is None, "websockets package is not installed")
+    async def test_web_page_origin_is_rejected(self):
+        manager = bridge.Bridge()
+        async with bridge.websockets.serve(manager.handle_client, "127.0.0.1", 0) as server:
+            port = server.sockets[0].getsockname()[1]
+            for origin in ("https://evil.example", None):
+                kwargs = {"origin": origin} if origin else {}
+                async with bridge.websockets.connect(f"ws://127.0.0.1:{port}", **kwargs) as client:
+                    with self.assertRaises(bridge.websockets.ConnectionClosed) as ctx:
+                        await client.recv()
+                    self.assertEqual(ctx.exception.rcvd.code, 1008)
 
     def test_duplicate_tool_names_are_server_qualified(self):
         first = bridge.MCPServer("roblox", {})
