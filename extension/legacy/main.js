@@ -1342,6 +1342,7 @@
           createProvider: (profile) => ZSCalibration.createCalibratedProvider({ document, location, profile }),
         },
         onSave: (profile) => profileStore.save(profile),
+        describe: (el) => ZSChat.describeElement(el),
       });
       calibrationWizard.start({ only });
     }

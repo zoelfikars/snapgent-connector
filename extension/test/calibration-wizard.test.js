@@ -13,6 +13,7 @@ function setup({ current = null, saveResult = { ok: true } } = {}) {
   const { window, document } = pageWith(PAGE, "https://chatgpt.com/c/test");
   const saved = [];
   const closed = [];
+  const copied = [];
   // The text box behaves like a rich editor: it takes a paste once its caret has settled, and delete empties it.
   const editor = document.getElementById("prompt-textarea");
   const state = { settledAt: 0, takesText: true };
@@ -24,6 +25,7 @@ function setup({ current = null, saveResult = { ok: true } } = {}) {
     document, hostname: "chatgpt.com", name: "ChatGPT", current,
     calibration: { learnProfile, updateProfile, createProvider: (profile) => createCalibratedProvider({ document, location: window.location, profile }) },
     onSave: async (profile) => { saved.push(profile); return saveResult; }, onClose: () => closed.push(true), shadowMode: "open", trusted: () => true,
+    describe: (el) => `${el.localName}${el.id ? `#${el.id}` : ""}`, copy: async (text) => { copied.push(text); },
   });
   const click = (el) => {
     el.dispatchEvent(new window.MouseEvent("mousemove", { bubbles: true }));
@@ -40,7 +42,7 @@ function setup({ current = null, saveResult = { ok: true } } = {}) {
     click(q("pre"));                         // a reply
     click(q(".whitespace-pre-wrap"));        // my own message
   };
-  return { window, document, wizard, saved, closed, click, panel, press, text, errorText, q, state, walkToPreview, editor };
+  return { window, document, wizard, saved, closed, copied, click, panel, press, text, errorText, q, state, walkToPreview, editor };
 }
 
 describe("calibration wizard", () => {
@@ -219,6 +221,41 @@ describe("calibration wizard", () => {
     await waitFor(() => t.wizard.state().done, 5000);
     assert.deepEqual(t.saved[0].composer, existing.composer);
     assert.deepEqual(t.saved[0].send, existing.send);
+  });
+
+  test("a report can be copied when something is wrong or at the preview: where the clicks landed and the profile, never the conversation", async () => {
+    const t = setup();
+    t.wizard.start();
+    t.click(t.q("main"));                                   // not a text box: an error
+    t.panel().querySelector('[data-action="copy-report"]').click();
+    await waitFor(() => t.copied.length === 1, 2000);
+    assert.match(t.copied[0], /site: chatgpt.com \(ChatGPT\)/);
+    assert.match(t.copied[0], /error: That does not look like a text box/);
+  });
+
+  test("the preview offers the report too, with the learned profile and the clicked elements, and none of the text", async () => {
+    const t = setup();
+    t.wizard.start();
+    t.walkToPreview();
+    t.panel().querySelector('[data-action="copy-report"]').click();
+    await waitFor(() => t.copied.length === 1, 2000);
+    const report = t.copied[0];
+    assert.match(report, /profile: \{"version":1/);
+    assert.match(report, /composer:\n\s+div#prompt-textarea/);
+    assert.doesNotMatch(report, /list_commands|⟦ZS-SYS⟧|CONTEXT:/, "no conversation text");
+  });
+
+  test("a failed copy says so instead of pretending", async () => {
+    const { window, document } = pageWith("<body><div contenteditable='true' id='box'></div></body>");
+    const wizard = createCalibrationWizard({
+      document, hostname: "a.test", name: "A", current: null, calibration: { learnProfile, updateProfile, createProvider: () => ({}) },
+      onSave: async () => ({ ok: true }), trusted: () => true, shadowMode: "open", copy: async () => { throw new Error("denied"); },
+    });
+    wizard.start();
+    document.body.insertAdjacentHTML("beforeend", "<p id='plain'>x</p>");
+    document.getElementById("plain").dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+    wizard.panel().querySelector('[data-action="copy-report"]').click();
+    assert.ok(await waitFor(() => /Could not copy/.test(wizard.panel().querySelector(".hint").textContent), 2000));
   });
 
   test("the panel cannot be reached from the page (closed shadow root by default)", () => {

@@ -33,6 +33,10 @@ const STEPS = {
   answer: { text: "Click just the part of the reply that is the answer." },
 };
 
+async function defaultCopy(text) {
+  await navigator.clipboard.writeText(text);
+}
+
 const STYLE = `
 :host { all: initial; }
 .card { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); width: min(480px, calc(100vw - 32px)); box-sizing: border-box;
@@ -52,9 +56,13 @@ button.primary { background: #facc15; color: #111; border-color: #facc15; font-w
  * @param {{ document: Document, hostname: string, name: string, current: object|null,
  *           calibration: { learnProfile: Function, updateProfile: Function, createProvider: (profile: object) => object },
  *           onSave: (profile: object) => Promise<{ ok: boolean, error?: string }>, onClose?: () => void,
+ *           describe?: (el: Element) => string, copy?: (text: string) => Promise<void>,
  *           shadowMode?: "open"|"closed", trusted?: (event: Event) => boolean }} deps
+ *   `describe` renders an element as its tag and stable attributes (never its text) for the report; `copy` puts text on the clipboard.
  */
-export function createCalibrationWizard({ document, hostname, name, current, calibration, onSave, onClose = () => {}, shadowMode = "closed", trusted }) {
+export function createCalibrationWizard({
+  document, hostname, name, current, calibration, onSave, onClose = () => {}, describe = (el) => el.localName, copy = defaultCopy, shadowMode = "closed", trusted,
+}) {
   const picker = createPicker({ document, trusted });
   let host = null;
   let shadow = null;
@@ -94,7 +102,8 @@ export function createCalibrationWizard({ document, hostname, name, current, cal
     err.textContent = error;
     const row = q(".buttons");
     row.textContent = "";
-    for (const { label, action, primary } of buttons) {
+    const withReport = (error || step === "preview") && !done ? [...buttons, { label: "Copy report", action: "copy-report" }] : buttons;
+    for (const { label, action, primary } of withReport) {
       const button = document.createElement("button");
       button.textContent = label;
       button.dataset.action = action;
@@ -212,7 +221,27 @@ export function createCalibrationWizard({ document, hostname, name, current, cal
     render({ text: `${name} is calibrated. You can press Start.`, buttons: [{ label: "Close", action: "close", primary: true }] });
   }
 
-  function handle(action) {
+  // What a bug report needs and nothing private: where the clicks landed (tag and stable attributes of the element and what is
+  // around it), the profile learned, and what went wrong. No text of the conversation is included.
+  function report() {
+    const chain = (el) => {
+      const lines = [];
+      for (let n = el; n && n.nodeType === 1 && lines.length < 8; n = n.parentElement) lines.push(`    ${describe(n)}`);
+      return lines.join("\n");
+    };
+    const picked = Object.entries(picks).filter(([, el]) => el && el.nodeType === 1).map(([role, el]) => `  ${role}:\n${chain(el)}`);
+    return [
+      "snapgent calibration report", `site: ${hostname} (${name})`, `step: ${step || "-"}`, `error: ${error || "-"}`,
+      `profile: ${draft ? JSON.stringify(draft) : "-"}`, "clicks (innermost first):", ...(picked.length ? picked : ["  -"]),
+    ].join("\n");
+  }
+
+  async function handle(action) {
+    if (action === "copy-report") {
+      try { await copy(report()); q(".hint").textContent = "Report copied. Paste it where you report the problem."; q(".hint").hidden = false; }
+      catch { q(".hint").textContent = "Could not copy. Select and copy the text from the page console instead."; q(".hint").hidden = false; }
+      return;
+    }
     if (action === "cancel" || action === "close") { cancel(); return; }
     if (action === "back") { index = Math.max(0, index - 1); error = ""; pickStep(steps[index]); return; }
     if (action === "enter-sends") { picks.send = null; error = ""; advance(); return; }
