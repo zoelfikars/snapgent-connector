@@ -50,9 +50,11 @@ extension/
       prompt/                system-prompt · feedback · reminder
       tools/                 category · catalogue · result-summary · names · isolation
                              virtual-commands · result-feedback
-      agent/                 turn-policy (what to do with each reply) · reply-classifier
+      agent/                 turn-policy · reply-classifier · session-start (preconditions, handshake)
+      skills/                skill-text (frontmatter parsing + validation)
       constants.js
-    application/             AgentLoop · ResponseWatcher (+ WatchState) · ToolRunner · ToolCatalogue
+    application/             AgentLoop · ResponseWatcher (+ WatchState) · MessageSender · SessionStarter
+                             ToolRunner · ToolCatalogue · SkillsService · PromptResender (+ SysTally)
                              StallWatchdog · ToolReminder · call-guard · ports (typedefs)
     infrastructure/chat/     waitFor · StreamSampler · dom-helpers (shared by adapters)
     entry/                   background.js · popup.js · legacy-globals.js
@@ -109,7 +111,8 @@ shippable.
 | Tool execution (`runTool`, catalogue, isolation, `list_commands`, result shaping) | **Migrated** to `application/` + `domain/tools/`, tested with fake ports |
 | Agent loop (`agentLoop`: turn policy, lifecycle, stall watchdog, reminder cadence) | **Migrated** to `domain/agent` + `application/`, scripted-scenario tests |
 | Response watcher (`waitForResponse`: timing gates + reply classification) | **Migrated** to `application/response-watcher` + `domain/agent/reply-classifier`, fake-clock tests |
-| `legacy/main.js` (~3.7k lines: send path + session bootstrap + chips/camouflage + UI) | Next: `Session`/send path, then `ui/` |
+| Send path (`submitAndGetBase`), session bootstrap (`startSession`), system-prompt re-injection, skills | **Migrated** (`MessageSender`, `SessionStarter`, `PromptResender`/`SysTally`, `SkillsService`), tested with scripted ports |
+| `legacy/main.js` (~3.4k lines: chips/camouflage + UI + wiring) | Next: `ui/` (bar, menus, settings popups) and chip/camouflage rendering |
 | `legacy/providers/*` (12 adapters, ~8.1k lines) | Shared primitives extracted; adapter family factory next |
 | `entry/background.js` | Bridge client + message router still in one file |
 
@@ -126,12 +129,9 @@ shippable.
    (`getEditor`, `writeText`, `snapshot`, `readAssistant`) becomes a
    `createGenericAdapter(selectors)` factory; the other eight keep their quirks
    behind a documented adapter contract (`ChatPort`).
-2. **`application/`**: `ToolRunner` and `AgentLoop` *(done)*. Still to extract
-   from `main.js`: `Session` (bootstrap, system-prompt re-injection, skills) and
-   the send path (`submitAndGetBase`), which would complete the `ChatTurnsPort`
-   the loop depends on. `ResponseWatcher` is done: ~400 lines became a sequence
-   of small gates (pre-start, streaming, no-turn-yet, settle, warm-up, reasoning)
-   over one `WatchState`, plus a pure `classifyReply`.
+2. **`application/`** *(done)*: `ToolRunner`, `AgentLoop`, `ResponseWatcher`,
+   `MessageSender`, `SessionStarter`, `PromptResender`, `SkillsService`. What is
+   left in `main.js` is presentation and wiring, which is what `ui/` is for.
 3. **`ui/`**: split the ~1.5k-line `ui` IIFE into `bar`, `target-menu`,
    `mcp-settings`, `banners`; split `decorate` (chips) into `chips` + `camouflage`.
    Rendering takes a state object and returns DOM, so view state is testable.

@@ -752,128 +752,76 @@
   // ════════════════════════════════════════════════════════════════════════
   //  SESSION BOOTSTRAP  ("Starting Up" animated chip, shown in the conversation)
   // ════════════════════════════════════════════════════════════════════════
-  async function startSession() {
-    if (A.running || A.starting) return;
-    // "Start session" is allowed ONLY on a blank conversation. Opening an
-    // EXISTING conversation must never trigger the bootstrap.
-    if (!P.chatIsEmpty() && !A.started) {
-      ui.toast("Use an empty chat.");
-      return;
-    }
-    A.userStopped = false;
-    A.stop = false;               // clear any halt left by a prior aborted bootstrap
-    // Snapshot any turn already on screen at session start (normally none on a
-    // clean new chat; on a reload-restored generation it's the stray turn). The
-    // auto-resume watchdog refuses to run a tool from this baseline turn so a
-    // restored command can't leak into the freshly started conversation.
-    A.bootBaselineId = P.lastAssistantId ? P.lastAssistantId() : null;
-    A.starting = true;
-    const myGen = ++A.startGen;   // identity of THIS bootstrap
-    A.startingKey = null;          // unknown until the conversation gets an id
-    const alive = () => A.startGen === myGen; // false once superseded/aborted
-    toolReminder.reset(); // fresh reminder cadence for the new session
-    ui.setStarting(true);
-    ui.updateStartGate(); // refresh the bar into its "starting" state
-    P.setInputLock(true); // block user input during bootstrap
-    ui.inputCover(true);  // cover the composer ("Working…") for the WHOLE Starting Up
-    try {
-      await catalogue.ensure(true); // boot: always take a fresh catalogue (the TTL then
-                               // covers the list_commands / list_mcp_servers calls
-                               // the model makes seconds later)
-      if (!alive()) return;
-      const selectedTools = activeTools();
-      const vscodeServer = (A.bridge && A.bridge.servers || []).find((server) => server.id === "vscode");
-      if (selectedTargetId === "vscode" && A.bridge && A.bridge.connected &&
-          vscodeServer && vscodeServer.alive &&
-          !selectedTools.some((tool) => bareToolName(tool.name) === "list_dir")) {
-        ui.banner("warn", "VS Code workspace required",
-          "Open a project folder in VS Code, then try again.");
-        return;
-      }
-      if (!activeTools().length) {
-        ui.banner("warn", `${ui.getTargetName()} tools unavailable`,
-          `Is the server online?`);
-        return;
-      }
-      if (selectedTargetId === "vscode") {
-        const workspaceTool = activeTools().find((tool) => bareToolName(tool.name) === "list_dir");
-        if (!workspaceTool) {
-          ui.banner("warn", "VS Code workspace required",
-            "Open a project folder in VS Code, then try again.");
-          return;
-        }
-        const probe = await bg({
-          type: "call_tool",
-          name: workspaceTool.name,
-          arguments: { path: "." },
-          timeout: 5000,
-        });
-        if (!alive()) return;
-        if (!probe || !probe.ok) {
-          ui.banner("warn", "VS Code workspace required",
-            "Open a project folder in VS Code, then try again.");
-          return;
-        }
-      }
-      const modeState = await P.ensureComposerReady("startup");
-      if (!alive()) return;
-      if (!modeState.ready) {
-        ui.banner("warn", `${P.displayName} mode not ready`,
-          `Try a new chat or reload.`);
-        return;
-      }
-      if (selectedTargetId === "vscode") await skillsService.load();
-      if (!alive()) return;
-      const prompt = systemPrompt();
-      const base = await submitAndGetBase(prompt);
-      if (!alive()) return;
-      // (syncSessionState pins A.startingKey to the conversation id once the chat
-      // has content, and aborts this bootstrap if the user opens a new empty chat.)
-      decorate.sweep(); // show the animated "Starting Up" chip immediately
-      const startRes = await waitForResponse(base);
-      if (!alive()) return;
-      // The user halted the bootstrap (our Stop or the site's native stop). Do
-      // NOT declare the session ready - abort quietly so "Start" stays available.
-      if (A.stop || startRes.kind === "stopped") { diag("start.aborted", { kind: startRes.kind }); return; }
-
-      // If the model calls list_commands as instructed, run it and wait for the "ready" reply.
-      const firstName = startRes.calls && startRes.calls[0] && startRes.calls[0].tool;
-      if (startRes.kind === "tool" && startRes.calls && startRes.calls.length === 1 &&
-          (firstName === "list_commands" || firstName === "list_tools")) {
-        decorate.toolBox(startRes.item, "Loading commands", "run", "", true);
-        const toolFeedback = await runTool(startRes.calls[0]);
-        // An unavailable target short-circuits list_commands into a plain note
-        // (main.js, list_commands handler) instead of the real catalogue - detect
-        // that and show it as such, rather than the STALE cached tool count below.
-        if (/No commands available|has no commands available|is not available/i.test(toolFeedback)) {
-          decorate.toolBox(startRes.item, "Loading commands", "err", `${ui.getTargetName()} unavailable`, true);
-        } else {
-          decorate.toolBox(startRes.item, "Loading commands", "done", `${activeTools().length} commands`, true);
-        }
-        const base2 = await submitAndGetBase(toolFeedback);
-        const readyRes = await waitForResponse(base2); // wait for "I'm ready" reply
-        if (!alive()) return;
-        if (A.stop || readyRes.kind === "stopped") { diag("start.aborted", { kind: readyRes.kind }); return; }
-      }
+  // Start flow (src/application/session-starter.js), wired to this page's flags and UI.
+  const { SessionStarter } = ZSApp;
+  const sessionLifecycle = {
+    canStart: () => !A.running && !A.starting,
+    begin() {
+      A.userStopped = false;
+      A.stop = false; // clear any halt left by a prior aborted bootstrap
+      // Snapshot any turn already on screen (a reload-restored generation): the auto-resume watchdog
+      // refuses to run a tool from this baseline turn, so a restored command cannot leak into the new chat.
+      A.bootBaselineId = P.lastAssistantId ? P.lastAssistantId() : null;
+      A.starting = true;
+      const myGeneration = ++A.startGen; // identity of THIS bootstrap
+      A.startingKey = null; // unknown until the conversation gets an id
+      toolReminder.reset(); // fresh reminder cadence for the new session
+      ui.setStarting(true);
+      ui.updateStartGate(); // refresh the bar into its "starting" state
+      P.setInputLock(true); // block user input during bootstrap
+      ui.inputCover(true); // cover the composer ("Working…") for the WHOLE Starting Up
+      return () => A.startGen === myGeneration; // false once superseded/aborted
+    },
+    markStarted() {
       A.started = true;
       rememberSession(P.conversationKey()); // survives virtualization AND reloads
       ui.setStarted(true);
-      ui.toast(`Agent on.`);
-    } catch (e) {
-      if (alive()) ui.banner("warn", "Startup failed", String((e && e.message) || e));
-    } finally {
-      // Only tear down our OWN starting state. If we were superseded (the user
-      // opened another chat), the newer flow / syncSessionState owns it now.
-      if (alive()) {
-        A.starting = false;
-        A.startingKey = null;
-        ui.setStarting(false);
-        ui.inputCover(false); // lift the Starting Up composer cover
-        P.setInputLock(false); // always unlock after bootstrap
-        decorate.sweep();
-      }
-    }
-  }
+    },
+    end(alive) {
+      // Only tear down our OWN starting state. If superseded (the user opened another chat), the newer
+      // flow / syncSessionState owns it now.
+      if (!alive()) return;
+      A.starting = false;
+      A.startingKey = null;
+      ui.setStarting(false);
+      ui.inputCover(false);
+      P.setInputLock(false);
+      decorate.sweep();
+    },
+  };
+  const sessionStarter = new SessionStarter({
+    session: sessionLifecycle,
+    page: {
+      isEmpty: () => P.chatIsEmpty(),
+      isStarted: () => A.started,
+      ensureComposerReady: (reason) => P.ensureComposerReady(reason),
+      displayName: () => P.displayName,
+    },
+    target: {
+      id: () => selectedTargetId,
+      name: () => ui.getTargetName(),
+      bridgeConnected: () => !!(A.bridge && A.bridge.connected),
+      serverAlive: () => {
+        const server = ((A.bridge && A.bridge.servers) || []).find((item) => item.id === "vscode");
+        return !!(server && server.alive);
+      },
+    },
+    catalogue,
+    callTool: (name, args, timeout) => bg({ type: "call_tool", name, arguments: args, timeout }),
+    skills: skillsService,
+    systemPrompt: () => systemPrompt(),
+    chat: loopChat,
+    runner: toolRunner,
+    view: {
+      toast: (text) => ui.toast(text),
+      banner: (level, title, text) => ui.banner(level, title, text),
+      showStartingChip: () => decorate.sweep(),
+      handshake: (item, phase, detail) => decorate.toolBox(item, "Loading commands", phase, detail, true),
+    },
+    isStopped: () => A.stop,
+    diag,
+  });
+  const startSession = () => sessionStarter.start();
 
   // ════════════════════════════════════════════════════════════════════════
   //  SVG ICON SET  (stroke = currentColor, inherits the chip's theme colour)

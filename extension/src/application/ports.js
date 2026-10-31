@@ -112,4 +112,20 @@
  * @property {() => void} end        Lift the cover (unless a loop owns it) and nudge the camouflage sweep.
  */
 
+/**
+ * @typedef {Object} SessionLifecyclePort  Session flags and UI locks, owned by the page.
+ * @property {() => boolean} canStart        Not already running or starting.
+ * @property {() => () => boolean} begin     Mark starting, lock the composer; returns `alive()` (false once superseded).
+ * @property {() => void} markStarted
+ * @property {(alive: () => boolean) => void} end  Tear down OUR starting state (only if still alive).
+ */
+
+/**
+ * @typedef {Object} StartViewPort
+ * @property {(text: string) => void} toast
+ * @property {(level: string, title: string, text: string) => void} banner
+ * @property {() => void} showStartingChip
+ * @property {(item: object, phase: "run"|"done"|"err", detail: string) => void} handshake  The "Loading commands" chip.
+ */
+
 export {};
