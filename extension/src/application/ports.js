@@ -92,4 +92,24 @@
  * @property {() => boolean} [resolveComparison]
  */
 
+/**
+ * @typedef {Object} ComposerPort  The chat page's composer and turn counters.
+ * @property {() => object|null} lastAssistant
+ * @property {(item: object) => number} streamLen
+ * @property {() => boolean} isGenerating
+ * @property {() => boolean} isBusyNow
+ * @property {() => number} assistantCount
+ * @property {() => number} userCount
+ * @property {() => string} editorText
+ * @property {(text: string, images?: object[]|null) => Promise<void>} typeAndSend
+ */
+
+/**
+ * @typedef {Object} SendEffectsPort  Page-side effects around one send (masking, cover, sweeps).
+ * @property {() => void} begin      Remember which turn is last, mark injecting, cover the composer.
+ * @property {(preUserCount: number) => void} armPrehide  Mask the next new user turn on creation.
+ * @property {() => void} rearmPrehide
+ * @property {() => void} end        Lift the cover (unless a loop owns it) and nudge the camouflage sweep.
+ */
+
 export {};

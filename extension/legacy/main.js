@@ -271,8 +271,6 @@
     return parked;
   }
 
-  // Submit `text` as a new turn, masking the input while we type. Returns the
-  // assistant-item count BEFORE the reply (waitForResponse waits beyond it).
   // Snapshot the identity of the assistant turn present BEFORE we send. Paired
   // with waitForResponse, this lets "a new reply turn exists" be tested by node
   // identity rather than a raw count - the latter is unreliable on providers that
@@ -281,96 +279,6 @@
   // user message, bootstrap). Providers without lastAssistantId fall back to count.
   function captureSendToken() {
     A.sendToken = P.lastAssistantId ? P.lastAssistantId() : undefined;
-  }
-
-  async function submitAndGetBase(text, images) {
-    captureSendToken();
-    diag("send", { text: String(text).slice(0, 60), busy: P.isBusyNow() });
-    A.injecting = true;
-    ui.inputCover(true);
-    try {
-      // Quick 2-point settle: sample the previous response's stream length before
-      // and after a 200ms yield. A one-shot React batch flush (the common case)
-      // shows no second growth and costs only 200ms. A genuinely still-generating
-      // stream shows growth → fall back to the full idle wait.
-      const _settleItem = P.lastAssistant();
-      const _settleLen0 = _settleItem ? P.streamLen(_settleItem) : 0;
-      await sleep(200);
-      if (_settleItem && _settleItem === P.lastAssistant() &&
-          P.streamLen(_settleItem) > _settleLen0) {
-        await waitFor(() => !P.isGenerating(), 4000);
-      }
-      const base = P.assistantCount();
-      const preUser = P.userCount();
-      // Arm the optimistic pre-hide for the result turn we're about to inject:
-      // the very next NEW user turn is ours, so preHideWholeItems can mask it on
-      // creation instead of waiting for its "Output of '…'" caption to render
-      // (which lands a tick after the node - especially with an attached image -
-      // and would otherwise flash the raw output for the 200/700ms until a sweep
-      // nudge catches it). See preHideWholeItems.
-      A.injectPreUser = preUser;
-      A.injectHideUntil = Date.now() + 2500;
-      // "Landed" = a new turn appeared in the DOM. In long chats, list
-      // virtualisation can keep counts flat even when our message landed - the
-      // textarea-cleared signal below is the primary fast gate.
-      const landed = () => P.userCount() > preUser || P.assistantCount() > base;
-      // CRITICAL: never type/send while the tab is HIDDEN. Background tabs throttle
-      // rendering, which made the landed-check unreliable and caused the SAME
-      // feedback to be sent several times. Send ONLY while visible.
-      let tries = 0;
-      let messageSent = false;
-      const maxTries = Number.isInteger(P.sendRetryLimit) && P.sendRetryLimit > 0
-        ? P.sendRetryLimit
-        : 4;
-      while (!messageSent && !landed() && tries < maxTries && !A.stop) {
-        if (document.hidden) {
-          diag("send.waitVisible", { tries });
-          if (!(await waitVisible()) || A.stop) break; // park (no cap) until foreground; break only on user stop
-        }
-        await jitterBeforeSend();
-        diag("submit.typeAndSend", { hasImages: !!(images && images.length) });
-        await P.typeAndSend(text, images);
-        // Re-arm the pre-hide window NOW that typeAndSend has returned (the send
-        // was just clicked, so our result turn is about to render). The initial
-        // arm above can EXPIRE during an image upload - typeAndSend blocks ~3-6s
-        // uploading the capture before the turn appears, past the 2.5s window - so
-        // without this re-arm the raw "Output of…" + a still-loading (0-byte)
-        // thumbnail flash for image feedbacks until a sweep chip lands. Safe: the
-        // input is covered and the loop owns this send, so no user turn can slip
-        // into the window, and the pre-hide is one-shot (consumes the first turn).
-        A.injectHideUntil = Date.now() + 2500;
-        // The site clears the textarea as soon as the send is accepted - faster
-        // and more reliable than waiting for a DOM turn count change.
-        await waitFor(() => {
-          if (P.editorText().trim() === "") messageSent = true;
-          return messageSent || landed();
-        }, 3500);
-        tries++;
-      }
-      if (messageSent) diag("send.cleared", { tries });
-      // All retries exhausted with NO evidence the message landed (textarea never
-      // cleared, no new turn). Silently returning here left the loop waiting for
-      // a reply that will never come (~60s "empty" timeout) with zero explanation
-      // - the reported "the tool result just never gets injected" symptom. Tell
-      // the user what actually happened so they can nudge the conversation
-      // themselves instead of watching a stuck bar.
-      if (!messageSent && !landed() && !A.stop) {
-        diag("send.failed", { tries });
-        ui.banner("warn", "Message could not be sent",
-          `Send "continue" to resume.`);
-      }
-      return base;
-    } finally {
-      // During Starting Up / the agent loop, the bootstrap or loop owns the cover
-      // for the whole phase, so don't lift it here between an injection and the
-      // next waitForResponse - it stays up until the loop / bootstrap ends.
-      if (!A.starting && !A.running) ui.inputCover(false);
-      setTimeout(() => (A.injecting = false), 400);
-      // Camouflage the turn we just injected without waiting on the rAF observer
-      // (paused in a background tab). A couple of nudges cover the render.
-      setTimeout(scheduleSweep, 200);
-      setTimeout(scheduleSweep, 700);
-    }
   }
 
   // ════════════════════════════════════════════════════════════════════════
@@ -506,6 +414,45 @@
   });
   const runTool = (call) => toolRunner.run(call);
   const activeTools = () => catalogue.active();
+
+  // ── Sending a message (src/application/message-sender.js) ────────────────
+  const { MessageSender } = ZSApp;
+  const sendEffects = {
+    begin() { captureSendToken(); A.injecting = true; ui.inputCover(true); },
+    // The very next NEW user turn is ours: preHideWholeItems masks it on creation instead of flashing the raw output.
+    armPrehide(preUser) { A.injectPreUser = preUser; A.injectHideUntil = Date.now() + 2500; },
+    // typeAndSend can block seconds uploading an image, past the first window.
+    rearmPrehide() { A.injectHideUntil = Date.now() + 2500; },
+    end() {
+      // During Starting Up / the agent loop, that phase owns the cover; it stays up until the loop ends.
+      if (!A.starting && !A.running) ui.inputCover(false);
+      setTimeout(() => (A.injecting = false), 400);
+      // Camouflage the turn we just injected without waiting on the rAF observer (paused in a background tab).
+      setTimeout(scheduleSweep, 200);
+      setTimeout(scheduleSweep, 700);
+    },
+  };
+  const messageSender = new MessageSender({
+    page: {
+      lastAssistant: () => P.lastAssistant(),
+      streamLen: (item) => P.streamLen(item),
+      isGenerating: () => P.isGenerating(),
+      isBusyNow: () => P.isBusyNow(),
+      assistantCount: () => P.assistantCount(),
+      userCount: () => P.userCount(),
+      editorText: () => P.editorText(),
+      typeAndSend: (text, images) => P.typeAndSend(text, images),
+    },
+    visibility: visibilityPort,
+    effects: sendEffects,
+    clock: { sleep, waitFor },
+    isStopped: () => A.stop,
+    beforeSend: () => jitterBeforeSend(),
+    retryLimit: P.sendRetryLimit,
+    notify: { banner: (level, title, text) => ui.banner(level, title, text) },
+    diag,
+  });
+  const submitAndGetBase = (text, images) => messageSender.submit(text, images);
 
   // ════════════════════════════════════════════════════════════════════════
   //  AGENTIC LOOP (src/application/agent-loop.js), wired to this page via ports
