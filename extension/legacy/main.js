@@ -847,36 +847,6 @@
   const startSession = () => sessionStarter.start();
 
   // ════════════════════════════════════════════════════════════════════════
-  //  SVG ICON SET  (stroke = currentColor, inherits the chip's theme colour)
-  // ════════════════════════════════════════════════════════════════════════
-  const SVG = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
-  const ICONS = {
-    screen:  SVG('<rect x="3" y="4" width="18" height="13" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'),
-    read:    SVG('<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'),
-    edit:    SVG('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
-    tool:    SVG('<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2-2z"/>'),
-    result:  SVG('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'),
-    check:   SVG('<polyline points="20 6 9 17 4 12"/>'),
-    // Bell - the mid-session system-prompt re-statement. Deliberately NOT the
-    // gear: the gear means "the agent is starting up", and a reminder is the
-    // opposite (a session already long enough to need re-anchoring).
-    remind:  SVG('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>'),
-    error:   SVG('<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'),
-    gear:    SVG('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.82 1.17V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15H4.5a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 11 4.6h.09A1.65 1.65 0 0 0 12 3.09 2 2 0 0 1 16 3v.09A1.65 1.65 0 0 0 19 4.6l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 21.4 11h.1a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.5 1z"/>'),
-  };
-  const SPIN = '<span class="zs-spin"></span>';
-
-  function iconFor(category, phase) {
-    if (phase === "run") return SPIN;
-    if (phase === "err") return ICONS.error;
-    if (phase === "done") return ICONS.check;
-    if (phase === "result") return ICONS.result;
-    if (phase === "sys") return ICONS.gear;
-    if (phase === "remind") return ICONS.remind;
-    return ICONS[category] || ICONS.tool;
-  }
-
-  // ════════════════════════════════════════════════════════════════════════
   //  CAMOUFLAGE / DECORATION  (chips are real "tool cards": header + an
   //  expandable body, themed by tool category and execution state)
   // ════════════════════════════════════════════════════════════════════════
@@ -902,39 +872,11 @@
   const decorate = {
     // Core renderer. opts: {label, detail, body, category, phase, cls, whole}
     chip(item, opts) {
-      const { label, detail = "", body = "", category = "tool", phase, cls, whole } = opts;
-      let chip = item.querySelector(".zs-chip");
-      const hasBody = !!body;
-      // While a command streams, the site re-renders the raw block on every token
-      // and we get called on nearly every sweep. If what we'd draw is identical,
-      // we must NOT rebuild the chip's innerHTML: doing so re-creates the
-      // <span class="zs-spin"> and restarts its CSS animation each time, so the
-      // spinner looks frozen / stutters ("retry en rafale"). Rebuild the inner
-      // markup ONLY when the rendered content actually changes; otherwise reuse
-      // the existing element (and keep its expand/collapse state) so the spinner
-      // keeps spinning smoothly. Re-anchoring + masking below still run each pass.
-      const sig = `${category}|${phase}|${cls || ""}|${whole ? 1 : 0}|${label}|${detail}|${hasBody ? body.length : 0}`;
-      if (!chip) chip = document.createElement("div");
-      if (chip.dataset.csig !== sig) {
-        chip.dataset.csig = sig;
-        chip.className = `zs-chip cat-${category} ${cls || ""}`;
-        chip.innerHTML =
-          `<div class="zs-chip-head">` +
-            `<span class="zs-chip-ic">${iconFor(category, phase)}</span>` +
-            `<span class="zs-chip-tx"></span>` +
-            `<span class="zs-chip-dt"></span>` +
-            (hasBody ? `<span class="zs-chip-cv">${SVG('<polyline points="6 9 12 15 18 9"/>')}</span>` : "") +
-          `</div>` +
-          (hasBody ? `<div class="zs-chip-body"><pre></pre></div>` : "");
-        chip.querySelector(".zs-chip-tx").textContent = label;
-        if (detail) chip.querySelector(".zs-chip-dt").textContent = detail;
-        if (hasBody) {
-          chip.querySelector(".zs-chip-body pre").textContent = body;
-          const head = chip.querySelector(".zs-chip-head");
-          head.style.cursor = "pointer";
-          head.onclick = () => chip.classList.toggle("open");
-        }
-      }
+      const { cls, whole } = opts;
+      // Drawing lives in ui/chip-view.js (paintChip). It rebuilds the inner markup only when the
+      // signature changes, so the streaming spinner keeps animating. Re-anchoring + masking below
+      // still run on every pass.
+      const chip = ZSUi.paintChip(document, item.querySelector(".zs-chip"), opts);
 
       if (whole) {
         // Fully injected turn (result / sys) → hide the whole item.
