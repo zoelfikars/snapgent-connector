@@ -1142,14 +1142,11 @@
           <span id="zs-state"></span>
           <button id="zs-action"></button>
           <button id="zs-stop" hidden>■ Stop</button>
-          <div class="zs-target-wrap" title="Choose which MCP server receives commands">
-            <select id="zs-target" aria-label="MCP target" hidden tabindex="-1">
-              <option value="vscode">VS Code</option>
-            </select>
-            <button id="zs-target-btn" type="button" aria-haspopup="listbox" aria-label="Choose MCP target"><span id="zs-target-name"></span></button>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
-          <button id="zs-switch" aria-label="Switch AI and options" title="Switch AI and options"><span id="zs-switch-name"></span><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <select id="zs-target" aria-label="MCP target" hidden tabindex="-1">
+            <option value="vscode">VS Code</option>
+          </select>
+          ${ZSUi.pillHtml({ id: "zs-target-btn", nameId: "zs-target-name", label: "Choose MCP target", title: "Choose which MCP server receives commands", popup: "listbox" })}
+          ${ZSUi.pillHtml({ id: "zs-switch", nameId: "zs-switch-name", label: "Switch AI and options", title: "Switch AI and options" })}
         </div>
         <button id="zs-toggle" type="button" aria-label="Show or hide snapgent"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
         <div id="zs-menu" hidden></div>

@@ -20,3 +20,4 @@ export { createBarPlacer } from "./bar-placer.js";
 export { createInputCover } from "./input-cover.js";
 export { createCalibrationWizard } from "./calibration-wizard.js";
 export { createPicker } from "./picker.js";
+export { pillHtml } from "./pill.js";

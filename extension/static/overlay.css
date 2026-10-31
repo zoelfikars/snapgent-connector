@@ -241,28 +241,21 @@ html.zs-light #zs-unstable {
 }
 #zs-stop[data-state="stopping"]:hover { background: #eab308; }
 
-/* Target and model selectors follow the Snapgent header pill style. */
-.zs-target-wrap {
-  flex: none; position: relative; display: inline-flex; align-items: center;
-  height: 32px; padding: 0 10px 0 12px;
+/* The dropdown pill (MCP target, Switch AI): one component, name at the left, arrow at the right edge. */
+.zs-pill {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  width: 100%; min-width: 0; height: 32px; box-sizing: border-box; padding: 0 8px 0 12px;
   color: #d0d0d6; background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(234, 179, 8, 0.75); border-radius: 18px;
+  font: inherit; font-size: 12px; font-weight: 600; text-align: left; white-space: nowrap; cursor: pointer;
+  transition: background 0.14s ease;
 }
-#zs-target {
-  appearance: none; -webkit-appearance: none;
-  max-width: min(130px, 30vw); padding: 0 16px 0 0;
-  color: inherit; background: transparent; border: 0; outline: 0;
-  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
-}
-#zs-target option { color: #1f2937; background: #fff; }
-#zs-target:disabled { opacity: 0.65; cursor: not-allowed; }
-#zs-target-btn {
-  max-width: min(130px, 30vw); padding: 0 16px 0 0;
-  color: inherit; background: transparent; border: 0; outline: 0;
-  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left;
-}
-#zs-target-btn:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.4); outline-offset: 4px; border-radius: 6px; }
+.zs-pill:hover { background: rgba(255, 255, 255, 0.11); }
+.zs-pill:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.4); outline-offset: 2px; }
+.zs-pill-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.zs-pill svg { flex: none; opacity: 0.65; pointer-events: none; }
+html.zs-light .zs-pill { background: rgba(0, 0, 0, 0.05); color: #4b5563; border-color: rgba(180, 130, 10, 0.55); }
+html.zs-light .zs-pill:hover { background: rgba(0, 0, 0, 0.09); color: #1f2430; }
 
 /* MCP target dropdown: same shell as the Switch AI menu */
 #zs-target-menu {
@@ -283,19 +276,6 @@ html.zs-light #zs-target-menu {
   background: #ffffff; color: #1f2937; border-color: rgba(0, 0, 0, 0.1);
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.18); scrollbar-color: rgba(0,0,0,0.25) transparent;
 }
-.zs-target-wrap svg { position: absolute; right: 8px; pointer-events: none; opacity: 0.65; }
-
-/* model switcher: names the current AI and opens the provider menu */
-#zs-switch {
-  flex: none; display: flex; align-items: center; gap: 5px;
-  height: 32px; padding: 0 12px;
-  background: rgba(255, 255, 255, 0.04); color: #d0d0d6;
-  border: 1px solid rgba(234, 179, 8, 0.75); border-radius: 18px;
-  font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
-  transition: background 0.14s ease;
-}
-#zs-switch:hover { background: rgba(255, 255, 255, 0.11); }
-#zs-switch svg { opacity: 0.55; }
 
 @media (max-width: 560px) {
   #zs-bar {
@@ -320,21 +300,10 @@ html.zs-light #zs-target-menu {
     text-overflow: ellipsis;
   }
   #zs-stop { height: auto; padding: 0 12px; border-radius: 18px; }
-  .zs-target-wrap, #zs-switch {
-    max-width: 38%;
-    min-width: 0;
-    min-height: 36px;
-    height: auto;
-    padding-left: 9px;
-    padding-right: 9px;
-  }
-  #zs-target { max-width: 100%; min-width: 0; font-size: 11px; }
-  #zs-switch { font-size: 11px; }
 }
 
 @media (max-width: 400px) {
   #zs-bar { gap: 5px; padding: 5px 6px; }
-  .zs-target-wrap, #zs-switch { max-width: 42%; }
 }
 
 /* ── the "more" menu popover (right/bottom set inline) ────────────────────── */
@@ -1064,12 +1033,6 @@ html.zs-light #zs-state { color: #4b5563; }
 html.zs-light #zs-state b { color: #4f46e5; }
 html.zs-light #zs-state.zs-state-warn { color: #b91c1c; }
 html.zs-light #zs-bar.tone-active #zs-state b { color: #059669; }
-html.zs-light #zs-switch,
-html.zs-light .zs-target-wrap {
-  background: rgba(0, 0, 0, 0.05); color: #4b5563;
-  border-color: rgba(180, 130, 10, 0.55);
-}
-html.zs-light #zs-switch:hover { background: rgba(0, 0, 0, 0.09); color: #1f2430; }
 html.zs-light #zs-action:disabled {
   background: rgba(0, 0, 0, 0.05); color: rgba(0, 0, 0, 0.35); border-color: rgba(0, 0, 0, 0.08);
 }
@@ -1157,14 +1120,4 @@ html #zs-bar {
 }
 html #zs-bar #zs-state { order: 0; flex: none; min-height: 0; white-space: normal; font-size: 11.5px; line-height: 1.35; }
 html #zs-bar #zs-action, html #zs-bar #zs-stop { order: 1; flex: none; width: 100%; max-width: none; min-height: 32px; justify-content: center; }
-html #zs-bar .zs-target-wrap, html #zs-bar #zs-switch { order: 2; flex: none; width: 100%; max-width: none; min-width: 0; min-height: 30px; box-sizing: border-box; }
-
-/* The MCP target pill is one button, like the Switch AI pill: the whole pill is the hit area and shows the pointer. */
-html #zs-bar .zs-target-wrap { display: flex; padding: 0; transition: background 0.14s ease; }
-html #zs-bar .zs-target-wrap:hover { background: rgba(255, 255, 255, 0.11); }
-html #zs-bar #zs-target-btn { flex: 1 1 auto; align-self: stretch; width: 100%; max-width: none; padding: 0 28px 0 12px; cursor: pointer; }
-html.zs-light #zs-bar .zs-target-wrap:hover { background: rgba(0, 0, 0, 0.06); }
-
-/* The Switch AI pill looks like the MCP pill: name at the left, the arrow at the right edge. */
-html #zs-bar #zs-switch { justify-content: space-between; padding: 0 8px 0 12px; }
-html #zs-bar #zs-switch svg { flex: none; opacity: 0.65; }
+html #zs-bar .zs-pill { order: 2; flex: none; }
