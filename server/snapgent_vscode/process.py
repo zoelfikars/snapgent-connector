@@ -9,10 +9,16 @@ from .limits import COMMAND_TIMEOUT_SECONDS, MAX_FILE_CHARS
 
 def run_process(command: List[str], cwd: Path, timeout: int = COMMAND_TIMEOUT_SECONDS) -> str:
     """Run without a shell. Returns trimmed output; a non-zero exit becomes a RuntimeError with that output."""
-    result = subprocess.run(
-        command, cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace",
-        shell=False, timeout=timeout, check=False,
-    )
+    try:
+        result = subprocess.run(
+            command, cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace",
+            shell=False, timeout=timeout, check=False,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(
+            f"The command was stopped after {timeout} seconds without finishing. It may still be needed: "
+            "run long jobs detached or in smaller steps (for example start a build in the background and check on it)."
+        ) from error
     output = result.stdout.strip() or result.stderr.strip() or "(no output)"
     if result.returncode:
         raise RuntimeError(f"Command exited with status {result.returncode}:\n{output[:MAX_FILE_CHARS]}")

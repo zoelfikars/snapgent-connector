@@ -1,4 +1,5 @@
-"""Logging: always printed, and written to a file once `configure` has been called."""
+"""Logging: everything goes to the log file once `configure` has been called; only `notice` also reaches the terminal,
+so the window stays readable (the approval question, where to listen, a fatal error)."""
 
 import logging
 from pathlib import Path
@@ -15,5 +16,10 @@ def configure(path: Path) -> None:
 
 
 def log(message: str) -> None:
+    logging.info(message)
+
+
+def notice(message: str) -> None:
+    """Log it and show it in the terminal."""
     logging.info(message)
     print(message, flush=True)

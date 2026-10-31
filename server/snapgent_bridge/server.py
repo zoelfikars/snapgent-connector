@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 from . import BRIDGE_VERSION, settings
 from .config import ConfigStore
-from .logs import configure as configure_logging, log
+from .logs import configure as configure_logging, log, notice
 from .mcp_client import MCPServer
 from .protocol import error_message, json_line
 from .registry import ServerRegistry
@@ -85,14 +85,31 @@ class BridgeServer:
         async def reply(message: Dict[str, Any]) -> None:
             await self._send(websocket, message)
 
+        # Each request runs on its own task: a tool that takes a minute (a docker build) must not stop the bridge from
+        # answering the extension's pings meanwhile, or the extension decides the socket is dead and drops the call.
+        running = set()
+
+        async def handle(request: Dict[str, Any]) -> None:
+            try:
+                await self.router.handle(request, reply)
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:  # one bad request must not end the connection
+                self._log(f"request failed: {error}")
+                await reply(error_message(request.get("id"), f"Bridge error: {error}"))
+
         try:
             async for raw in websocket:
                 request = self._parse(raw)
                 if isinstance(request, str):
                     await reply(error_message(None, request))
-                else:
-                    await self.router.handle(request, reply)
+                    continue
+                task = asyncio.ensure_future(handle(request))
+                running.add(task)
+                task.add_done_callback(running.discard)
         finally:
+            for task in list(running):
+                task.cancel()
             async with self._lock:
                 self.clients.discard(websocket)
             self._log("extension disconnected")
@@ -129,7 +146,8 @@ async def run() -> None:
         max_size=settings.WS_MAX_MESSAGE_BYTES, ping_interval=20, ping_timeout=20,
     )
     log(f"snapgent bridge v{BRIDGE_VERSION}")
-    log(f"listening on ws://{settings.HOST}:{settings.PORT} - load the extension and open a supported AI chat")
+    notice(f"  Listening on ws://{settings.HOST}:{settings.PORT} - load the extension and open a supported AI chat.")
+    notice(f"  Details are written to {settings.LOG_PATH}")
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
     monitor_task = asyncio.create_task(bridge.monitor())
@@ -146,12 +164,12 @@ async def run() -> None:
         server.close()
         await server.wait_closed()
         await bridge.stop_servers()
-        log("bridge stopped")
+        notice("bridge stopped")
 
 
 def main() -> None:
     try:
         asyncio.run(run())
     except (OSError, RuntimeError, ValueError) as error:
-        log(f"FATAL: {error}")
+        notice(f"FATAL: {error}")
         raise SystemExit(1)

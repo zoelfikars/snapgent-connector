@@ -61,7 +61,7 @@ class EntryPointTests(unittest.IsolatedAsyncioTestCase):
                 self.fail("bridge ignored SIGTERM")
         self.assertEqual(process.returncode, 0, output)
         self.assertIn("bridge stopped", output)
-        self.assertIn(f"listening on ws://127.0.0.1:{port}", output)
+        self.assertIn(f"Listening on ws://127.0.0.1:{port}", output)
 
 
 if __name__ == "__main__":

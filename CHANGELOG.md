@@ -14,6 +14,13 @@ All notable changes to snapgentV3 Free are documented here.
 - Frozen executables keep `config.json` and `logs/` next to the `.exe` (not in a temp folder).
 - `scripts/package_release.py` assembles the release zip (tested).
 
+### Fixed
+- **A long tool call no longer makes the bridge look offline.** The bridge handled one request at a time per connection, so a
+  minute-long command (a docker build) left the extension's pings unanswered; the extension then dropped the socket and told the
+  model the bridge was unreachable. Each request now runs on its own task.
+- `run_command` waits up to 120 seconds (was 30) and says plainly when it stopped a command that took longer.
+- The bridge's terminal shows only where it listens, the approval question and fatal errors; everything else is in `logs/bridge_debug.log`.
+
 ### Added
 - **One program for Linux (beta)**: `snapgent` runs the bridge, and `snapgent --vscode-mcp` runs the VS Code MCP server the bridge
   starts, so a release needs no Python. It writes its own `config.json`, replaces an older Snapgent bridge on the port, and is built by

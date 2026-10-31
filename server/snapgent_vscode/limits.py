@@ -11,6 +11,6 @@ MAX_LINES_PER_READ = 1000
 MAX_TREE_DEPTH = 8
 SAFE_PROJECT_SCRIPTS = frozenset({"build", "check", "format", "lint", "test", "typecheck"})
 
-COMMAND_TIMEOUT_SECONDS = 30
+COMMAND_TIMEOUT_SECONDS = 120  # as long as the bridge waits for one tool call (builds, installs)
 SCRIPT_TIMEOUT_SECONDS = 300
 COMMIT_TIMEOUT_SECONDS = 120

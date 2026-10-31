@@ -68,6 +68,29 @@ class WebSocketServerTests(unittest.IsolatedAsyncioTestCase):
             result = await self.recv(client)
             self.assertEqual((result["ok"], result["text"], result["id"]), (True, "round trip", 2))
 
+    async def test_a_slow_tool_does_not_stop_the_bridge_answering_pings(self):
+        # A docker build can keep one call busy for a minute; the extension's pings must still be answered meanwhile,
+        # or it decides the socket is dead, drops the call and tells the model the bridge is offline.
+        await self.approve()
+        release = asyncio.Event()
+        self.addCleanup(release.set)  # a failing run must not leave the call waiting forever
+        original = self.bridge.router._call_tool
+
+        async def slow(request, reply):
+            await release.wait()
+            await original(request, reply)
+
+        self.bridge.router._handlers["call_tool"] = slow
+        async with self.connect() as client:
+            await self.recv(client)  # connected
+            await client.send(json.dumps({"id": 1, "type": "call_tool", "name": "echo", "arguments": {"message": "late"}, "timeout": 2000, "server": "mock"}))
+            await client.send(json.dumps({"id": 2, "type": "ping"}))
+            pong = await self.recv(client)
+            self.assertEqual((pong["type"], pong["id"]), ("pong", 2))
+            release.set()
+            result = await self.recv(client)
+            self.assertEqual((result["ok"], result["text"]), (True, "late"))
+
     async def test_web_pages_and_clients_without_an_origin_are_closed_with_1008(self):
         for origin in ("https://evil.example", "http://127.0.0.1:3000", None):
             async with self.connect(origin) as client:
