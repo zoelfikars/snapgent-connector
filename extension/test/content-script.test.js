@@ -68,6 +68,18 @@ describe("content script on a supported site that is not calibrated yet", () => 
     }
   });
 
+  test("the bar is actually on screen (not just in the page): shown, and placed inside the window", async () => {
+    const page = await startOn("<html><body><main><p>a chat page</p></main></body></html>");
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 200)); // a few frames of the placement loop
+      const bar = page.document.getElementById("zs-bar");
+      assert.notEqual(bar.style.display, "none", "the placement loop left the bar hidden");
+      assert.ok(bar.style.top && bar.style.left, "and gave it a position");
+    } finally {
+      page.window.close();
+    }
+  });
+
   test("pressing Calibrate opens the calibration panel, and Cancel closes it", async () => {
     const page = await startOn("<html><body><main><p>a chat page</p></main></body></html>");
     try {

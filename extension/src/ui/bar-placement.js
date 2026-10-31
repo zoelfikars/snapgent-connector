@@ -10,6 +10,7 @@
 // While a bot check or a login/consent modal is on screen the bar steps aside entirely: a full-width
 // transparent bar would silently eat clicks meant for the modal's buttons.
 
+const WINDOW_MARGIN = 24;
 export const BAR_MAX_WIDTH = 560;
 export const BAR_GAP = 8;
 const ANCHOR_PADDING_GAP = 6;
@@ -38,6 +39,20 @@ export function anchoredGeometry(rect, barHeight) {
 }
 
 /** Centre above `rect` (the editor), no wider than BAR_MAX_WIDTH. @returns {{left:number, top:number, width:number}|null} */
+/**
+ * Where the bar goes on a page with no known text box (a site that is not calibrated yet, or whose box is gone): centred
+ * at the bottom of the window, so the user can always reach Calibrate and the menu.
+ */
+export function windowGeometry(viewport, barHeight) {
+  const height = barHeight || DEFAULT_FLOATING_HEIGHT;
+  const width = Math.max(0, Math.min(BAR_MAX_WIDTH, viewport.width - 2 * WINDOW_MARGIN));
+  return {
+    left: Math.round((viewport.width - width) / 2),
+    top: Math.max(MIN_TOP, Math.round(viewport.height - height - WINDOW_MARGIN)),
+    width,
+  };
+}
+
 export function floatingGeometry(rect, barHeight) {
   if (!rect.width) return null;
   const width = Math.min(rect.width, BAR_MAX_WIDTH);

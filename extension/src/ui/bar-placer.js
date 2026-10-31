@@ -3,7 +3,7 @@
 // (anchored), floating above the editor, or out of the way. Which of those applies and the geometry of each are pure
 // (bar-placement.js); this does the DOM work for one mode each and cleans up when it leaves a mode.
 
-import { anchoredGeometry, chooseBarMode, floatingGeometry, pillPosition } from "./bar-placement.js";
+import { anchoredGeometry, chooseBarMode, floatingGeometry, pillPosition, windowGeometry } from "./bar-placement.js";
 
 /**
  * @param {{ document: Document, provider: object,
@@ -103,9 +103,10 @@ export function createBarPlacer({ document, provider, parts, positionMenu }) {
       if (ui.root && ui.bar.parentElement !== ui.root) ui.root.appendChild(ui.bar);
     }
     const f = (provider.getEditor && provider.getEditor()) || (provider.composerFrame && provider.composerFrame());
-    if (!f) { ui.bar.style.display = "none"; if (ui.menuEl) ui.menuEl.hidden = true; return; }
     ui.bar.style.display = "flex";
-    const g = floatingGeometry(f.getBoundingClientRect(), ui.bar.offsetHeight);
+    // No text box to float above (not calibrated yet, or it is gone): sit at the bottom of the window, never vanish.
+    const win = document.defaultView;
+    const g = f ? floatingGeometry(f.getBoundingClientRect(), ui.bar.offsetHeight) : windowGeometry({ width: win.innerWidth, height: win.innerHeight }, ui.bar.offsetHeight);
     if (!g) { ui.bar.style.display = "none"; return; }
     ui.bar.style.width = g.width + "px";
     ui.bar.style.left = g.left + "px";

@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { BAR_MAX_WIDTH, anchoredGeometry, chooseBarMode, floatingGeometry, pillPosition } from "../src/ui/bar-placement.js";
+import { BAR_MAX_WIDTH, anchoredGeometry, chooseBarMode, floatingGeometry, pillPosition, windowGeometry } from "../src/ui/bar-placement.js";
 
 describe("chooseBarMode", () => {
   test("an overlay always wins: the bar steps aside so it cannot swallow clicks meant for a modal", () => {
@@ -58,5 +58,17 @@ describe("pillPosition", () => {
   test("a hidden or zero-width bar hides the pill", () => {
     assert.equal(pillPosition({ left: 0, top: 0, width: 0 }, 20), null);
     assert.equal(pillPosition(null, 20), null);
+  });
+});
+
+describe("windowGeometry", () => {
+  test("centred at the bottom, capped in width, with a margin", () => {
+    assert.deepEqual(windowGeometry({ width: 1200, height: 800 }, 34), { left: 320, top: 742, width: 560 });
+  });
+  test("a narrow window keeps the margin on both sides", () => {
+    assert.deepEqual(windowGeometry({ width: 400, height: 700 }, 34), { left: 24, top: 642, width: 352 });
+  });
+  test("never above the top of a very short window", () => {
+    assert.ok(windowGeometry({ width: 800, height: 20 }, 34).top >= 0);
   });
 });

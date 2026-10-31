@@ -39,10 +39,13 @@ describe("bar placer", () => {
     assert.equal(parts.bar.classList.contains("zs-bar-inline"), false);
   });
 
-  test("floating hides the bar when the page has no editor", () => {
+  test("with no text box on the page (not calibrated yet, or it is gone) the bar sits at the bottom of the window instead of vanishing", () => {
     const { placer, parts } = page(() => ({ getEditor: () => null }));
     placer.place();
-    assert.equal(parts.bar.style.display, "none");
+    assert.equal(parts.bar.style.display, "flex");
+    assert.equal(parts.bar.parentElement, parts.root);
+    assert.ok(parseInt(parts.bar.style.top, 10) > 600, "near the bottom of the 800px window");
+    assert.ok(parseInt(parts.bar.style.left, 10) >= 0 && parseInt(parts.bar.style.width, 10) > 0);
   });
 
   test("a provider mount seats the bar inside the composer, before the node it names", () => {
