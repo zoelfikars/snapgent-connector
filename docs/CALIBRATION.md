@@ -1,6 +1,6 @@
 # Calibration: teaching the extension a chat site instead of coding it
 
-Status: **design, agreed in discussion; nothing below is built yet** except phase 0.
+Status: **design, agreed in discussion. Phase 0 is done; everything else below is not built yet.**
 
 ## Why
 
@@ -140,15 +140,15 @@ the whole application layer (agent loop, tool runner, session logic) and the gen
    contract minimally and reports "Not calibrated for this site yet", which disables Start through the existing
    `modeWarning` path. Remove the main-world scripts, the ChatGPT layout table and the tests that only exercised
    adapters. The extension builds, loads, shows the bar, connects to the bridge, switches AI, edits MCP settings
-   and skills, and does nothing else. The old adapters stay recoverable from the git tag `pre-calibration`.
+   and skills, and does nothing else. The old adapters, the saved page captures (`extension/test/fixtures/`) and the contract test (`test/sites-contract.test.js`) stay recoverable from the git tag `pre-calibration`; phase 1 restores what it needs with `git show pre-calibration:<path>`.
 1. **Spike, ChatGPT and Gemini.** Profile format, fingerprint and resolver, the engine for the contract above, no UI
    (profiles written by hand from the saved fixtures). Acceptance: the contract suite passes on the saved page
    captures of both sites with profiles that were not tuned to the engine's quirks; plus a live check by the maintainer.
    Outcome is a go / no-go, with a list of anything the engine could not do generically.
 2. **Calibration UI**: picker, write/read-back test, preview, per-role re-calibration, health check, storage,
    export / import, seed profiles from `profiles/`.
-3. **Delete the last old code** once calibrated sites work (leftover helpers, tests, the registry fields that only
-   served adapters).
+3. **Delete the last old code** once calibrated sites work: the site-specific rules left in `overlay.css`, the
+   adapter-only members of the provider contract that `main.js` still checks, leftover helpers and registry fields.
 4. **Unknown sites.** Any chat site can be used by calibrating it; the match list becomes the user's choice
    (optional host permission) instead of a fixed registry.
 

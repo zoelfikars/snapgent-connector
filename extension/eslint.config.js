@@ -2,7 +2,7 @@ import globals from "globals";
 
 const legacyGlobals = {
   // provided by dist/globals.js (src/entry/legacy-globals.js)
-  ZSParse: "readonly", ZS: "readonly", ZSDomain: "readonly", ZSApp: "readonly", ZSChat: "readonly", ZSUi: "readonly",
+  ZSParse: "readonly", ZS: "readonly", ZSDomain: "readonly", ZSApp: "readonly", ZSChat: "readonly", ZSUi: "readonly", ZSSites: "readonly",
 };
 
 export default [

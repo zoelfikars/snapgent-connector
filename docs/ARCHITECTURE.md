@@ -1,5 +1,12 @@
 # Architecture
 
+> **Chat-site support is being rebuilt.** The per-site adapters (`legacy/providers/*`, ~8k lines of selectors) were
+> removed; one *uncalibrated* provider remains, so the extension boots, shows its bar, talks to the bridge and offers
+> the switch-AI shortcuts, but cannot run the agent on a chat site yet. Sites will be taught by the user in a short
+> calibration and stored as data: see [CALIBRATION.md](CALIBRATION.md). The last version with the old adapters is
+> the git tag `pre-calibration`. Sections below that describe adapters, layouts and fixtures describe that old
+> design and are kept only until the calibrated engine replaces them.
+
 snapgent connects an AI chat in the browser to VS Code through MCP. Three
 deployable parts, one direction of dependency inside each.
 
@@ -118,7 +125,7 @@ shippable.
 | UI: dialog, bar decision/placement, menus, cover, theme, chips for our own turns, notifications, setup card, popups | **Migrated** to `ui/`, jsdom/unit tested |
 | `BridgeMonitor` (is the server usable, workspace probe), `SessionTracker` (is this chat a session, moved-away detection), `ServerDirectory` (server names, toggles, custom prompt), `TurnMemory` (halted/executed turns outside the DOM) | **Migrated** to `application/`, tested with fake ports |
 | `legacy/main.js` (~2.1k lines: `decorate.classify` for model turns, bar `build()`, menus, stop button, wiring) | Next; the per-site DOM fixtures it needs now exist (below) |
-| `legacy/providers/*` (12 adapters, ~8.1k lines) | Shared primitives extracted; adapter family factory next |
+| `legacy/providers/*` | **Removed** (tag `pre-calibration`). One `uncalibrated.js` provider remains; the calibrated engine replaces it (see CALIBRATION.md) |
 | `entry/background.js` | Bridge client + message router still in one file |
 
 ### Roadmap (each item is its own PR)
@@ -241,7 +248,9 @@ visible; it is not a sandbox.
 To cut a release: bump the version in `server/snapgent_bridge/__init__.py`, `extension/package.json` and the
 README badge, add the CHANGELOG section, commit, then `git tag vX.Y.Z && git push --tags`.
 
-## When a chat site changes its markup
+## When a chat site changes its markup (old design, removed in phase 0)
+
+This section describes the adapters that were removed; with calibration the answer to a changed site is "re-calibrate that part" (see CALIBRATION.md).
 
 Sites change their DOM without notice; this is the expected failure mode, so it is built to be
 visible and cheap to fix.

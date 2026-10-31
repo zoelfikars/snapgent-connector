@@ -1,24 +1,12 @@
-// Loads a legacy provider script into a real DOM (jsdom), with the same globals the bundled
-// globals.js gives it in the browser. Lets adapter tests run against captured page markup.
-import { readFileSync } from "node:fs";
+// Small helpers for tests that need a real DOM (jsdom) with the layout-dependent bits stubbed.
 import { JSDOM } from "jsdom";
-import * as parser from "../../src/domain/parser/index.js";
-import * as domain from "../../src/domain/index.js";
-import * as chat from "../../src/infrastructure/chat/index.js";
 
-const root = new URL("../../", import.meta.url);
-export const fixture = (name) => readFileSync(new URL(`test/fixtures/${name}`, root), "utf8");
-
-export function loadProvider(providerFile, html, url = "https://chatgpt.com/c/test") {
-  const dom = new JSDOM(html, { runScripts: "outside-only", url });
+/** A page whose elements all count as laid out (jsdom has no layout engine). */
+export function pageWith(html, url = "https://example.test/") {
+  const dom = new JSDOM(html, { runScripts: "outside-only", url, pretendToBeVisual: true });
   const { window } = dom;
-  // jsdom has no layout, so nothing is ever "visible"; treat every connected element as laid out.
   window.Element.prototype.getClientRects = function () { return this.isConnected ? [{ width: 100, height: 20 }] : []; };
   Object.defineProperty(window.HTMLElement.prototype, "offsetParent", { get() { return this.isConnected ? this.ownerDocument.body : null; } });
   window.HTMLElement.prototype.getBoundingClientRect = function () { return { width: 100, height: 20, top: 0, left: 0, right: 100, bottom: 20 }; };
-  const { parser: _unused, ...prompt } = domain;
-  Object.assign(window, { ZSParse: parser, ZSChat: chat, ZS: prompt });
-  const source = readFileSync(new URL(`legacy/providers/${providerFile}`, root), "utf8");
-  const provider = window.eval(`${source}\n;ZSProvider`);
-  return { provider, window, document: window.document };
+  return { window, document: window.document };
 }

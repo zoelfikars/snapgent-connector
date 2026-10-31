@@ -21,18 +21,16 @@ describe("site registry", () => {
 });
 
 describe("manifest generation", () => {
-  test("every site gets exactly one isolated-world content script with core scripts around its adapter", () => {
+  test("every site gets exactly one content script: core scripts around the one uncalibrated provider", () => {
     for (const site of SITES) {
-      const entries = chrome.content_scripts.filter((c) => !c.world && c.matches === site.matches);
+      const entries = chrome.content_scripts.filter((c) => c.matches === site.matches);
       assert.equal(entries.length, 1, site.id);
-      assert.deepEqual(entries[0].js, ["globals.js", `providers/${site.id}.js`, "main.js"]);
+      assert.deepEqual(entries[0].js, ["globals.js", "providers/uncalibrated.js", "main.js"]);
     }
   });
 
-  test("MAIN-world scripts run at document_start", () => {
-    const main = contentScripts().filter((c) => c.world === "MAIN");
-    assert.deepEqual(main.flatMap((c) => c.js).sort(), ["providers/chatgpt-cm.js", "providers/qwen-net.js"]);
-    assert.ok(main.every((c) => c.run_at === "document_start"));
+  test("no script runs in the page's own (MAIN) world any more", () => {
+    assert.deepEqual(contentScripts().filter((c) => c.world), []);
   });
 
   test("host permissions include sites and the local bridge only", () => {

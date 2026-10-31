@@ -14,6 +14,15 @@ All notable changes to snapgentV3 Free are documented here.
 - Frozen executables keep `config.json` and `logs/` next to the `.exe` (not in a temp folder).
 - `scripts/package_release.py` assembles the release zip (tested).
 
+### Removed
+- **All per-site chat adapters** (ChatGPT, Gemini, Claude, DeepSeek, Grok, Mistral, Kimi, Qwen, GLM, Arena, Meta,
+  Ptero), their main-world scripts, the ChatGPT layout table and every test and fixture that only exercised them.
+  They are replaced by one *uncalibrated* provider until the calibration-based engine is built
+  ([design](docs/CALIBRATION.md)). The extension still loads, connects to the bridge and offers the switch-AI
+  shortcuts, but cannot run the agent on a chat site. The old code is in the git tag `pre-calibration`.
+  Also dropped on purpose (see the design for the full list): image / vision round-trips, per-site continue and
+  stop workarounds, per-site badges and mode warnings.
+
 ### Changed
 - **The user chooses the model and the thinking mode, never the extension.** Meta AI no longer switches itself to
   Thinking on Start, and DeepSeek no longer forces Expert or turns the DeepThink toggle on; whichever Instant /

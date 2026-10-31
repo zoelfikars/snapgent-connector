@@ -44,7 +44,7 @@ describe("content script boot order: globals.js -> adapter -> main.js", () => {
 
     vm.runInContext(await bundledGlobals(), ctx, { filename: "globals.js" });
     assert.equal(typeof ctx.ZSApp.ToolRunner, "function");
-    vm.runInContext(read("legacy/providers/chatgpt.js"), ctx, { filename: "chatgpt.js" });
+    vm.runInContext(read("legacy/providers/uncalibrated.js"), ctx, { filename: "uncalibrated.js" });
     // Throws on a ReferenceError (e.g. use-before-define of the catalogue or runner).
     vm.runInContext(read("legacy/main.js"), ctx, { filename: "main.js" });
     await new Promise((resolve) => setImmediate(resolve)); // let startup microtasks surface their errors

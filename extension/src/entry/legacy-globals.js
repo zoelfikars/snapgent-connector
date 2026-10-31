@@ -17,6 +17,8 @@ globalThis.ZSDomain = { SKILL_MAX_BYTES, bareToolName, countSinceLastMarker, fee
 // Shared chat-adapter primitives (see infrastructure/chat/). Adapters load after this script.
 import * as ui from "../ui/index.js";
 import * as chat from "../infrastructure/chat/index.js";
+import { siteFor } from "../sites/registry.js";
 globalThis.ZSChat = chat;
+globalThis.ZSSites = { siteFor };
 
 globalThis.ZSUi = ui;

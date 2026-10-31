@@ -6,7 +6,6 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { build } from "esbuild";
 import { JSDOM, VirtualConsole } from "jsdom";
-import { fixture } from "./support/jsdom-provider.js";
 
 const root = new URL("../", import.meta.url).pathname;
 const source = (path) => readFileSync(root + path, "utf8");
@@ -16,12 +15,12 @@ async function bundledGlobals() {
   return result.outputFiles[0].text;
 }
 
-async function startOn(html) {
+async function startOn(html, url = "https://chatgpt.com/c/test") {
   const warnings = [];
   const virtualConsole = new VirtualConsole();
   virtualConsole.on("warn", (...args) => warnings.push(args.join(" ")));
   virtualConsole.on("jsdomError", (error) => warnings.push(String(error)));
-  const dom = new JSDOM(html, { runScripts: "outside-only", url: "https://chatgpt.com/c/test", pretendToBeVisual: true, virtualConsole });
+  const dom = new JSDOM(html, { runScripts: "outside-only", url, pretendToBeVisual: true, virtualConsole });
   const { window } = dom;
   window.chrome = {
     storage: { local: { get: (_key, callback) => callback && callback({}), set() {} } },
@@ -40,28 +39,46 @@ async function startOn(html) {
   const context = dom.getInternalVMContext();
   const run = (code, filename) => new vm.Script(code, { filename }).runInContext(context);
   run(await bundledGlobals(), "globals.js");
-  run(source("legacy/providers/chatgpt.js"), "chatgpt.js");
+  run(source("legacy/providers/uncalibrated.js"), "uncalibrated.js");
   run(source("legacy/main.js"), "main.js");
   await new Promise((resolve) => setTimeout(resolve, 1200)); // let the first camouflage sweep run
   return { window, document: window.document, warnings, count: (selector) => window.document.querySelectorAll(selector).length };
 }
 
-describe("content script on the 2026-10 ChatGPT layout", () => {
-  test("hides the system prompt, replaces the command with a chip, and starts without warnings", async () => {
-    const page = await startOn(fixture("chatgpt-search-units-2026-10.html"));
+// Until a site is calibrated (docs/CALIBRATION.md) the extension must still boot cleanly and say why it cannot start.
+describe("content script on a supported site that is not calibrated yet", () => {
+  test("shows the bar, keeps Start disabled with the reason, draws no chips and logs no warnings", async () => {
+    const page = await startOn("<html><body><main><p>a chat page</p></main></body></html>");
     try {
       assert.deepEqual(page.warnings, []);
-      assert.ok(page.count(".zs-chip") >= 1, "a chip is drawn");
-      assert.ok(page.document.querySelector('[data-code-block="true"]').classList.contains("zs-tool-hide"), "the JSON block is hidden");
-      const user = page.document.querySelector('[data-content-search-unit-key$=":user"]');
-      assert.ok(user.classList.contains("zs-hidden"), "the bootstrap prompt is camouflaged");
-      // The bootstrap turn is a system chip. The model's command has no result yet, so it is never settled (done/err):
-      // "run" while generation is fresh, "idle" ("not run") once the watchdog's window has passed on a slow machine.
-      const phases = [...page.document.querySelectorAll("[data-zphase]")].map((el) => el.dataset.zphase);
-      assert.equal(phases[0], "sys");
-      assert.ok(["run", "idle"].includes(phases[1]), `command phase was ${phases[1]}`);
+      assert.ok(page.document.getElementById("zs-bar"), "the bar is there");
+      assert.match(page.document.getElementById("zs-state").textContent, /Not calibrated for this site yet/);
+      assert.equal(page.document.getElementById("zs-action").disabled, true);
+      assert.equal(page.count(".zs-chip"), 0);
     } finally {
       page.window.close(); // stops the content script's timers even when an assertion failed
+    }
+  });
+
+  test("the switch-AI shortcut list is still there, with the current site marked", async () => {
+    const page = await startOn("<html><body><main><p>a chat page</p></main></body></html>");
+    try {
+      page.document.getElementById("zs-switch").click();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const menu = page.document.getElementById("zs-menu");
+      assert.ok(menu.querySelectorAll("button.zs-site-opt").length >= 5, "links to the other chat sites");
+      assert.match(menu.querySelector(".zs-site-here").textContent, /ChatGPT/);
+    } finally {
+      page.window.close();
+    }
+  });
+
+  test("the name shown is the site's own, taken from the registry by host name", async () => {
+    const page = await startOn("<html><body></body></html>", "https://gemini.google.com/app/x");
+    try {
+      assert.equal(page.document.getElementById("zs-switch-name").textContent.trim(), "Gemini");
+    } finally {
+      page.window.close();
     }
   });
 });
