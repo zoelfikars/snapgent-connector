@@ -6,8 +6,8 @@ import { fixture, loadProvider } from "./support/jsdom-provider.js";
 // The start used to fire that flip in the background and send at the same time, so the send was lost.
 const OPTION = "composer-mode-option-think_hard";
 
-function metaPage({ startInReflexion = false, modeLabel, onSend } = {}) {
-  const page = loadProvider("meta.js", fixture("sites/meta.html"), "https://www.meta.ai/prompt/x");
+function metaPage({ startInReflexion = false, modeLabel, onSend, layout = "meta.html" } = {}) {
+  const page = loadProvider("meta.js", fixture(`sites/${layout}`), "https://www.meta.ai/prompt/x");
   const { window, document } = page;
   document.body.insertAdjacentHTML("beforeend", `<button data-testid="composer-mode-dropdown-button">${modeLabel || (startInReflexion ? "Réflexion" : "Instantané")}</button>`);
   const modeButton = document.querySelector('[data-testid="composer-mode-dropdown-button"]');
@@ -27,13 +27,13 @@ function metaPage({ startInReflexion = false, modeLabel, onSend } = {}) {
   };
   modeButton.addEventListener("pointerdown", openMenu);
   const textarea = document.querySelector('[data-testid="composer-input"]');
+  const pressed = { count: 0 };
   const sendButton = document.querySelector('[data-testid="composer-send-button"]');
   sendButton.addEventListener("click", (event) => {
     events.push({ menuOpenAtSend: menuOpen || !!document.querySelector(`[data-testid="${OPTION}"]`), mode: modeButton.textContent, trusted: event.detail });
     if (onSend) return onSend({ document, textarea, window, pressed });
     if (!menuOpen) textarea.value = ""; // a send while the menu is open is swallowed: the text stays
   });
-  const pressed = { count: 0 };
   sendButton.addEventListener("pointerdown", () => { pressed.count++; });
   window.PointerEvent = window.PointerEvent || window.MouseEvent;
   globalThis.window = window; // the shared setNativeValue helper defaults to the page's window global
@@ -106,6 +106,65 @@ describe("Meta AI start", () => {
     await page.provider.typeAndSend("hello", []);
     assert.equal(page.events.length, 2, "one plain click, then the press's click");
     assert.equal(page.textarea.value, "");
+    page.window.close();
+    delete globalThis.window;
+  });
+
+});
+
+// Since 2026-10 the textarea is a hidden pre-hydration leftover; Meta sends what its Lexical editor holds.
+describe("Meta AI composer with the Lexical editor (captured 2026-10 structure)", () => {
+  function lexicalPage() {
+    const page = metaPage({ startInReflexion: true, layout: "meta-lexical.html" });
+    const { window, document } = page;
+    // jsdom has no clipboard: just enough of one for the paste the adapter dispatches.
+    window.DataTransfer = class { constructor() { this.data = {}; } setData(type, value) { this.data[type] = value; } getData(type) { return this.data[type] || ""; } };
+    window.ClipboardEvent = class extends window.Event { constructor(type, init = {}) { super(type, init); this.clipboardData = init.clipboardData; } };
+    const editor = document.querySelector("[data-lexical-editor]");
+    const textarea = document.querySelector("textarea");
+    const sent = [];
+    // Lexical applies a paste over the selection; the pre-hydration textarea does nothing for Meta.
+    editor.addEventListener("paste", (event) => { editor.textContent = event.clipboardData.getData("text/plain"); });
+    document.querySelector('[data-testid="composer-send-button"]').addEventListener("click", () => {
+      if (!editor.textContent.trim()) return; // Meta reads Lexical, not the textarea
+      sent.push(editor.textContent);
+      editor.textContent = "";
+    });
+    return { ...page, editor, textarea, sent };
+  }
+
+  test("the text goes into the Lexical editor and is sent, not into the dead textarea", async () => {
+    const page = lexicalPage();
+    await page.provider.typeAndSend("⟦ZS-SYS⟧ first message", []);
+    assert.deepEqual(page.sent, ["⟦ZS-SYS⟧ first message"]);
+    assert.equal(page.textarea.value, "", "the pre-hydration textarea was left alone");
+    page.window.close();
+    delete globalThis.window;
+  });
+
+  test("whatever the user already typed is replaced, not appended to", async () => {
+    const page = lexicalPage();
+    page.editor.textContent = "half-typed draft";
+    await page.provider.typeAndSend("the real message", []);
+    assert.deepEqual(page.sent, ["the real message"]);
+    page.window.close();
+    delete globalThis.window;
+  });
+
+  test("the composer text it reports is what Lexical holds", async () => {
+    const page = lexicalPage();
+    page.editor.textContent = "typed by hand";
+    assert.equal(page.provider.editorText(), "typed by hand");
+    page.window.close();
+    delete globalThis.window;
+  });
+
+  test("an editor that ignores the paste is an error naming the cause, not a silent empty send", async () => {
+    const page = lexicalPage();
+    page.editor.addEventListener("paste", (event) => { event.stopImmediatePropagation(); }, true);
+    page.editor.textContent = "";
+    page.editor.replaceWith(page.editor.cloneNode(true)); // drop the listener the helper added
+    await assert.rejects(() => page.provider.typeAndSend("hello", []), /did not take the typed text/);
     page.window.close();
     delete globalThis.window;
   });

@@ -331,8 +331,13 @@ const ZSProvider = (() => {
   // contenteditable editor directly.
   const writeEl = () => editorEls().find((e) => e.tagName === "TEXTAREA") ||
     editorEls().find((e) => e.tagName === "INPUT") || getEditor();
+  // The on-screen Lexical editor, once Meta has hydrated it. Since the 2026-10 layout the textarea is only a
+  // pre-hydration leftover (hidden, 0x0, no longer mirrored): the text Meta sends is whatever Lexical holds.
+  const lexicalEditor = () => editorEls().find((e) =>
+    !isValueEditor(e) && typeof e.hasAttribute === "function" && e.hasAttribute("data-lexical-editor") && e.getClientRects().length > 0) || null;
+  const composerTarget = () => lexicalEditor() || writeEl();
   const editorText = () => {
-    const e = writeEl();
+    const e = composerTarget();
     if (!e) return "";
     return isValueEditor(e) ? (e.value || "") : (e.textContent || "");
   };
@@ -524,6 +529,45 @@ const ZSProvider = (() => {
   // ── Sending ─────────────────────────────────────────────────────────────────
   const { setNativeValue: setTextareaValue } = ZSChat;
 
+  const selectContents = (el) => {
+    const selection = window.getSelection && window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+  // Put `text` in the composer the way Meta will read it and return the element it went into. With the Lexical editor
+  // that is a paste over a select-all (Lexical applies it as a user paste, replaces anything already typed, and enables
+  // send); execCommand("insertText") is the second try. Without it (older layout) it is the controlled textarea.
+  async function writeComposer(text) {
+    const lexical = lexicalEditor();
+    if (!lexical) {
+      const textarea = writeEl();
+      if (!textarea) throw new Error("Meta AI input box not found");
+      textarea.focus();
+      setTextareaValue(textarea, text);
+      return textarea;
+    }
+    const want = text.trim().slice(0, 30);
+    const landed = () => (lexical.textContent || "").includes(want);
+    lexical.focus();
+    selectContents(lexical);
+    const data = new DataTransfer();
+    data.setData("text/plain", text);
+    lexical.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    let ok = await waitFor(landed, 3000);
+    if (!ok) {
+      lexical.focus();
+      selectContents(lexical);
+      try { document.execCommand("insertText", false, text); } catch {}
+      ok = await waitFor(landed, 3000);
+    }
+    diag("meta.tas.write", { via: "lexical", ok, len: (lexical.textContent || "").length });
+    if (!ok) throw new Error("Meta AI did not take the typed text. Click into the message box and try again.");
+    return lexical;
+  }
+
   async function typeAndSend(text, images) {
     // Images FIRST: staging swaps in the inline image; the mirror textarea still
     // drives the composed text alongside it. Idempotent across the core's up-to-4
@@ -539,11 +583,8 @@ const ZSProvider = (() => {
     // Write via the mirror textarea (the controlled input that drives Lexical).
     // A mode flip started elsewhere (the sweep, an earlier retry) must be over, with its menu closed, before we click send.
     await waitFor(() => !_modeInFlight && !modeOptionOpen(), 6000);
-    const editor = writeEl();
-    if (!editor) throw new Error("Meta AI input box not found");
     const usersBeforeSend = userCount();
-    editor.focus();
-    setTextareaValue(editor, text);
+    const editor = await writeComposer(text);
     const sendReady = () => {
       const b = sendButton();
       return !!b && !b.disabled && b.getAttribute("aria-disabled") !== "true";
@@ -554,10 +595,9 @@ const ZSProvider = (() => {
       const buttons = [...document.querySelectorAll(S.sendBtn)].map((b) => ({
         disabled: !!b.disabled, ariaDisabled: b.getAttribute("aria-disabled"), shown: b.getClientRects().length > 0, label: b.getAttribute("aria-label"),
       }));
-      const current = writeEl();
       diag("meta.tas.noSend", {
-        buttons, editorSame: current === editor, editorConnected: !!editor.isConnected, editorLen: editorText().length,
-        textareaLen: (editor.value || "").length, mode: (modeBtn() && (modeBtn().textContent || "").trim()) || null,
+        buttons, editorSame: composerTarget() === editor, editorConnected: !!editor.isConnected, editorLen: editorText().length,
+        lexical: !!lexicalEditor(), mode: (modeBtn() && (modeBtn().textContent || "").trim()) || null,
         menuOpen: modeOptionOpen(), modeInFlight: _modeInFlight, hasAttachment: hasPendingAttachment(),
       });
       throw new Error("Meta AI send button did not become available.");
