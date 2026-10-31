@@ -562,23 +562,46 @@ const ZSProvider = (() => {
       });
       throw new Error("Meta AI send button did not become available.");
     }
-    // Meta may keep the mirror textarea's value after accepting a send. Treat a
-    // new user turn or the stop button as acceptance too; do not click repeatedly,
-    // since a delayed composer update could otherwise send the same prompt twice.
+    // Meta may keep the mirror textarea's value after accepting a send, and on a fresh chat (no assistant turn yet) its turn
+    // list cannot be found, so a new user turn and the stop button are not reliable evidence either. Accept any of: the
+    // composer emptied, a new user turn, the stop button, the conversation getting an id (the URL changed), or our own text
+    // now showing up in the page outside the composer. Never click twice on a doubt: a delayed update would send it twice.
+    const keyBefore = conversationKey();
+    const probe = text.trim().slice(0, 40);
+    const probeCount = () => (probe ? (((document.body && document.body.textContent) || "").split(probe).length - 1) : 0);
+    const probeBefore = probeCount();
+    const accepted = () =>
+      (editorText().trim() === "" && !hasPendingAttachment()) ||
+      userCount() > usersBeforeSend ||
+      !!stopButton() ||
+      conversationKey() !== keyBefore ||
+      probeCount() > probeBefore;
     try { sendButton().click(); } catch (error) {
       throw new Error(`Meta AI send button failed: ${String(error && error.message || error)}`);
     }
-    const sent = await waitFor(() =>
-      (editorText().trim() === "" && !hasPendingAttachment()) ||
-      userCount() > usersBeforeSend ||
-      !!stopButton(),
-    5000);
+    let sent = await waitFor(accepted, 5000);
+    if (!sent) {
+      // A plain .click() can be ignored by a React handler that listens for pointer events: press it like a mouse would.
+      const button = sendButton();
+      if (button) {
+        diag("meta.tas.pressFallback", {});
+        for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+          try {
+            const Ctor = type.startsWith("pointer") && typeof PointerEvent === "function" ? PointerEvent : MouseEvent;
+            button.dispatchEvent(new Ctor(type, { bubbles: true, cancelable: true, button: 0, pointerId: 1, pointerType: "mouse" }));
+          } catch {}
+        }
+        sent = await waitFor(accepted, 5000);
+      }
+    }
     if (sent) _attachedImages = null;
     diag("meta.tas.sent", {
       sent,
       editorLen: editorText().length,
       newUserTurn: userCount() > usersBeforeSend,
       generating: !!stopButton(),
+      keyChanged: conversationKey() !== keyBefore,
+      textShown: probeCount() > probeBefore,
     });
     if (!sent) {
       const send = sendButton();
@@ -604,7 +627,8 @@ const ZSProvider = (() => {
   const modeBtn = () => document.querySelector(S.modeBtn);
   const isReflexion = () => {
     const b = modeBtn();
-    return !!b && /r[ée]flexion|think.?hard/i.test((b.textContent || "") + (b.getAttribute("data-testid") || ""));
+    // The label is localised: "Réflexion" in French, "Thinking" in English (the other mode is "Instant").
+    return !!b && /r[ée]flexion|think/i.test((b.textContent || "") + (b.getAttribute("data-testid") || ""));
   };
   let _modeInFlight = false;
   const modeOptionOpen = () => !!document.querySelector(S.modeOptHard);
