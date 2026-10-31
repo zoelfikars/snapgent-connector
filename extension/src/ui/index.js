@@ -16,3 +16,4 @@ export { describeResultTurn, describeSystemTurn } from "./turn-chips.js";
 export { commandPhase, haltState, holdsRegenerateLook, shouldReown } from "./command-phase.js";
 export { switchMenuHtml, targetMenuHtml, targetOptionsHtml } from "./menu-html.js";
 export { createChipPainter } from "./chip-painter.js";
+export { createBarPlacer } from "./bar-placer.js";
