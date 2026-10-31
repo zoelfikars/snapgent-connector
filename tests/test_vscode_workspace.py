@@ -1,4 +1,5 @@
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,7 +22,7 @@ class StoragePathTests(unittest.TestCase):
 
     def test_macos(self):
         paths = ws.storage_paths("darwin", {}, self.home)
-        self.assertTrue(all("Library/Application Support" in str(p) for p in paths))
+        self.assertTrue(all("Library/Application Support" in p.as_posix() for p in paths))
         self.assertTrue(any("Code - Insiders" in str(p) for p in paths))
 
     def test_windows_needs_appdata(self):
@@ -44,6 +45,7 @@ class ParsingTests(unittest.TestCase):
         self.assertEqual(ws.uri_to_path("file:///c%3A/x", "linux"), Path("/c:/x"))  # only Windows strips the leading slash
 
 
+@unittest.skipIf(sys.platform == "win32", "these simulate a Linux host with POSIX file URIs")
 class ActiveFolderTests(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()

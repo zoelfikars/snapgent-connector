@@ -22,12 +22,25 @@ class MCPServer:
         self.tools: List[Dict[str, Any]] = []
         self._next_id = 1
         self._pending: Dict[int, asyncio.Future] = {}
-        self._write_lock = asyncio.Lock()
+        self._write_lock_: Optional[asyncio.Lock] = None
         self._reader_task: Optional[asyncio.Task] = None
         self._stderr_task: Optional[asyncio.Task] = None
-        self._start_lock = asyncio.Lock()
+        self._start_lock_: Optional[asyncio.Lock] = None
         self.error: Optional[str] = None
         self.ready = False
+
+    # Locks are made on first use, inside the running loop: Python 3.9 binds a Lock to the current loop when it is created.
+    @property
+    def _write_lock(self) -> asyncio.Lock:
+        if self._write_lock_ is None:
+            self._write_lock_ = asyncio.Lock()
+        return self._write_lock_
+
+    @property
+    def _start_lock(self) -> asyncio.Lock:
+        if self._start_lock_ is None:
+            self._start_lock_ = asyncio.Lock()
+        return self._start_lock_
 
     @property
     def alive(self) -> bool:

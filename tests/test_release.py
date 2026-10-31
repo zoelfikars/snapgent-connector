@@ -50,6 +50,7 @@ class AssembleTests(ReleaseCase):
             self.assertNotIn(forbidden, names, forbidden)
         self.assertFalse(any("__pycache__" in n or n.endswith(".pyc") for n in names))
 
+    @unittest.skipIf(sys.platform == "win32", "Windows has no execute bit; the zip test covers it")
     def test_launchers_are_executable_so_they_can_be_double_clicked(self):
         folder = self.build()
         for name in ("Linux_Start.sh", "MacOS_Start.command"):

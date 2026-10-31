@@ -38,8 +38,15 @@ class BridgeServer:
         self._log = log_fn
         self._trust = trust or TrustPolicy(TrustStore(None), settings.pinned_origins(), ask_in_terminal, log_fn)
         self.clients = set()
-        self._lock = asyncio.Lock()
+        self._lock_: Optional[asyncio.Lock] = None
         self.router = RequestRouter(registry, config, self.broadcast, BRIDGE_VERSION, log_fn)
+
+    @property
+    def _lock(self) -> asyncio.Lock:
+        # Made on first use inside the running loop (Python 3.9 binds a Lock to the loop current at creation).
+        if self._lock_ is None:
+            self._lock_ = asyncio.Lock()
+        return self._lock_
 
     async def start_servers(self) -> None:
         await self.registry.start_all(self.config.load_servers())

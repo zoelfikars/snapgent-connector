@@ -8,7 +8,7 @@
     "build": "node build/build.mjs all",
     "build:chrome": "node build/build.mjs chrome",
     "build:firefox": "node build/build.mjs firefox",
-    "test": "node --test test/",
+    "test": "node --test \"test/**/*.test.js\" \"test/**/*.test.cjs\"",
     "lint": "eslint legacy src build test",
     "run:firefox": "web-ext run --source-dir dist/firefox"
   },

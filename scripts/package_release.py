@@ -85,7 +85,11 @@ def make_zip(folder: Path) -> Path:
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(folder.rglob("*")):
             if path.is_file():
-                zf.write(path, path.relative_to(folder.parent).as_posix())
+                info = zipfile.ZipInfo.from_file(path, path.relative_to(folder.parent).as_posix())
+                if path.suffix in EXECUTABLE_SUFFIXES:
+                    info.external_attr = (0o100755) << 16  # explicit, so building on Windows keeps the bit too
+                info.compress_type = zipfile.ZIP_DEFLATED
+                zf.writestr(info, path.read_bytes())
     return archive
 
 
