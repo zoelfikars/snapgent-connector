@@ -155,6 +155,7 @@ snapgent_bridge/
   logs.py                  logging (stdout always, file once configured)
   protocol.py              PURE: every message to/from the extension, tool-call parsing, result shaping
   security.py              PURE: who may connect (extension origins only, optional pinning)
+  trust.py                 which extensions the user approved (asked once, remembered)
   config.py                PURE validation + ConfigStore (atomic config.json writes)
   mcp_client.py            one MCP server process over stdio JSON-RPC
   registry.py              running servers: catalogue, name collisions, tool resolution, isolation
@@ -175,10 +176,12 @@ extension (`chrome-extension://`, `moz-extension://`); web pages cannot forge
 with `ZS_ALLOWED_ORIGINS`. Tool calls carry the selected server and the
 registry refuses any tool that belongs to another one (isolation).
 
-Not covered yet: `add_server` lets a connected extension register an arbitrary
-command to spawn. Behind the origin check that is acceptable, but a pairing
-token or a confirmation step would remove the remaining trust in "any installed
-extension".
+Trust: passing the origin check only proves "some browser extension", and every installed extension
+passes. So the first connection from an unknown extension origin is turned away and the person at the
+bridge terminal is asked once (`trust.py`, like SSH `known_hosts`); a yes is stored in
+`trusted_origins.json`, a no is remembered for the run, and a prompt that fails or has no terminal means
+no. `ZS_ALLOWED_ORIGINS` pins the exact origin and skips the question. Without this, a hostile extension
+could call tools, add servers (spawn commands) and approve its own confirmation tokens.
 
 ## VS Code MCP server (`snapgent_vscode/`)
 

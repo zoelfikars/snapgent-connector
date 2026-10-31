@@ -35,6 +35,8 @@ let toolsCache = [];
 let mcpAlive = false;
 let serversCache = [];
 let bridgeVersion = null;
+// The bridge closes with code 1008 and this reason until the user approves this extension in its window.
+let needsApproval = false;
 
 function log(...a) {
   console.log("[zs-bg]", ...a);
@@ -55,6 +57,7 @@ function connect() {
   }
 
   ws.onopen = () => {
+    needsApproval = false;
     connected = true;
     reconnectDelay = RECONNECT_MIN;
     lastMessageAt = Date.now();
@@ -74,7 +77,8 @@ function connect() {
     handleBridgeMessage(msg);
   };
 
-  ws.onclose = () => {
+  ws.onclose = (event) => {
+    needsApproval = !!(event && event.code === 1008 && /not approved/i.test(event.reason || ""));
     connected = false;
     mcpAlive = false;
     serversCache = [];
@@ -236,7 +240,7 @@ function failAllPending(reason) {
 
 // ── status push to any open DeepSeek tab + popup ─────────────────────────
 function statusObj() {
-  return { type: "zs-status", connected, mcpAlive, bridgeVersion, tools: toolsCache.length, servers: serversCache };
+  return { type: "zs-status", connected, mcpAlive, bridgeVersion, needsApproval, tools: toolsCache.length, servers: serversCache };
 }
 
 function broadcastStatus() {

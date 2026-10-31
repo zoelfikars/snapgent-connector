@@ -28,3 +28,6 @@ extension/dist/
 /dist/
 /out/
 *.exe
+
+# Extensions the user approved to control the bridge (per machine)
+trusted_origins.json

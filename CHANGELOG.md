@@ -47,6 +47,10 @@ All notable changes to snapgentV3 Free are documented here.
   bootstrap turn was not recognised for camouflage and session detection.
 
 ### Security
+- **Browser extensions must be approved once** (`snapgent_bridge/trust.py`). Any installed extension
+  used to pass the origin check, so a hostile one could drive the bridge. Now an unknown extension is
+  turned away and the bridge window asks you to allow it (remembered in `trusted_origins.json`);
+  the popup shows *Approve in the bridge window* meanwhile. `ZS_ALLOWED_ORIGINS` still pins an origin.
 - **The VS Code server now has a security policy** (`snapgent_vscode/security/`). By default it asks the
   user before deleting files, committing, running arbitrary commands, reading secret files
   (`.env`, keys, `.ssh`) and running project scripts the AI has edited; searches and listings hide

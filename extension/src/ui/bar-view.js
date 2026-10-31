@@ -12,7 +12,7 @@ import { escapeHtml } from "./html.js";
  * @property {boolean} running          The agent loop is running.
  * @property {boolean} parked           The loop is paused because the tab is in the background.
  * @property {boolean} blankChat        The chat is empty (so "Start" makes sense).
- * @property {{ connected: boolean, servers?: Array<{id: string, alive?: boolean, tools?: number}> }} bridge
+ * @property {{ connected: boolean, needsApproval?: boolean, servers?: Array<{id: string, alive?: boolean, tools?: number}> }} bridge
  * @property {boolean} bridgeOk         The selected target is connected and has tools.
  * @property {{ id: string, name: string }} target
  * @property {number} activeToolCount   Tools the model currently has.
@@ -38,7 +38,7 @@ function whileStarted(state) {
   const server = (state.bridge.servers || []).find((item) => item.id === state.target.id);
   const tools = state.activeToolCount || (server && server.tools) || 0;
   const name = escapeHtml(state.target.name);
-  if (!state.bridge.connected) return view("warn", "<b>Active</b> · start the bridge", { warn: true });
+  if (!state.bridge.connected) return view("warn", `<b>Active</b> · ${state.bridge.needsApproval ? "approve in the bridge window" : "start the bridge"}`, { warn: true });
   if (!state.bridgeOk) return view("warn", `<b>Active</b> · ${name} offline`, { warn: true });
   return view("active", `<b>Active</b>${tools ? ` · ${tools} tools` : ""} · ${name}`);
 }
@@ -49,7 +49,7 @@ function beforeStart(state) {
   const server = (state.bridge.servers || []).find((item) => item.id === state.target.id);
   const folderMissing = isVscode && state.bridge.connected && !!server && !!server.alive && !(server.tools > 0);
   let message;
-  if (!state.bridge.connected) message = "Start the <b>bridge</b>";
+  if (!state.bridge.connected) message = state.bridge.needsApproval ? "Approve this extension in the <b>bridge window</b>" : "Start the <b>bridge</b>";
   else if (isVscode && (state.bridgeOk || folderMissing)) {
     message = state.workspaceProbePending ? "Checking <b>VS Code workspace</b>…" : "Open a <b>folder in VS Code</b>";
   } else message = `<b>${escapeHtml(state.target.name)} unavailable</b>`;

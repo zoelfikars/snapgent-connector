@@ -19,6 +19,7 @@ def app_root(frozen: bool = getattr(sys, "frozen", False), executable: str = sys
 ROOT = app_root()
 CONFIG_PATH = ROOT / "config.json"
 LOG_PATH = ROOT / "logs" / "bridge_debug.log"
+TRUSTED_ORIGINS_PATH = ROOT / "trusted_origins.json"
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("ZS_BRIDGE_PORT", "17613"))

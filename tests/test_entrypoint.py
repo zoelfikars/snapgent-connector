@@ -28,7 +28,7 @@ def free_port() -> int:
 class EntryPointTests(unittest.IsolatedAsyncioTestCase):
     async def test_bridge_py_serves_extensions_rejects_pages_and_stops_cleanly(self):
         port = free_port()
-        env = {**os.environ, "ZS_BRIDGE_PORT": str(port)}
+        env = {**os.environ, "ZS_BRIDGE_PORT": str(port), "ZS_ALLOWED_ORIGINS": "moz-extension://abc-123"}
         process = subprocess.Popen([sys.executable, "bridge.py"], cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         try:
             client = None
@@ -43,6 +43,10 @@ class EntryPointTests(unittest.IsolatedAsyncioTestCase):
                 connected = json.loads(await asyncio.wait_for(client.recv(), 5))
                 self.assertEqual(connected["type"], "connected")
                 self.assertRegex(connected["bridge_version"], r"^\d+\.\d+\.\d+$")
+            async with websockets.connect(f"ws://127.0.0.1:{port}", origin="moz-extension://another-extension") as other:
+                with self.assertRaises(websockets.ConnectionClosed) as stranger:
+                    await asyncio.wait_for(other.recv(), 5)
+                self.assertEqual(stranger.exception.rcvd.code, 1008, "an extension that is not the pinned one")
             async with websockets.connect(f"ws://127.0.0.1:{port}", origin="https://evil.example") as page:
                 with self.assertRaises(websockets.ConnectionClosed) as caught:
                     await asyncio.wait_for(page.recv(), 5)

@@ -14,6 +14,7 @@ from .protocol import error_message, json_line
 from .registry import ServerRegistry
 from .router import RequestRouter
 from .security import origin_allowed, request_origin
+from .trust import TrustPolicy, TrustStore, ask_in_terminal
 
 try:
     import websockets
@@ -31,10 +32,11 @@ def build_registry(log_fn=log) -> ServerRegistry:
 class BridgeServer:
     """Owns the connected extension sockets. Everything else is delegated."""
 
-    def __init__(self, registry: ServerRegistry, config: ConfigStore, log_fn=log) -> None:
+    def __init__(self, registry: ServerRegistry, config: ConfigStore, log_fn=log, trust: Optional[TrustPolicy] = None) -> None:
         self.registry = registry
         self.config = config
         self._log = log_fn
+        self._trust = trust or TrustPolicy(TrustStore(None), settings.pinned_origins(), ask_in_terminal, log_fn)
         self.clients = set()
         self._lock = asyncio.Lock()
         self.router = RequestRouter(registry, config, self.broadcast, BRIDGE_VERSION, log_fn)
@@ -62,6 +64,10 @@ class BridgeServer:
         if not origin_allowed(origin, settings.pinned_origins()):
             self._log(f"rejected connection with origin {origin!r}")
             await websocket.close(1008, "origin not allowed")
+            return
+        if not self._trust.allows(origin):
+            self._log(f"extension {origin!r} is not approved (yet); see the bridge window")
+            await websocket.close(1008, "extension not approved: answer the question in the bridge window")
             return
         async with self._lock:
             self.clients.add(websocket)
@@ -107,7 +113,8 @@ async def run() -> None:
             f"'{sys.executable} -m pip install websockets'."
         )
     configure_logging(settings.LOG_PATH)
-    bridge = BridgeServer(build_registry(), ConfigStore(settings.CONFIG_PATH))
+    trust = TrustPolicy(TrustStore(settings.TRUSTED_ORIGINS_PATH), settings.pinned_origins(), ask_in_terminal, log)
+    bridge = BridgeServer(build_registry(), ConfigStore(settings.CONFIG_PATH), trust=trust)
     await bridge.start_servers()
     server = await websockets.serve(
         bridge.handle_client, settings.HOST, settings.PORT,
