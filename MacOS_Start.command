@@ -101,9 +101,9 @@ fi
 echo "        OK"
 log "websockets library OK."
 
-# --- 3. Configure MCP servers and start optional EffectCraft ----------------
+# --- 3. Configure the VS Code MCP server ------------------------------------
 if [ -f "./setup-config.py" ]; then
-    echo "  [3/4] Detecting VS Code, Roblox Studio, and EffectCraft..."
+    echo "  [3/4] Configuring VS Code MCP..."
     if ! "$PY" "./setup-config.py"; then
         echo "  ERROR: MCP configuration failed. See the message above."
         log "MCP auto-configuration failed."
