@@ -243,12 +243,48 @@ snapgent-full/
 ├── bridge.exe                 # Windows local bridge
 ├── bridge.py                  # Bridge entry point (cross-platform Python)
 ├── snapgent_bridge/           # Bridge implementation (protocol, registry, router, server)
-├── tests/                     # Bridge tests (python -m unittest discover -s tests -t .)
+├── snapgent_vscode/           # VS Code MCP server implementation (tools, security policy)
+├── tests/                     # Bridge + VS Code MCP tests (python -m unittest discover -s tests -t .)
 ├── vscode_mcp.exe             # Default VS Code MCP server (28 workspace tools)
 ├── vscode_mcp.py              # VS Code MCP server source
 ├── test_setup_config.py       # MCP setup helper tests
 └── vscode_mcp.spec            # PyInstaller build recipe
 ```
+
+---
+
+## `07b` &nbsp; Safety: what the AI may do
+
+The AI chat is a website you do not control, and what it reads (web pages, documents) can contain
+instructions aimed at it. So the VS Code server does not simply do whatever it is asked:
+
+| Action | What happens |
+|---|---|
+| Read, search, list, `git status/diff/log`, create/edit/move files, `git add`, run project scripts and tests | Runs without asking |
+| **Delete a file**, **`git commit`**, **run any command** other than harmless ones (`git status`, `git diff`, `node --version`, …) | **A dialog asks you first**; nothing runs until you click Allow |
+| Read a file that may hold secrets (`.env`, `*.pem`, `id_rsa`, `.ssh/*`, …) | Asks first; search and file listings never show such files |
+| Run project scripts after the AI edited `package.json`, `Makefile`, `pyproject.toml`, … | Asks first, because the script may no longer be yours |
+| Write anything inside `.git/` (hooks run code) | Always refused |
+
+Approval is a one-time code only the extension holds, valid for that exact action for two minutes; the
+AI cannot grant it to itself. If you press Cancel the AI is told not to retry.
+
+**Modes.** Set them in `config.json` (created by the launcher), under `mcpServers.vscode.env`; the launcher keeps them:
+
+```json
+"vscode": { "command": "...", "args": ["..."], "env": {
+  "SNAPGENT_POLICY": "standard",
+  "SNAPGENT_ALLOWED_COMMANDS": "cargo,make"
+} }
+```
+
+- `standard` (default): the table above.
+- `readonly`: observe only; every write, command and commit is refused.
+- `trusted`: never asks (only the `.git` rule remains). Use it only on throwaway projects.
+- `SNAPGENT_ALLOWED_COMMANDS`: bare program names that may run without asking.
+
+This is defence in depth, not a sandbox: an AI that can write code and run your tests can run code.
+The dialog keeps the dangerous one-liners visible to you.
 
 ---
 

@@ -27,6 +27,17 @@ class SetupConfigTests(unittest.TestCase):
             [str(setup_config.VSCODE_MCP)],
         )
 
+    def test_rerunning_setup_keeps_the_users_environment_settings(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(json.dumps({"mcpServers": {"vscode": {
+                "command": "python3", "args": ["/old/vscode_mcp.py"], "env": {"SNAPGENT_POLICY": "readonly"}}}}), encoding="utf-8")
+            with patch.object(setup_config.sys, "platform", "linux"), patch.object(setup_config, "CONFIG_PATH", config_path):
+                self.assertEqual(setup_config.main(), 0)
+            vscode = json.loads(config_path.read_text(encoding="utf-8"))["mcpServers"]["vscode"]
+        self.assertEqual(vscode["env"], {"SNAPGENT_POLICY": "readonly"})
+        self.assertEqual(vscode["args"], [str(setup_config.VSCODE_MCP)], "the path itself is still refreshed")
+
 
 if __name__ == "__main__":
     unittest.main()

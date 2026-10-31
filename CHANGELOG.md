@@ -11,6 +11,9 @@ All notable changes to snapgentV3 Free are documented here.
 - **Firefox support.** One source tree builds both browsers (`npm run build` in
   `extension/` -> `dist/chrome`, `dist/firefox`). Firefox gets an event-page
   background and a gecko id; Chrome keeps the service worker.
+- **`vscode_mcp.py` is now a package** (`snapgent_vscode/`): one registry defines each tool once;
+  workspace detection, path fencing, security and JSON-RPC are separate modules. Releases must
+  include the `snapgent_vscode/` folder.
 - **`bridge.py` is now a package** (`snapgent_bridge/`: protocol, security, config,
   mcp client, registry, router, server). `bridge.py` stays as the entry point, so launchers
   are unchanged; releases must include the `snapgent_bridge/` folder (the macOS/Linux
@@ -37,6 +40,13 @@ All notable changes to snapgentV3 Free are documented here.
   bootstrap turn was not recognised for camouflage and session detection.
 
 ### Security
+- **The VS Code server now has a security policy** (`snapgent_vscode/security/`). By default it asks the
+  user before deleting files, committing, running arbitrary commands, reading secret files
+  (`.env`, keys, `.ssh`) and running project scripts the AI has edited; searches and listings hide
+  secret files; writes inside `.git/` are always refused. Modes `readonly` / `standard` / `trusted`
+  and an allowlist are set in `config.json` (`SNAPGENT_POLICY`, `SNAPGENT_ALLOWED_COMMANDS`); the
+  launcher no longer overwrites them. Approval is a one-time token only the extension receives.
+- On Windows, command arguments containing `cmd.exe` metacharacters are refused.
 - **Bridge now rejects connections that do not come from a browser extension.**
   Any website could previously open `ws://127.0.0.1:17613` and call tools such as
   `run_command` or `write_file`. The bridge now checks the WebSocket `Origin` and

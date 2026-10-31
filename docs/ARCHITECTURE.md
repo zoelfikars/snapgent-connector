@@ -176,12 +176,35 @@ command to spawn. Behind the origin check that is acceptable, but a pairing
 token or a confirmation step would remove the remaining trust in "any installed
 extension".
 
-## MCP server (`vscode_mcp.py`)
+## VS Code MCP server (`snapgent_vscode/`)
 
-Roadmap: split into `tools/{fs,search,git,process}` behind a `policy` module
-(path confinement, protected paths, command allow-list / confirmation for
-destructive tools) and a `workspace` module (detecting the active folder), with
-the JSON-RPC stdio loop as a thin shell.
+`vscode_mcp.py` is a thin entry point (config files and launchers still point at it).
+
+```
+snapgent_vscode/
+  limits.py  risk.py  context.py     constants, tool risk levels, Context(root, policy, session)
+  workspace.py                       which folder VS Code has open (storage.json parsing is pure)
+  paths.py                           every path must resolve inside the workspace root
+  process.py                         child processes with bounded output/time
+  tools/                             each tool defined ONCE: schema + handler + risk (registry.py)
+    project · reading · editing · git · commands
+  security/                          the policy
+    modes.py        readonly / standard / trusted, from the user's env (a typo never loosens it)
+    files.py        secrets, .git, files that decide what scripts run
+    commands.py     which run_command calls are harmless; cmd.exe metacharacter guard
+    confirmation.py one-time, argument-bound approval tokens
+    decision.py     decide(policy, tool, args, session) -> allow | confirm | deny   (pure)
+  protocol.py  server.py             JSON-RPC and the stdio loop
+```
+
+Flow of a risky call: `McpServer` asks `decide`; on `confirm` it refuses with an MCP error result
+whose structured data carries a token (text for the model never contains it). The bridge forwards it as
+`kind: "confirmation_required"`; `ToolRunner` asks the user (`ConfirmPort`) and, if approved, repeats
+the call with the token in a reserved argument it strips from anything the model sends.
+
+Residual risk, stated plainly: code execution is inherent to a coding agent (write a file, run the
+tests). The policy removes silent destructive/exfiltrating one-liners and secrets and makes the rest
+visible; it is not a sandbox.
 
 ## When a chat site changes its markup
 

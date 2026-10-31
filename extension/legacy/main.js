@@ -421,8 +421,16 @@
     diag,
   };
   const catalogue = new ToolCatalogue({ bridge: bridgePort, session: sessionPort, diag });
+  // Risky actions (delete, commit, arbitrary commands, reading secrets) need the user's approval. A native
+  // dialog is deliberately blunt: it cannot be styled or auto-clicked by the page, and if the browser
+  // suppresses it the answer is "no", which is the safe default.
+  const confirmPort = {
+    ask: async ({ description }) => {
+      try { return window.confirm(`snapgentV3 - the AI wants to:\n\n${description}\n\nAllow this?`); } catch { return false; }
+    },
+  };
   const toolRunner = new ToolRunner({
-    bridge: bridgePort, catalogue, session: sessionPort, visibility: visibilityPort, sink: sinkPort,
+    bridge: bridgePort, catalogue, session: sessionPort, visibility: visibilityPort, sink: sinkPort, confirm: confirmPort,
   });
   const runTool = (call) => toolRunner.run(call);
   const activeTools = () => catalogue.active();

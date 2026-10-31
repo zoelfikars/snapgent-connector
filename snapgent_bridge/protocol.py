@@ -107,6 +107,12 @@ def split_content(result: Dict[str, Any]) -> Tuple[str, List[Dict[str, str]]]:
 def tool_result_message(request_id: Any, result: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
     """The reply for a finished tool call, and the text for the log."""
     text, images = split_content(result)
+    confirmation = (result.get("structuredContent") or {}).get("confirmation")
+    if result.get("isError") and isinstance(confirmation, dict):
+        # The server wants the USER's approval. The token travels in this field for the extension only.
+        message = tool_error(request_id, text or "Confirmation required.", "confirmation_required")
+        message["confirmation"] = confirmation
+        return message, text
     if result.get("isError"):
         return tool_error(request_id, text or "MCP tool failed."), text
     return {"type": "tool_result", "id": request_id, "ok": True, "text": text, "images": images}, text

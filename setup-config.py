@@ -30,7 +30,10 @@ def _load_config() -> Dict[str, object]:
 def _set_server(
     servers: Dict[str, object], server_id: str, command: str, args: List[str]
 ) -> None:
-    servers[server_id] = {"command": command, "args": args, "env": {}}
+    # Keep the user's own settings (for example the security policy in "env") across launcher runs.
+    existing = servers.get(server_id)
+    env = existing.get("env") if isinstance(existing, dict) and isinstance(existing.get("env"), dict) else {}
+    servers[server_id] = {"command": command, "args": args, "env": env}
 
 
 def main() -> int:

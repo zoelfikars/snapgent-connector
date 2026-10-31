@@ -44,7 +44,7 @@ log "===== MacOS_Start.command launched ====="
 # native build, then use the cross-platform Python bridge shipped in the source.
 BRIDGE_BIN=""
 if [ -x "./bridge" ]; then BRIDGE_BIN="./bridge"; fi
-if [ -z "$BRIDGE_BIN" ] && { [ ! -f "bridge.py" ] || [ ! -f "snapgent_bridge/__init__.py" ]; }; then
+if [ -z "$BRIDGE_BIN" ] && { [ ! -f "bridge.py" ] || [ ! -f "snapgent_bridge/__init__.py" ] || [ ! -f "snapgent_vscode/__init__.py" ]; }; then
     echo "  ERROR: no macOS-compatible Snapgent bridge was found."
     echo "  Extract the complete release, including bridge.py and the snapgent_bridge folder, then run this launcher again."
     log "FATAL: no native bridge or bridge.py; refusing to run bridge.exe on macOS."

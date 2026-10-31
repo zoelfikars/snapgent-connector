@@ -194,7 +194,7 @@ function handleBridgeMessage(msg) {
   if (msg.type === "tool_result") {
     resolvePending(msg.id, msg.ok
       ? { ok: true, text: msg.text, images: msg.images || [] }
-      : { ok: false, kind: msg.kind, error: msg.error });
+      : { ok: false, kind: msg.kind, error: msg.error, confirmation: msg.confirmation });
     return;
   }
   if (msg.type === "mcp_status") {

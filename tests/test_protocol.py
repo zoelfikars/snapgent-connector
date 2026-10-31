@@ -55,6 +55,26 @@ class ResultTests(unittest.TestCase):
         self.assertEqual(protocol.tool_result_message(3, {"isError": True, "content": []})[0]["error"], "MCP tool failed.")
 
 
+class ConfirmationTests(unittest.TestCase):
+    def test_a_confirmation_request_carries_the_token_in_its_own_field(self):
+        result = {"isError": True, "content": [{"type": "text", "text": "CONFIRMATION_REQUIRED: Delete file: a"}],
+                  "structuredContent": {"confirmation": {"token": "t0k", "description": "Delete file: a", "tool": "delete_file", "risk": "destructive"}}}
+        message, text = protocol.tool_result_message(5, result)
+        self.assertEqual((message["ok"], message["kind"], message["id"]), (False, "confirmation_required", 5))
+        self.assertEqual(message["confirmation"]["token"], "t0k")
+        self.assertNotIn("t0k", message["error"], "the token must not be in the text")
+        self.assertNotIn("t0k", text)
+
+    def test_ordinary_errors_have_no_confirmation(self):
+        message, _ = protocol.tool_result_message(1, {"isError": True, "content": [{"type": "text", "text": "boom"}], "structuredContent": {"other": 1}})
+        self.assertNotIn("confirmation", message)
+        self.assertNotIn("kind", message)
+
+    def test_a_confirmation_field_on_a_successful_result_is_ignored(self):
+        message, _ = protocol.tool_result_message(1, {"content": [{"type": "text", "text": "ok"}], "structuredContent": {"confirmation": {"token": "x"}}})
+        self.assertEqual((message["ok"], "confirmation" in message), (True, False))
+
+
 class MessageShapeTests(unittest.TestCase):
     def test_connected_and_tools_share_a_body(self):
         connected = protocol.connected_message("1.2", True, [{"name": "a"}], [{"id": "s"}])

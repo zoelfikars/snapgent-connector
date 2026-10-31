@@ -31,6 +31,11 @@
  */
 
 /**
+ * @typedef {Object} ConfirmPort  Asks the human before a risky action runs.
+ * @property {(request: { description: string, tool: string, risk: string }) => Promise<boolean>} ask  true = approved.
+ */
+
+/**
  * @typedef {Object} Timers
  * @property {typeof setTimeout} setTimeout
  * @property {typeof clearTimeout} clearTimeout
