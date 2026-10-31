@@ -1203,8 +1203,16 @@
     let targetBtn, targetMenuEl;
     let cover, coverRaf, barRaf;
     let openMenuFn = null; // set by build(); lets the popup force the panel open via runtime message
-    let bridgeOk = false, workspaceReady = false, workspaceProbePending = false, workspaceProbeAt = 0;
-    let wasConnected = false;
+    // Connection health and the VS Code workspace probe: src/application/bridge-monitor.js
+    const { BridgeMonitor } = ZSApp;
+    const bridgeMonitor = new BridgeMonitor({
+      ensureTools: () => catalogue.ensure(false),
+      activeTools,
+      listRoot: (name, timeout) => bg({ type: "call_tool", name, arguments: { path: "." }, timeout }),
+      isListTool: (name) => bareToolName(name) === "list_dir",
+      onChange: () => renderBar(),
+      log: (...args) => console.warn("[snapgentV3]", ...args),
+    });
 
     // Placement maths lives in src/ui/menu-position.js; these only measure and apply.
     function positionMenu(anchor) {
@@ -1483,11 +1491,11 @@
         parked: A.parked,
         blankChat: !A.started && !A.starting && !A.staleExtension && (P.isFreshChat() || P.chatIsEmpty()),
         bridge: A.bridge,
-        bridgeOk,
+        bridgeOk: bridgeMonitor.bridgeOk,
         target: { id: selectedTargetId, name: getTargetName() },
         activeToolCount: activeTools().length,
-        workspaceReady,
-        workspaceProbePending,
+        workspaceReady: bridgeMonitor.workspaceReady,
+        workspaceProbePending: bridgeMonitor.workspaceProbePending,
         modeWarning: !A.started && !A.starting && P.modeWarning ? P.modeWarning() : null,
       });
       const toneClass = view.tone, msg = view.message, label = view.label, kind = view.kind;
@@ -1530,49 +1538,13 @@
     function setStatus(s) {
       A.bridge = s;
       if (!bar) return;
-      const servers = s.servers || [];
-      const selected = servers.find((item) => item.id === selectedTargetId);
-      const serverConnected = !!s.connected && !!selected && !!selected.alive;
-      const ready = serverConnected &&
-        ((selected.tools || 0) > 0 || activeTools().length > 0);
-      bridgeOk = ready;
+      const health = bridgeMonitor.update(s, selectedTargetId);
       setTarget(selectedTargetId);
-      if (wasConnected && !s.connected) bridgeAlert(true);
+      if (health.lost) bridgeAlert(true);
       if (s.connected) bridgeAlert(false);
-      wasConnected = s.connected;
       if (s.connected && !setupSeen) {
         setupSeen = true;
         try { chrome.storage.local.set({ zsSetupSeen: true }); } catch {}
-      }
-      if (selectedTargetId === "vscode" && serverConnected && !workspaceProbePending &&
-          Date.now() - workspaceProbeAt >= 5000) {
-        workspaceProbeAt = Date.now();
-        workspaceProbePending = true;
-        catalogue.ensure(false).then(() => {
-          const workspaceTool = activeTools().find((tool) => bareToolName(tool.name) === "list_dir");
-          bridgeOk = serverConnected &&
-            ((selected.tools || 0) > 0 || activeTools().length > 0);
-          if (!workspaceTool) {
-            workspaceReady = false;
-            return;
-          }
-          return bg({
-            type: "call_tool",
-            name: workspaceTool.name,
-            arguments: { path: "." },
-            timeout: 5000,
-          }).then((result) => {
-            workspaceReady = !!(result && result.ok);
-          });
-        }).catch((error) => {
-          workspaceReady = false;
-          console.warn("[snapgentV3] Could not verify VS Code workspace:", error);
-        }).finally(() => {
-          workspaceProbePending = false;
-          renderBar();
-        });
-      } else if (selectedTargetId === "vscode" && !serverConnected) {
-        workspaceReady = false;
       }
       renderBar();
       refreshSetup(s.connected);

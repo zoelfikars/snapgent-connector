@@ -15,3 +15,4 @@ export { SessionStarter } from "./session-starter.js";
 export { ServerDirectory } from "./server-directory.js";
 export { TurnMemory } from "./turn-memory.js";
 export { SessionTracker, textShowsSession } from "./session-tracker.js";
+export { BridgeMonitor } from "./bridge-monitor.js";
