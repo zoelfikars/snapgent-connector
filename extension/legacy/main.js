@@ -187,7 +187,7 @@
     // so we re-inject the list every REMIND_TOOLS_EVERY calls (see agentLoop).
     // When the system prompt was last re-stated. Diagnostic only - whether one
     // is OWED is derived from the conversation itself, never from a counter
-    // (see sinceLastSys / sysResendDue).
+    // (see PromptResender).
     sysResendAt: 0,
     // This page outlived its extension build - nothing works until a reload.
     // Latched (never cleared): the context cannot come back. See bg().
@@ -604,7 +604,7 @@
     tools: loopTools,
     memory: { executed: (item) => rememberExecuted(item) },
     // A result becomes a turn, so it counts toward the system-prompt re-statement budget and may carry it.
-    outbox: { prepare: (text) => { bumpSys("results"); return withSysResend(text); } },
+    outbox: { prepare: (text) => { promptResender.bump("results"); return promptResender.attach(text); } },
     reminder: toolReminder,
     // Nothing observable changing while the tab is visible and no tool runs means the loop is stuck.
     activity: {
@@ -884,166 +884,37 @@
     });
   }
 
-  // ── Periodic system-prompt re-injection (opt-in, per provider) ────────────
-  // Some sites aggressively summarise their own context mid-conversation. When
-  // that happens the model keeps the gist of the task but loses the MECHANISM:
-  // it forgets that an extension reads its replies and executes them, and starts
-  // answering "I can't invoke those commands in this session" while the
-  // extension sits there ready and waiting. Observed repeatedly on ChatGPT.
-  //
-  // The periodic tools reminder does NOT fix this: it re-anchors command NAMES,
-  // but it never restates that the commands actually run. So providers that need
-  // it set `resendSystemEvery`, and the whole prompt goes back in.
-  //
-  // Delivery rides on the next injected tool result rather than costing its own
-  // message - free and invisible. But that channel dries up in exactly the case
-  // this exists for (a model that has forgotten it can call tools stops calling
-  // them, so no results flow), so a fallback sends it as its own masked turn
-  // once the window has elapsed with nothing to piggyback on.
-  const RESEND_SYS_EVERY = P.resendSystemEvery || 0;
-  // Injected tool results get their own, larger budget (see sysResendDue).
-  const RESEND_SYS_EVERY_RESULTS = 12;
-
-  // How much conversation has accumulated since the operating instructions were
-  // last stated. PERSISTED per conversation, because both simpler designs failed
-  // in opposite directions - each caught live on 2026-08-14:
-  //
-  //  - An in-memory counter RESETS on every page reload, while the session
-  //    itself survives one (A.started is persisted). After an F5, or a silent
-  //    Chrome extension auto-update, the tally restarted and the re-statement
-  //    could be postponed indefinitely.
-  //  - Walking the DOM back to the last SYS_MARKER turn is reload-proof but
-  //    UNDER-counts badly: these sites virtualize. Measured on a real ChatGPT
-  //    session that had long passed the threshold - only 12 turns were rendered,
-  //    the marker was not among them (so the walk silently counted from the top
-  //    of the window) and it saw 5 injected results instead of the true total.
-  //
-  // Counting at INJECTION time and persisting sidesteps both: it is exact, and
-  // virtualization cannot erase it. The DOM walk is kept as a floor, since a
-  // conversation that visibly shows the threshold is due no matter what storage
-  // says (e.g. a session adopted from another device, or storage cleared).
-  const sysKey = () => `zsSys:${P.conversationKey() || "new"}`;
-  let sysCount = { users: 0, results: 0 };
-  let sysCountKey = "";
-
-  // Hydrate from storage. Only meaningful at startup / on a conversation switch;
-  // it never overwrites counts already accumulated in this tick's memory (a
-  // bump that landed while the async read was in flight must not be lost).
-  async function loadSysCount() {
-    const k = sysKey();
-    if (k === sysCountKey) return sysCount;
-    sysCountKey = k;
-    const local = sysCount;
-    sysCount = { users: 0, results: 0 };
-    try {
-      const r = await new Promise((res) => chrome.storage.local.get(k, res));
-      const saved = r && r[k];
-      if (saved) sysCount = {
-        users: Math.max(saved.users || 0, local.users || 0),
-        results: Math.max(saved.results || 0, local.results || 0),
-      };
-    } catch {}
-    return sysCount;
-  }
-  function saveSysCount() {
-    try { chrome.storage.local.set({ [sysCountKey]: sysCount }); } catch {}
-  }
-  // Increment SYNCHRONOUSLY, persist asynchronously. sysResendDue() reads
-  // sysCount in the same tick as the bump that should trip it, so deferring the
-  // increment into the storage promise made the tally lag a full turn behind and
-  // the threshold was never seen at the moment it mattered (caught live: 12 tool
-  // results, counter still reading 11, no rider). Storage is a durability
-  // mechanism here, not the source of truth for the current tick.
-  function bumpSys(field) {
-    if (!RESEND_SYS_EVERY) return;
-    if (sysCountKey !== sysKey()) { sysCountKey = sysKey(); }
-    sysCount[field]++;
-    saveSysCount();
-  }
-  function resetSysCount() {
-    sysCount = { users: 0, results: 0 };
-    saveSysCount();
-  }
-
-  // Lower bound read straight from what is on screen (see above).
-  function sinceLastSysInDom() {
-    const items = P.allItems();
-    let users = 0, results = 0;
-    for (let i = items.length - 1; i >= 0; i--) {
-      const it = items[i];
-      const txt = P.classifyText(it, ".zs-chip");
-      // The bootstrap turn and every rider both carry the marker - either one
-      // means the rules were fully stated here, so stop counting.
-      if (txt.includes(ZS.SYS_MARKER)) break;
-      if (!P.isUserItem(it)) continue;
-      if (ZSParse.isInjectedFeedback(txt)) results++;
-      else users++;
-    }
-    return { users, results };
-  }
-
-  function sinceLastSys() {
-    const dom = sinceLastSysInDom();
-    return {
-      users: Math.max(sysCount.users, dom.users),
-      results: Math.max(sysCount.results, dom.results),
-    };
-  }
-
-  // A re-statement is owed once EITHER budget is spent. Two triggers because
-  // they measure different things: user turns track a long back-and-forth, while
-  // injected results track context VOLUME - and volume is what actually makes
-  // the site summarise. Measured live on 2026-08-14: in a real session 5 of the
-  // 6 "user" turns were injected tool results and only ONE was typed by Seb, so
-  // a user-turn-only trigger sat at 1/6 while five full tool payloads had
-  // already landed. The results budget is the one that fires in practice.
-  function sysResendDue() {
-    if (!RESEND_SYS_EVERY) return false;
-    const { users, results } = sinceLastSys();
-    const due = users >= RESEND_SYS_EVERY || results >= RESEND_SYS_EVERY_RESULTS;
-    // Logged sparsely on purpose: this is consulted on EVERY tool result, and an
-    // entry each time would flush the 300-slot diag ring of everything else -
-    // exactly the history you need when something goes wrong. The verdict turn
-    // and every 4th result is enough to reconstruct the tally.
-    if (due || results % 4 === 0) {
-      diag("sys.tally", {
-        users, results, due,
-        mem: `${sysCount.users}/${sysCount.results}`,
-        need: `${RESEND_SYS_EVERY}u ${RESEND_SYS_EVERY_RESULTS}r`,
-      });
-    }
-    return due;
-  }
-  // Attach the prompt to an outgoing tool result IF it fits. The result is never
-  // truncated to make room: the passenger is dropped and the flag stays raised,
-  // so it rides the next result instead. A tool result the model is waiting on
-  // is always worth more than a reminder.
-  function withSysResend(text) {
-    if (!sysResendDue()) return text;
-    const prompt = systemPrompt();
-    const rider =
-      "\n\n────────────────────────────────\n" +
-      ZS.RESEND_MARKER + "\n" +
-      "(System note from snapgentV3 - an automatic re-statement of your operating " +
-      "instructions, NOT a new request and NOT something to reply to. This conversation " +
-      "may have been summarised, which drops the part explaining how you actually run " +
-      "commands. To be explicit: the snapgentV3 extension IS running in this page right " +
-      "now, it DOES read your replies, and the commands below DO execute for real - the " +
-      "results you have been receiving are proof of it. Keep using them exactly as " +
-      "described. Just carry on with the task; do not acknowledge this note.)\n" +
-      prompt;
-    const cap = P.sendCharBudget || Infinity;
-    if (text.length + rider.length > cap) {
-      // Stays due - the next (smaller) result carries it.
-      diag("sys.resendDeferred", { result: text.length, rider: rider.length, cap });
-      return text;
-    }
-    const spent = sinceLastSys();
-    resetSysCount();
-    A.sysResendAt = Date.now();
-    diag("sys.resend", { via: "toolResult", chars: rider.length, ...spent });
-    return text + rider;
-  }
+  // ── Periodic system-prompt re-injection (opt-in per provider; src/application/prompt-resender.js) ──
+  // Some sites summarise their own context mid-conversation; the model then forgets that an extension
+  // runs its commands. Providers that need it set `resendSystemEvery`; the whole prompt rides on the next
+  // injected tool result, with a fallback that sends it as its own masked turn (see the interval at the
+  // bottom of this file).
+  const { SysTally, PromptResender } = ZSApp;
+  const sysTally = new SysTally({
+    storage: {
+      get: (key) => new Promise((resolve) => chrome.storage.local.get(key, (r) => resolve(r && r[key]))),
+      set: (key, value) => chrome.storage.local.set({ [key]: value }),
+    },
+    conversationKey: () => P.conversationKey(),
+    enabled: !!P.resendSystemEvery,
+  });
+  const promptResender = new PromptResender({
+    tally: sysTally,
+    everyUsers: P.resendSystemEvery || 0,
+    systemPrompt: () => systemPrompt(),
+    // What is visibly on screen is a floor under the stored tally (a session adopted from another device, cleared storage).
+    domCounts: () => {
+      const items = P.allItems();
+      return ZSDomain.countSinceLastMarker(items.length, (i) => ({
+        // The bootstrap turn and every rider both carry the marker: either means the rules were fully stated here.
+        text: P.classifyText(items[i], ".zs-chip"),
+        isUser: P.isUserItem(items[i]),
+      }));
+    },
+    charBudget: () => P.sendCharBudget || Infinity,
+    onResent: (at) => { A.sysResendAt = at; },
+    diag,
+  });
 
   // ════════════════════════════════════════════════════════════════════════
   //  SESSION BOOTSTRAP  ("Starting Up" animated chip, shown in the conversation)
@@ -3355,7 +3226,7 @@
   }
   // Hydrate the persisted re-statement budget for this conversation up front, so
   // the first tool result after a reload already knows the real tally.
-  loadSysCount();
+  sysTally.hydrate();
   bg({ type: "status" }).then(onStatus);
   statusTimer = setInterval(() => bg({ type: "status" }).then(onStatus), 5000);
 
@@ -3553,7 +3424,7 @@
       // A fresh user message = fresh intent: clear any previous manual stop so
       // the loop is allowed to run again.
       A.userStopped = false;
-      bumpSys("users");
+      promptResender.bump("users");
       captureSendToken(); // identity of the assistant turn before this reply
       // A Stop clicked during this 300ms window sets A.userStopped → honor it and
       // do NOT start the loop (otherwise the stop is silently ignored and the
@@ -3676,7 +3547,7 @@
   }, 1000);
 
   // ── System-prompt re-injection fallback ───────────────────────────────────
-  // The piggyback path (withSysResend) is free but needs a tool result to ride
+  // The piggyback path (PromptResender.attach) is free but needs a tool result to ride
   // on, and the failure this feature exists for - the model forgetting it can
   // run commands at all - is precisely the state where no tool results are being
   // produced. So when a re-statement has been owed for a while and nothing has
@@ -3691,7 +3562,7 @@
   // what they were typing).
   const SYS_FALLBACK_IDLE_MS = 20000;
   setInterval(async () => {
-    if (!sysResendDue()) return;
+    if (!promptResender.due()) return;
     if (!A.started || A.running || A.starting || A.injecting) return;
     if (document.hidden || A.userStopped) return;
     if (P.isGenerating()) return;
@@ -3700,10 +3571,7 @@
     // Give the cheap path a fair chance first: only step in once the turn has
     // been settled and quiet for a while with no tool result to ride on.
     if (Date.now() - A.lastGenAt < SYS_FALLBACK_IDLE_MS) return;
-    const spent = sinceLastSys();
-    resetSysCount();
-    A.sysResendAt = Date.now();
-    diag("sys.resend", { via: "ownTurn", ...spent });
+    promptResender.claim("ownTurn");
     try {
       const base = await submitAndGetBase(systemPrompt());
       await waitForResponse(base);

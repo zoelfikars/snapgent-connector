@@ -7,3 +7,5 @@ export { StallWatchdog } from "./stall-watchdog.js";
 export { ToolReminder, REMIND_TOOLS_EVERY } from "./tool-reminder.js";
 export { ResponseWatcher } from "./response-watcher.js";
 export { WatchState } from "./watch-state.js";
+export { SysTally } from "./sys-tally.js";
+export { PromptResender } from "./prompt-resender.js";
