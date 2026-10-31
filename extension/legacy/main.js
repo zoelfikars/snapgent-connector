@@ -691,135 +691,21 @@
     ui.toast("Stopping…");
   }
 
-  // The full system prompt for the CURRENT provider and user settings. One
-  // definition, used both by the bootstrap and by the periodic re-injection, so
-  // the two can never drift apart.
-  // Skills found in the workspace (.snapgent/skills/<name>/SKILL.md), as
-  // [{ name, description, path }]. Filled by the skills loader; empty = feature off.
-  let workspaceSkills = [];
-  // Every skill found on disk (enabled or not), for the Skills settings popup.
-  let allSkills = [];
-  // Persisted map { skillName: boolean }. A skill never toggled counts as enabled.
-  const SKILLS_ENABLED_KEY = "zsSkillsEnabled";
-  let skillsEnabled = {};
-  try {
-    chrome.storage.local.get(SKILLS_ENABLED_KEY, (result) => {
-      const saved = result && result[SKILLS_ENABLED_KEY];
-      if (saved && typeof saved === "object" && !Array.isArray(saved)) skillsEnabled = saved;
-    });
-  } catch (error) {
-    console.warn("[snapgentV3] Could not load skill toggles:", error);
-  }
-  function isSkillEnabled(name) {
-    return skillsEnabled[name] !== false;
-  }
-  function setSkillEnabled(name, on) {
-    skillsEnabled = { ...skillsEnabled, [name]: !!on };
-    try { chrome.storage.local.set({ [SKILLS_ENABLED_KEY]: skillsEnabled }); } catch {}
-    workspaceSkills = allSkills.filter((s) => isSkillEnabled(s.name));
-  }
+  // Skills (.snapgent/skills/<name>/SKILL.md in the workspace + a global library): src/application/skills-service.js
+  const { SkillsService } = ZSApp;
+  const skillsService = new SkillsService({
+    store: {
+      get: (key) => new Promise((resolve) => chrome.storage.local.get(key, (r) => resolve(r && r[key]))),
+      set: (key, value) => chrome.storage.local.set({ [key]: value }),
+    },
+    findTool: (bareName) => activeTools().find((tool) => bareToolName(tool.name) === bareName),
+    callTool: (name, args, timeout) => bg({ type: "call_tool", name, arguments: args, timeout }),
+    diag,
+    log,
+  });
 
-  // Scan .snapgent/skills/*/SKILL.md and fill workspaceSkills with name +
-  // one-line description (progressive disclosure: bodies are read on demand by
-  // the model via read_file). Never throws; on any problem the list stays empty.
-  async function loadWorkspaceSkills() {
-    workspaceSkills = [];
-    try {
-      const tools = activeTools();
-      const findTool = tools.find((t) => bareToolName(t.name) === "find_files");
-      const readTool = tools.find((t) => bareToolName(t.name) === "read_file");
-      if (!findTool || !readTool) return;
-      const found = await bg({ type: "call_tool", name: findTool.name,
-        arguments: { path: ".snapgent/skills", pattern: "**/SKILL.md" }, timeout: 5000 });
-      if (!found || !found.ok || !found.text) return;
-      let paths;
-      try { paths = JSON.parse(found.text); } catch { return; }
-      if (!Array.isArray(paths)) return;
-      const out = [];
-      for (const p of paths.slice(0, 30)) {
-        if (typeof p !== "string") continue;
-        const r = await bg({ type: "call_tool", name: readTool.name,
-          arguments: { path: p }, timeout: 5000 });
-        if (!r || !r.ok || !r.text) continue;
-        const fm = r.text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
-        if (!fm) continue;
-        const clean = (v) => (v || "").trim().replace(/^["']|["']$/g, "").replace(/\s+/g, " ");
-        const name = clean((fm[1].match(/^name:\s*(.+)$/m) || [])[1]);
-        const description = clean((fm[1].match(/^description:\s*(.+)$/m) || [])[1]).slice(0, 200);
-        if (!name || !description) continue;
-        out.push({ name, description, path: p });
-      }
-      allSkills = out;
-      workspaceSkills = out.filter((s) => isSkillEnabled(s.name));
-      diag("skills.loaded", { count: out.length, enabled: workspaceSkills.length });
-    } catch (error) {
-      log("Could not load workspace skills:", error);
-    }
-  }
-
-  // Validate pasted SKILL.md text. Returns { ok, name, description } or { ok:false, error }.
-  const SKILL_MAX_BYTES = 20 * 1024;
-  function validateSkillText(text) {
-    if (typeof text !== "string" || !text.trim()) return { ok: false, error: "Empty content." };
-    if (new Blob([text]).size > SKILL_MAX_BYTES) return { ok: false, error: "Too large (max 20 KB)." };
-    const fm = text.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
-    if (!fm) return { ok: false, error: "Missing frontmatter (--- name / description ---)." };
-    const clean = (v) => (v || "").trim().replace(/^["']|["']$/g, "").replace(/\s+/g, " ");
-    const name = clean((fm[1].match(/^name:\s*(.+)$/m) || [])[1]);
-    const description = clean((fm[1].match(/^description:\s*(.+)$/m) || [])[1]);
-    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name) || name.length > 64)
-      return { ok: false, error: "name must be lowercase letters, digits and hyphens only (max 64)." };
-    if (!description) return { ok: false, error: "description is required." };
-    if (description.length > 200) return { ok: false, error: "description is too long (max 200 characters)." };
-    return { ok: true, name, description };
-  }
-
-  // Write a validated skill to .snapgent/skills/<name>/SKILL.md. create_file never
-  // overwrites, so an existing name is rejected. Imported skills start DISABLED.
-  async function importSkillText(text) {
-    const v = validateSkillText(text);
-    if (!v.ok) return v;
-    const createTool = activeTools().find((t) => bareToolName(t.name) === "create_file");
-    if (!createTool) return { ok: false, error: "create_file is not available on this server." };
-    if (allSkills.some((s) => s.name === v.name)) return { ok: false, error: `A skill named "${v.name}" already exists.` };
-    const r = await bg({ type: "call_tool", name: createTool.name,
-      arguments: { path: `.snapgent/skills/${v.name}/SKILL.md`, content: text }, timeout: 8000 });
-    if (!r || !r.ok) return { ok: false, error: (r && (r.error || r.text)) || "Write failed." };
-    setSkillEnabled(v.name, false);
-    return { ok: true, name: v.name };
-  }
-
-  // Global skill library: stored in chrome.storage (not in any workspace). The
-  // model cannot read these, so they must be installed into a workspace (through
-  // the same review + importSkillText path) before they take effect.
-  const GLOBAL_SKILLS_KEY = "zsGlobalSkills";
-  let globalSkills = {}; // { name: { description, text } }
-  try {
-    chrome.storage.local.get(GLOBAL_SKILLS_KEY, (result) => {
-      const saved = result && result[GLOBAL_SKILLS_KEY];
-      if (saved && typeof saved === "object" && !Array.isArray(saved)) globalSkills = saved;
-    });
-  } catch (error) {
-    console.warn("[snapgentV3] Could not load global skills:", error);
-  }
-  function persistGlobalSkills() {
-    try { chrome.storage.local.set({ [GLOBAL_SKILLS_KEY]: globalSkills }); } catch {}
-  }
-  function saveGlobalSkill(text) {
-    const v = validateSkillText(text);
-    if (!v.ok) return v;
-    if (globalSkills[v.name]) return { ok: false, error: `A global skill named "${v.name}" already exists.` };
-    globalSkills = { ...globalSkills, [v.name]: { description: v.description, text } };
-    persistGlobalSkills();
-    return { ok: true, name: v.name };
-  }
-  function removeGlobalSkill(name) {
-    const next = { ...globalSkills };
-    delete next[name];
-    globalSkills = next;
-    persistGlobalSkills();
-  }
-
+  // The full system prompt for the CURRENT provider and user settings. One definition, used both by the
+  // bootstrap and by the periodic re-injection, so the two can never drift apart.
   function systemPrompt() {
     return ZS.buildSystemPrompt({
       siteName: P.displayName,
@@ -827,7 +713,7 @@
       providerNotes: P.promptExtra || "",
       targetServer: selectedTargetId,
       targetName: ui.getTargetName(),
-      skills: workspaceSkills,
+      skills: skillsService.enabled,
     });
   }
 
@@ -936,7 +822,7 @@
           `Try a new chat or reload.`);
         return;
       }
-      if (selectedTargetId === "vscode") await loadWorkspaceSkills();
+      if (selectedTargetId === "vscode") await skillsService.load();
       if (!alive()) return;
       const prompt = systemPrompt();
       const base = await submitAndGetBase(prompt);
@@ -1968,7 +1854,7 @@
       let draft = "";
       let importMsg = "";
       const renderImport = () => {
-        const v = mode === "review" ? validateSkillText(draft) : null;
+        const v = mode === "review" ? skillsService.validate(draft) : null;
         const body = mode === "paste"
           ? `<input type="file" id="zs-skill-file" accept=".md,.txt,text/markdown,text/plain" style="margin-bottom:6px;font-size:11px;max-width:100%">` +
             `<textarea id="zs-skill-text" rows="10" style="width:100%;box-sizing:border-box;font:11px ui-monospace,Consolas,monospace;background:transparent;color:inherit;border:1px solid rgba(128,128,128,.4);border-radius:6px;padding:6px" placeholder="Paste the full SKILL.md here (with --- name / description --- frontmatter)">${esc(draft)}</textarea>` +
@@ -1988,7 +1874,7 @@
         if (fileInput) fileInput.addEventListener("change", () => {
           const f = fileInput.files && fileInput.files[0];
           if (!f) return;
-          if (f.size > SKILL_MAX_BYTES) { importMsg = "File too large (max 20 KB)."; renderImport(); return; }
+          if (f.size > ZSDomain.SKILL_MAX_BYTES) { importMsg = "File too large (max 20 KB)."; renderImport(); return; }
           const reader = new FileReader();
           reader.onload = () => {
             draft = String(reader.result || "");
@@ -2002,30 +1888,30 @@
         on("#zs-skill-cancel", () => { mode = "list"; importMsg = ""; draft = ""; render(); });
         on("#zs-skill-review", () => {
           draft = pop.querySelector("#zs-skill-text").value;
-          const chk = validateSkillText(draft);
+          const chk = skillsService.validate(draft);
           if (!chk.ok) { importMsg = chk.error; renderImport(); return; }
-          if (allSkills.some((s) => s.name === chk.name)) { importMsg = `A skill named "${chk.name}" already exists.`; renderImport(); return; }
+          if (skillsService.all.some((s) => s.name === chk.name)) { importMsg = `A skill named "${chk.name}" already exists.`; renderImport(); return; }
           importMsg = ""; mode = "review"; renderImport();
         });
         on("#zs-skill-back", () => { mode = "paste"; importMsg = ""; renderImport(); });
         on("#zs-skill-global", () => {
-          const res = saveGlobalSkill(draft);
+          const res = skillsService.saveGlobal(draft);
           if (!res.ok) { importMsg = res.error; renderImport(); return; }
           mode = "list"; draft = ""; importMsg = "";
           render();
         });
         on("#zs-skill-confirm", async () => {
-          const res = await importSkillText(draft);
+          const res = await skillsService.importText(draft);
           if (!res.ok) { importMsg = res.error; renderImport(); return; }
           mode = "list"; draft = ""; importMsg = "";
-          await loadWorkspaceSkills();
+          await skillsService.load();
           if (pop.isConnected) render();
         });
       };
       const render = () => {
         if (mode !== "list") { renderImport(); return; }
-        const rows = allSkills.length
-          ? allSkills.map((s) => `<label class="zs-mcp-row"><span class="zs-mcp-row-info"><span class="zs-mcp-row-name">${esc(s.name)}</span><span class="zs-mcp-row-meta">${esc(s.description)}</span></span><input type="checkbox" class="zs-mcp-check" data-name="${esc(s.name)}" ${isSkillEnabled(s.name) ? "checked" : ""}><span class="zs-mcp-toggle"></span></label>`).join("")
+        const rows = skillsService.all.length
+          ? skillsService.all.map((s) => `<label class="zs-mcp-row"><span class="zs-mcp-row-info"><span class="zs-mcp-row-name">${esc(s.name)}</span><span class="zs-mcp-row-meta">${esc(s.description)}</span></span><input type="checkbox" class="zs-mcp-check" data-name="${esc(s.name)}" ${skillsService.isEnabled(s.name) ? "checked" : ""}><span class="zs-mcp-toggle"></span></label>`).join("")
           : `<div class="zs-mcp-pop-note">No skills found in .snapgent/skills/ (VS Code workspace only).</div>`;
         pop.innerHTML =
           `<div class="zs-mcp-pop-card" role="dialog" aria-label="Skills settings">` +
@@ -2033,31 +1919,31 @@
             `<div class="zs-mcp-pop-note">Only enabled skills are listed in the prompt. Changes apply to the next chat session.</div>` +
             `<div class="zs-mcp-pop-list">${rows}</div>` +
             `<div class="zs-mcp-pop-note" style="margin-top:10px"><b>Global library</b> (stored in this browser; install into a workspace to use)</div>` +
-            (Object.keys(globalSkills).length
-              ? Object.keys(globalSkills).map((n) => `<div class="zs-mcp-row"><span class="zs-mcp-row-info"><span class="zs-mcp-row-name">${esc(n)}</span><span class="zs-mcp-row-meta">${esc(globalSkills[n].description)}</span></span><button class="zs-gear zs-gskill-install" data-name="${esc(n)}">Install</button><button class="zs-gear zs-gskill-del" data-name="${esc(n)}">Delete</button></div>`).join("")
+            (Object.keys(skillsService.globals).length
+              ? Object.keys(skillsService.globals).map((n) => `<div class="zs-mcp-row"><span class="zs-mcp-row-info"><span class="zs-mcp-row-name">${esc(n)}</span><span class="zs-mcp-row-meta">${esc(skillsService.globals[n].description)}</span></span><button class="zs-gear zs-gskill-install" data-name="${esc(n)}">Install</button><button class="zs-gear zs-gskill-del" data-name="${esc(n)}">Delete</button></div>`).join("")
               : `<div class="zs-mcp-pop-note">Empty. Use "Save to global" while reviewing an import.</div>`) +
             `<div style="margin-top:8px"><button id="zs-skill-import" class="zs-gear" style="width:100%">+ Import skill</button></div>` +
           `</div>`;
         pop.querySelector(".zs-mcp-pop-close").addEventListener("click", () => pop.remove());
         pop.querySelectorAll(".zs-gskill-install").forEach((b) => b.addEventListener("click", () => {
-          const g = globalSkills[b.dataset.name];
+          const g = skillsService.globals[b.dataset.name];
           if (!g) return;
           draft = g.text; importMsg = "";
-          if (allSkills.some((s) => s.name === b.dataset.name)) { importMsg = `A skill named "${b.dataset.name}" already exists in this workspace.`; }
+          if (skillsService.all.some((s) => s.name === b.dataset.name)) { importMsg = `A skill named "${b.dataset.name}" already exists in this workspace.`; }
           mode = "review"; render();
         }));
         pop.querySelectorAll(".zs-gskill-del").forEach((b) => b.addEventListener("click", () => {
-          removeGlobalSkill(b.dataset.name); render();
+          skillsService.removeGlobal(b.dataset.name); render();
         }));
         const impBtn = pop.querySelector("#zs-skill-import");
         if (impBtn) impBtn.addEventListener("click", () => { mode = "paste"; draft = ""; importMsg = ""; render(); });
         pop.querySelectorAll(".zs-mcp-check").forEach((box) =>
-          box.addEventListener("change", () => setSkillEnabled(box.dataset.name, box.checked)));
+          box.addEventListener("change", () => skillsService.setEnabled(box.dataset.name, box.checked)));
       };
       pop.addEventListener("click", (e) => { if (e.target === pop) pop.remove(); });
       document.documentElement.appendChild(pop);
       render();
-      if (selectedTargetId === "vscode") loadWorkspaceSkills().then(() => { if (pop.isConnected) render(); });
+      if (selectedTargetId === "vscode") skillsService.load().then(() => { if (pop.isConnected) render(); });
     }
 
     function buildMenu() {
