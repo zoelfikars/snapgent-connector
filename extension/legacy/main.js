@@ -1902,6 +1902,8 @@
   setInterval(scheduleSweep, 1500);
   // When the user returns to the tab, immediately refresh camouflage/state.
   document.addEventListener("visibilitychange", () => { if (!document.hidden) scheduleSweep(); });
+  // The provider swapped (a site profile was stored or removed): redraw the bar and re-read the page now.
+  document.addEventListener("zs-provider-changed", () => scheduleSweep());
 
   syncSessionState();
 

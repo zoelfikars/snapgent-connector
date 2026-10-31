@@ -8,11 +8,11 @@ const FIREFOX_MIN_VERSION = "128.0"; // first release with MV3 `world: "MAIN"` c
 
 const CORE_SCRIPTS = ["globals.js", "main.js"];
 
-// One adapter for every site: the "uncalibrated" provider (see docs/CALIBRATION.md). Per-site adapters were removed.
+// One provider script for every site: it is calibrated from a stored profile or says "not calibrated" (docs/CALIBRATION.md).
 export function contentScripts(sites = SITES) {
   return sites.map((site) => ({
     matches: site.matches,
-    js: ["globals.js", "providers/uncalibrated.js", "main.js"],
+    js: ["globals.js", "providers/provider.js", "main.js"],
     css: ["overlay.css"],
     run_at: "document_idle",
   }));

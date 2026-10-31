@@ -6,6 +6,8 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { build } from "esbuild";
 import { JSDOM, VirtualConsole } from "jsdom";
+import { learnProfile } from "../src/infrastructure/calibration/index.js";
+import { pageWith } from "./support/jsdom-provider.js";
 
 const root = new URL("../", import.meta.url).pathname;
 const source = (path) => readFileSync(root + path, "utf8");
@@ -15,15 +17,19 @@ async function bundledGlobals() {
   return result.outputFiles[0].text;
 }
 
-async function startOn(html, url = "https://chatgpt.com/c/test") {
+async function startOn(html, url = "https://chatgpt.com/c/test", { storage = {} } = {}) {
   const warnings = [];
   const virtualConsole = new VirtualConsole();
   virtualConsole.on("warn", (...args) => warnings.push(args.join(" ")));
   virtualConsole.on("jsdomError", (error) => warnings.push(String(error)));
   const dom = new JSDOM(html, { runScripts: "outside-only", url, pretendToBeVisual: true, virtualConsole });
   const { window } = dom;
+  window.__storageListeners = [];
   window.chrome = {
-    storage: { local: { get: (_key, callback) => callback && callback({}), set() {} } },
+    storage: {
+      local: { get: (_key, callback) => callback && callback({ ...storage }), set() {} },
+      onChanged: { addListener: (listener) => { window.__storageListeners.push(listener); } },
+    },
     // A bridge that is connected with a live VS Code server but advertises no tools yet.
     runtime: {
       sendMessage: (message, callback) => callback && callback(
@@ -39,10 +45,11 @@ async function startOn(html, url = "https://chatgpt.com/c/test") {
   const context = dom.getInternalVMContext();
   const run = (code, filename) => new vm.Script(code, { filename }).runInContext(context);
   run(await bundledGlobals(), "globals.js");
-  run(source("legacy/providers/uncalibrated.js"), "uncalibrated.js");
+  run(source("legacy/providers/provider.js"), "provider.js");
   run(source("legacy/main.js"), "main.js");
   await new Promise((resolve) => setTimeout(resolve, 1200)); // let the first camouflage sweep run
-  return { window, document: window.document, warnings, count: (selector) => window.document.querySelectorAll(selector).length };
+  const providerId = () => run("ZSProvider.id", "probe.js");
+  return { window, document: window.document, warnings, providerId, count: (selector) => window.document.querySelectorAll(selector).length };
 }
 
 // Until a site is calibrated (docs/CALIBRATION.md) the extension must still boot cleanly and say why it cannot start.
@@ -77,6 +84,66 @@ describe("content script on a supported site that is not calibrated yet", () => 
     const page = await startOn("<html><body></body></html>", "https://gemini.google.com/app/x");
     try {
       assert.equal(page.document.getElementById("zs-switch-name").textContent.trim(), "Gemini");
+    } finally {
+      page.window.close();
+    }
+  });
+});
+
+// A profile stored by the calibration UI switches the same provider script from "not calibrated" to the calibrated engine.
+describe("content script with a stored profile", () => {
+  const PAGE = `<html><body>
+    <div class="turn-user">⟦ZS-SYS⟧ hello</div>
+    <div class="turn-assistant"><pre>{"command":"read_file","params":{"path":"a.js"}}</pre></div>
+    <form><div id="box" contenteditable="true" role="textbox"></div><button aria-label="Send prompt"></button></form>
+  </body></html>`;
+  function storedProfile() {
+    const { document } = pageWith(PAGE, "https://chatgpt.com/c/test");
+    const learned = learnProfile({
+      hostname: "chatgpt.com", name: "ChatGPT",
+      picks: { composer: document.getElementById("box"), send: document.querySelector("button"), assistant: document.querySelector("pre"), user: document.querySelector(".turn-user") },
+    });
+    assert.equal(learned.error, undefined);
+    return JSON.parse(JSON.stringify(learned.profile)); // what storage hands back
+  }
+
+  test("the bar stops saying 'not calibrated' and the page is read through the profile", async () => {
+    const page = await startOn(PAGE, "https://chatgpt.com/c/test", { storage: { zsProfiles: { "chatgpt.com": storedProfile() } } });
+    try {
+      assert.deepEqual(page.warnings, []);
+      assert.doesNotMatch(page.document.getElementById("zs-state").textContent, /Not calibrated/);
+      assert.ok(page.count(".zs-chip") >= 1, "the command in the reply gets a chip");
+    } finally {
+      page.window.close();
+    }
+  });
+
+  test("a profile for another site is ignored", async () => {
+    const page = await startOn(PAGE, "https://chatgpt.com/c/test", { storage: { zsProfiles: { "gemini.google.com": storedProfile() } } });
+    try {
+      assert.match(page.document.getElementById("zs-state").textContent, /Not calibrated for this site yet/);
+    } finally {
+      page.window.close();
+    }
+  });
+
+  test("storing and removing a profile switches the provider while the page stays open", async () => {
+    const page = await startOn(PAGE, "https://chatgpt.com/c/test");
+    try {
+      assert.equal(page.providerId(), "uncalibrated");
+      page.window.__storageListeners.forEach((listener) => listener({ zsProfiles: { newValue: { "chatgpt.com": storedProfile() } } }, "local"));
+      assert.equal(page.providerId(), "chatgpt-com");
+      page.window.__storageListeners.forEach((listener) => listener({ zsProfiles: { newValue: {} } }, "local"));
+      assert.equal(page.providerId(), "uncalibrated");
+    } finally {
+      page.window.close();
+    }
+  });
+
+  test("a broken profile is not used", async () => {
+    const page = await startOn(PAGE, "https://chatgpt.com/c/test", { storage: { zsProfiles: { "chatgpt.com": { version: 99 } } } });
+    try {
+      assert.match(page.document.getElementById("zs-state").textContent, /Not calibrated for this site yet/);
     } finally {
       page.window.close();
     }

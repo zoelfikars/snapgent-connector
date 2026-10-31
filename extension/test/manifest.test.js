@@ -25,7 +25,7 @@ describe("manifest generation", () => {
     for (const site of SITES) {
       const entries = chrome.content_scripts.filter((c) => c.matches === site.matches);
       assert.equal(entries.length, 1, site.id);
-      assert.deepEqual(entries[0].js, ["globals.js", "providers/uncalibrated.js", "main.js"]);
+      assert.deepEqual(entries[0].js, ["globals.js", "providers/provider.js", "main.js"]);
     }
   });
 

@@ -1,0 +1,11 @@
+<!doctype html>
+<html><body>
+<!-- composer structure as captured 2026-10: the textarea is a hidden pre-hydration leftover, the Lexical div is what Meta reads -->
+<div class="flex flex-col">
+<div class="user-turn"><div>⟦ZS-SYS⟧ hello</div></div>
+<div class="assistant-turn"><div data-testid="assistant-message"><div class="ur-code-block"><pre><code>{"command":"read_file","arguments":{"path":"a.js"}}</code></pre></div></div></div>
+</div>
+<div class="hidden"><textarea data-testid="composer-input" data-ecto-composer-prehydration-input="" placeholder="Ask Meta AI..." style="field-sizing:content"></textarea></div>
+<div class="relative"><div data-testid="composer-input" contenteditable="true" role="textbox" data-lexical-editor="true" data-composer-focus=""></div></div>
+<button data-testid="composer-send-button" aria-label="Send">Send</button>
+</body></html>

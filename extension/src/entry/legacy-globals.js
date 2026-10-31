@@ -18,7 +18,9 @@ globalThis.ZSDomain = { SKILL_MAX_BYTES, bareToolName, countSinceLastMarker, fee
 import * as ui from "../ui/index.js";
 import * as chat from "../infrastructure/chat/index.js";
 import { siteFor } from "../sites/registry.js";
+import { createCalibratedProvider, profileProblems } from "../infrastructure/calibration/index.js";
 globalThis.ZSChat = chat;
 globalThis.ZSSites = { siteFor };
+globalThis.ZSCalibration = { createCalibratedProvider, profileProblems };
 
 globalThis.ZSUi = ui;

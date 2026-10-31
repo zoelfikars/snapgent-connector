@@ -1,6 +1,6 @@
 # Calibration: teaching the extension a chat site instead of coding it
 
-Status: **design, agreed in discussion. Phase 0 is done; everything else below is not built yet.**
+Status: **design, agreed in discussion. Phases 0 and 1 are done (see "Phase 1 results"); the calibration UI and everything after it are not built yet.**
 
 ## Why
 
@@ -31,14 +31,14 @@ The maintainer does not want to chase 12 sites, and the users are the maintainer
 |---|---|
 | Composer (text box) | **Picked**: one click. Then a write/read-back test. |
 | Send button | **Picked**: one click, or "use Enter". |
-| One assistant reply | **Picked**: one click on any existing reply. The other replies are found by the repeating pattern around it. |
+| One assistant reply | **Picked**: one click on any existing reply. |
+| One of the user's own messages | **Picked**: one click. Needed (phase 1 finding): a reply can only be told apart from a message by comparing the two. |
 | The part of the reply to read | **Previewed**: the text we would read is shown. If it includes reasoning, toolbars or labels, the user clicks the right inner part. |
-| User messages | Derived: turns that are not assistant replies. Optional pick when that is wrong. |
 | Stop button | Derived: learned when the send button changes while generating. |
 | Composer card (for the bar and the cover) | Derived: the nearest ancestor that visually contains composer and send button. Optional pick. |
 | Where chips go | Derived: inside the reply container. |
 
-Calibration is at most four steps and needs one existing conversation with one reply (or is finished after the first
+Calibration is at most five clicks and needs one existing conversation with one message and one reply (or is finished after the first
 message). It is started from the bar ("Calibrate this site") and any single role can be re-done on its own.
 
 ## Calibration flow
@@ -47,7 +47,7 @@ message). It is started from the bar ("Calibrate this site") and any single role
    writes a short test string, reads it back, clears it. If it did not take, the engine tries the next writing
    method (native setter, paste, `insertText`, `beforeinput`) and remembers the one that worked.
 2. **Send.** Click the send button, or choose "Enter sends".
-3. **Reply.** Click any assistant reply. The engine finds the sibling pattern and counts how many replies it sees.
+3. **Reply and your message.** Click any assistant reply, then any message of your own. The engine finds what tells the two kinds of turn apart (an attribute, a tag, a class) and counts the turns of each kind it now sees.
 4. **Preview.** Shows the text that would be read from the last reply. "Looks right" saves; otherwise the user
    clicks the inner part that is the answer, and the preview refreshes.
 5. Save the profile for this site. The bar shows "Calibrated".
@@ -161,3 +161,44 @@ the whole application layer (agent loop, tool runner, session logic) and the gen
 - Fingerprints can still go stale; the health check and per-role re-calibration are the answer, not a promise
   that calibration is permanent.
 - Where seed profiles come from: they are produced by calibrating, exporting and committing, never written by hand.
+
+## Phase 1 results (spike)
+
+Built: `src/infrastructure/calibration/` (selector learning, profile, engine) and a loader in `legacy/providers/provider.js`
+that uses a stored `zsProfiles[<host>]` when there is one. No UI yet: profiles are learned in tests from simulated
+clicks and stored by hand.
+
+**Acceptance.** `test/calibration.test.js` learns a profile from five clicks (text box, send button, a reply, a message
+of the user's, optionally the part of the reply to read) on three pages and runs the contract on it: counts, telling
+user from assistant turns, reading the tool call, the marker in the user's turn, the composer and its card, hiding the
+raw block with its chrome, the stop control, a fresh chat, writing and sending (button and Enter), and a missing part
+named by the health check. ChatGPT (captured 2026-10 reply chain), Gemini (captured reply structure) and Meta
+(captured Lexical composer structure) all pass, and the real content script (`test/content-script.test.js`) boots with
+a stored profile and draws chips through it. 41 + 4 tests; mutations of each rule make them fail.
+
+**What the spike taught (design changes, already applied above):**
+- A reply cannot be selected in isolation. The turn is the outermost element around the click that differs from the
+  user's turn, so a second pick (a user message) is required.
+- Instance-specific values must be generalised. Captured ChatGPT turns carry `data-content-search-unit-key="fallback-turn-1:1:assistant"`;
+  matching it exactly finds only that turn. Any value with a digit is treated as per-instance and matched by its
+  stable word (`[…$=":assistant"]`). Generated class names (`block-BQZwFn`) are never used.
+- Hiding the raw command block must count text without markup whitespace, or pretty-printed pages never qualify as "chrome".
+- Writing needs a short settle (150 ms) before input reaches a rich editor, then the methods in turn
+  (paste, `insertText`, `beforeinput`); the one that worked is remembered. This is the Meta lesson, now generic.
+
+**Evidence limits (be honest about them).** The pages are captures of the reply part only; the composers and send buttons
+of the ChatGPT and Gemini pages are written to match what was reported, not captured. Nothing here has run on a live
+site, and nine sites have not been tried. The Meta page is the only one with a captured composer.
+
+**Not done in the spike, and the open gaps:**
+- Reasoning is not separated from the answer unless the user picks the inner part (the preview step in phase 2).
+- Stop is found by an `aria-label`/`data-testid`/`title` matching *stop|cancel|halt|arrêter* inside the composer card;
+  sites that label it otherwise need a `profile.stop.selector` (set by calibration, not yet learnt).
+- Turn keys come from an id-like attribute when present, else none; virtualised lists on sites without one are untested.
+- No `scanError` / limit detection, no continue handling, no images (all deliberately dropped).
+- Calibration works only on a conversation that already has a message and a reply; a brand-new chat has to be started first.
+- Site-specific CSS from the old adapters is still in `overlay.css` and still applies by accident on some sites.
+
+**Verdict: go.** The profile-from-clicks approach reproduces the parts of the adapter contract that the old contract
+tests covered, on all three pages, with no site-specific code. The remaining risk is live pages, which only phase 2 (a real
+picker) can test. Next: phase 2.
