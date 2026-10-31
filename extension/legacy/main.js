@@ -2185,57 +2185,7 @@
 
     // Masks the input box while the extension types/sends, so the copied text
     // and the submit aren't visible to the user.
-    // Returns a FULLY OPAQUE colour that matches what is VISUALLY behind the cover.
-    // The cover must hide the typed text, so it can't be translucent - but simply
-    // returning the first solid ancestor is wrong when the composer surface itself
-    // is translucent: Meta's card is rgba(56,56,56,0.8) over a dark page, so its
-    // real on-screen colour is a BLEND (~rgb(50,50,50)), lighter than the bare page
-    // (rgb(24,24,25)). Filling the cover with the page colour made it visibly
-    // darker than the composer. So collect the background layers from `el` up to
-    // the first opaque ancestor and FLATTEN them (alpha compositing) into one solid
-    // colour that reproduces the composer's actual appearance.
-    function opaqueBg(el) {
-      const layers = [];
-      let n = el;
-      while (n && n !== document.documentElement) {
-        const c = parseColor(getComputedStyle(n).backgroundColor);
-        if (c && c.a > 0) {
-          layers.push(c);
-          if (c.a >= 0.999) break; // opaque base reached - nothing behind matters
-        }
-        n = n.parentElement;
-      }
-      // Guarantee an opaque base at the bottom of the stack.
-      if (!layers.length || layers[layers.length - 1].a < 0.999) {
-        const base = parseColor(getComputedStyle(document.body).backgroundColor) ||
-                     { r: 255, g: 255, b: 255, a: 1 };
-        layers.push({ r: base.r, g: base.g, b: base.b, a: 1 });
-      }
-      // We collected top-most (el) first, so composite from the opaque base (last)
-      // upward toward el (first).
-      let out = layers[layers.length - 1];
-      for (let i = layers.length - 2; i >= 0; i--) out = blendOver(layers[i], out);
-      return `rgb(${Math.round(out.r)}, ${Math.round(out.g)}, ${Math.round(out.b)})`;
-    }
-    // Parse an rgb()/rgba() computed colour into {r,g,b,a}. Returns null for
-    // "transparent"/unparseable. getComputedStyle always yields rgb/rgba form.
-    function parseColor(c) {
-      if (!c || c === "transparent") return null;
-      const m = c.match(/rgba?\(([^)]+)\)/i);
-      if (!m) return null;
-      const p = m[1].split(",").map((x) => parseFloat(x));
-      return { r: p[0], g: p[1], b: p[2], a: p.length >= 4 ? p[3] : 1 };
-    }
-    // Source-over compositing of a (possibly translucent) fg onto an opaque bg.
-    function blendOver(fg, bg) {
-      const a = fg.a;
-      return {
-        r: fg.r * a + bg.r * (1 - a),
-        g: fg.g * a + bg.g * (1 - a),
-        b: fg.b * a + bg.b * (1 - a),
-        a: 1,
-      };
-    }
+    // The cover's fill colour is computed by ui/cover-color.js (ZSUi.opaqueBg).
 
     function inputCover(on) {
       const ed = P.getEditor();
@@ -2379,7 +2329,7 @@
         cover.style.height = h + "px";
         // Composite the surface BEHIND the cover target so the fill matches what
         // the user sees (a translucent composer card blends over the page).
-        cover.style.background = opaqueBg(covNode);
+        cover.style.background = ZSUi.opaqueBg(document, covNode);
         // When the cover blankets a whole composer card (coverTarget), match its
         // corner radius so the cover's square corners don't poke past the card's
         // rounded ones. Editor-sized covers keep the CSS default.

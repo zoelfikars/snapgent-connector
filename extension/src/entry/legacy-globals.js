@@ -22,7 +22,8 @@ import { openMcpSettings } from "../ui/mcp-settings.js";
 import { openSkillsSettings } from "../ui/skills-settings.js";
 import { paintChip } from "../ui/chip-view.js";
 import { applyTheme } from "../ui/page-theme.js";
+import { opaqueBg } from "../ui/cover-color.js";
 import * as chat from "../infrastructure/chat/index.js";
 globalThis.ZSChat = chat;
 
-globalThis.ZSUi = { computeBarView, createConfirmDialog, createNotifications, openMcpSettings, openSkillsSettings, paintChip, applyTheme };
+globalThis.ZSUi = { computeBarView, createConfirmDialog, createNotifications, openMcpSettings, openSkillsSettings, paintChip, applyTheme, opaqueBg };
