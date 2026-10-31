@@ -1356,9 +1356,7 @@
       const options = serverDirectory.targetOptions(id);
       const optionsKey = options.map((option) => `${option.id}:${option.name}`).join("|");
       if (targetSelect.dataset.optionsKey !== optionsKey) {
-          targetSelect.innerHTML = options
-            .map((option) => `<option value="${option.id.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">${option.name.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]))}</option>`)
-            .join("");
+        targetSelect.innerHTML = ZSUi.targetOptionsHtml(options);
         targetSelect.dataset.optionsKey = optionsKey;
       }
       targetSelect.value = id;
@@ -1370,19 +1368,13 @@
 
     function renderTargetMenu() {
       if (!targetMenuEl || !targetSelect) return;
-      const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
       // Skip the rewrite when nothing changed: periodic status updates call
       // setTarget() -> renderTargetMenu() and would otherwise destroy the buttons
       // between mouse-down and mouse-up, so the click never fires.
       const menuKey = selectedTargetId + "|" + [...targetSelect.options].map((o) => `${o.value}:${o.textContent}`).join("|");
       if (targetMenuEl.dataset.menuKey === menuKey && targetMenuEl.childElementCount) return;
       targetMenuEl.dataset.menuKey = menuKey;
-      const rows = [...targetSelect.options].map((o) => {
-        const cur = o.value === selectedTargetId;
-        return `<button type="button" class="zs-site-opt zs-target-opt${cur ? " zs-target-cur" : ""}" data-id="${esc(o.value)}"><span class="zs-site-name"><span>${esc(o.textContent)}</span></span>${cur ? `<span class="zs-site-badge">active</span>` : ""}</button>`;
-      }).join("");
-      targetMenuEl.innerHTML =
-        `<section class="zs-menu-sec"><div class="zs-sec-label"><span>MCP target</span></div>${rows}</section>`;
+      targetMenuEl.innerHTML = ZSUi.targetMenuHtml([...targetSelect.options].map((o) => ({ id: o.value, name: o.textContent })), selectedTargetId);
       targetMenuEl.querySelectorAll(".zs-target-opt").forEach((b) =>
         b.addEventListener("click", () => {
           targetMenuEl.hidden = true;
@@ -1440,22 +1432,7 @@
     }
 
     function buildMenu() {
-      const here = (P.displayName || "").toLowerCase();
-      const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
-      let sites = "";
-      for (const s of AI_SITES) {
-        const current = s.name.toLowerCase() === here;
-        const label = `<span class="zs-site-name"><span>${s.name}</span><span class="zs-site-host">${hostOf(s.url)}</span></span>`;
-        sites += current
-          ? `<div class="zs-site-opt zs-site-here">${label}<span class="zs-site-badge">active</span></div>`
-          : `<button class="zs-site-opt" data-u="${s.url}">${label}<span class="zs-site-go">&rarr;</span></button>`;
-      }
-      menuEl.innerHTML =
-        `<div class="zs-menu-head"><span class="zs-menu-logo">snapgentV3</span></div>
-         <section class="zs-menu-sec">
-           <div class="zs-sec-label zs-sec-label-row"><span>Switch AI</span><span><button id="zs-skills-settings" class="zs-gear" title="Skills" aria-label="Skills">&#9733;</button><button id="zs-mcp-settings" class="zs-gear" title="MCP settings" aria-label="MCP settings">&#9881;</button></span></div>
-           <div class="zs-site-grid">${sites}</div>
-         </section>`;
+      menuEl.innerHTML = ZSUi.switchMenuHtml(AI_SITES, P.displayName);
       const open = (url) => { try { window.open(url, "_blank", "noopener"); } catch {} menuEl.hidden = true; };
       menuEl.querySelectorAll("button.zs-site-opt, .zs-tip-opt").forEach((b) =>
         b.addEventListener("click", () => open(b.dataset.u)));

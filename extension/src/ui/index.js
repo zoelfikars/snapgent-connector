@@ -14,3 +14,4 @@ export { computeCoverRect, measureClippingAncestors, boxOf } from "./cover-geome
 export { anchoredGeometry, chooseBarMode, floatingGeometry, pillPosition } from "./bar-placement.js";
 export { describeResultTurn, describeSystemTurn } from "./turn-chips.js";
 export { commandPhase, haltState, holdsRegenerateLook, shouldReown } from "./command-phase.js";
+export { switchMenuHtml, targetMenuHtml, targetOptionsHtml } from "./menu-html.js";
