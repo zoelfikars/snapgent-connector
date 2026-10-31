@@ -14,6 +14,8 @@
 // walks. No jsdom, no npm install: the repo has no dependencies and this test
 // keeps it that way.
 const fs = require("fs");
+globalThis.ZSChat = require("../src/infrastructure/chat/index.js");
+globalThis.ZSParse = require("../src/domain/parser/index.js");
 const ZSParse = require("../src/domain/parser/index.js");
 
 // ── Stub DOM ────────────────────────────────────────────────────────────────

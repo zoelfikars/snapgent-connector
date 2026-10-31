@@ -9,3 +9,7 @@ const { parser, ...prompt } = domain;
 globalThis.ZSParse = parser;
 globalThis.ZS = prompt;
 globalThis.ZSDomain = { formatCatalogue, argSummary, outSummary, feedbackIsError, stripOutputPrefix };
+
+// Shared chat-adapter primitives (see infrastructure/chat/). Adapters load after this script.
+import * as chat from "../infrastructure/chat/index.js";
+globalThis.ZSChat = chat;

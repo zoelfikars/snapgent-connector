@@ -417,17 +417,13 @@ const ZSProvider = (() => {
   }
   const streamLen = (item) => streamText(item === undefined ? lastAssistant() : item).length;
 
-  let _streamMax = -1, _streamAt = 0, _streamItem = null;
+  // Reply-growth tracking (shared implementation: infrastructure/chat/stream-sampler.js).
+  const streamSampler = new ZSChat.StreamSampler({ minLen: 2 });
   function sampleStream() {
     const item = lastAssistant();
-    const len = streamText(item).length;
-    const now = Date.now();
-    if (item !== _streamItem || len < _streamMax - 400) {
-      _streamItem = item; _streamMax = len; _streamAt = now; return;
-    }
-    if (len > _streamMax) { _streamMax = len; _streamAt = now; }
+    streamSampler.sample(item, streamText(item).length);
   }
-  const grewWithin = (ms) => _streamMax > 1 && Date.now() - _streamAt < ms;
+  const grewWithin = (ms) => streamSampler.grewWithin(ms);
 
   function genActive() {
     sampleStream();
@@ -465,14 +461,7 @@ const ZSProvider = (() => {
     return { present: true, reply: b ? textWithout(b, ".zs-chip").trim() : "", thinking: "", item };
   }
 
-  async function waitFor(pred, timeout) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeout) {
-      if (pred()) return true;
-      await sleep(120);
-    }
-    return false;
-  }
+  const { waitFor } = ZSChat;
 
   // ── Image attachment (validated live 2026-07-13) ────────────────────────────
   // Meta's composer holds ONE hidden multi-file input[type=file] (accepts image
@@ -484,14 +473,7 @@ const ZSProvider = (() => {
   // present. NOTE: the end-to-end send-with-image path is wired from the DOM
   // contract but not yet exercised live (the test account's message quota was
   // exhausted) - verify with a real screen_capture round-trip.
-  function fileFromImage(img, i) {
-    const mime = img.mimeType || "image/jpeg";
-    const bin = atob(img.data);
-    const arr = new Uint8Array(bin.length);
-    for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
-    const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : mime.includes("gif") ? "gif" : "jpg";
-    return new File([arr], `snapgentV3_${Date.now()}_${i}.${ext}`, { type: mime });
-  }
+  const { fileFromImage } = ZSChat;
   const fileInputEl = () => {
     for (const inp of document.querySelectorAll('input[type="file"]')) {
       if (!inp.closest("#zs-root")) return inp;
@@ -540,14 +522,7 @@ const ZSProvider = (() => {
   }
 
   // ── Sending ─────────────────────────────────────────────────────────────────
-  function setTextareaValue(el, v) {
-    const ctor = el.tagName === "INPUT" ? window.HTMLInputElement : window.HTMLTextAreaElement;
-    const proto = ctor && ctor.prototype;
-    const setter = proto && Object.getOwnPropertyDescriptor(proto, "value");
-    if (setter && setter.set) setter.set.call(el, v);
-    else el.value = v;
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  }
+  const { setNativeValue: setTextareaValue } = ZSChat;
 
   async function typeAndSend(text, images) {
     // Images FIRST: staging swaps in the inline image; the mirror textarea still
@@ -736,7 +711,7 @@ const ZSProvider = (() => {
   // subtree on stream settle and on the next send, so also mark the assistant body
   // (its identity survives) with .zs-cmd-mask; the overlay.css rule keeps recreated
   // code wrappers hidden.
-  const CMD_SHAPE = /"(?:command|tool)"\s*:\s*"|###mcp_tool###/i;
+  const CMD_SHAPE = ZSParse.COMMAND_SHAPE_RE;
   function findToolBlockSpot(item /*, chip */) {
     const b = bodyOf(item);
     if (!b) return null;

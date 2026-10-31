@@ -488,17 +488,13 @@ const ZSProvider = (() => {
   const streamLen = (item) =>
     streamText(item === undefined ? lastAssistant() : item).length;
 
-  let _streamMax = -1, _streamAt = 0, _streamItem = null;
+  // Reply-growth tracking (shared implementation: infrastructure/chat/stream-sampler.js).
+  const streamSampler = new ZSChat.StreamSampler({ minLen: 2 });
   function sampleStream() {
     const item = lastAssistant();
-    const len = streamText(item).length;
-    const now = Date.now();
-    if (item !== _streamItem || len < _streamMax - 400) {
-      _streamItem = item; _streamMax = len; _streamAt = now; return;
-    }
-    if (len > _streamMax) { _streamMax = len; _streamAt = now; }
+    streamSampler.sample(item, streamText(item).length);
   }
-  const grewWithin = (ms) => _streamMax > 1 && Date.now() - _streamAt < ms;
+  const grewWithin = (ms) => streamSampler.grewWithin(ms);
 
   // Core hook: is the LATEST turn's text still an unsettled read? Only the A/B
   // "dual" turn is at risk - the network tap flips `done` when the SSE ends, but
@@ -603,14 +599,7 @@ const ZSProvider = (() => {
     };
   }
 
-  async function waitFor(pred, timeout) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeout) {
-      if (pred()) return true;
-      await sleep(120);
-    }
-    return false;
-  }
+  const { waitFor } = ZSChat;
 
   // ── Sending ───────────────────────────────────────────────────────────────
   // Native textarea setter drives React's synthetic event system. After setting
@@ -675,8 +664,7 @@ const ZSProvider = (() => {
   }
 
   function stopGeneration() {
-    const b = stopButton();
-    if (b) try { b.click(); } catch {}
+    ZSChat.clickIfPresent(stopButton);
   }
 
   function enforceComposer() { return { ready: !!getEditor() }; }
@@ -702,14 +690,7 @@ const ZSProvider = (() => {
   const isBusyMsg = (text) => RE.busy.test(text);
 
   // ── Image attachment ──────────────────────────────────────────────────────
-  function fileFromImage(img, i) {
-    const mime = img.mimeType || "image/jpeg";
-    const bin = atob(img.data);
-    const arr = new Uint8Array(bin.length);
-    for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
-    const ext = mime.includes("png") ? "png" : "jpg";
-    return new File([arr], `snapgentV3_${Date.now()}_${i}.${ext}`, { type: mime });
-  }
+  const { fileFromImage } = ZSChat;
   // The PENDING upload's preview: Qwen mounts each staged image as
   // `img.vision-item-image` in the composer's `.file-card-list`. A SENT image
   // reuses the SAME class inside its `.qwen-chat-message-user` turn, so exclude
@@ -803,7 +784,7 @@ const ZSProvider = (() => {
   // markdown subtree on stream updates, so mark the assistant turn with
   // .zs-cmd-mask and let the CSS rule (overlay.css) re-hide recreated pre
   // elements with no flash.
-  const CMD_SHAPE = /"(?:command|tool)"\s*:\s*"|###mcp_tool###/i;
+  const CMD_SHAPE = ZSParse.COMMAND_SHAPE_RE;
   function findToolBlockSpot(item) {
     const bd = bodyEl(item);
     if (!bd) return null;

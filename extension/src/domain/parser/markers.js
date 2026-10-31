@@ -32,3 +32,7 @@ export const CMD_KEY_RE = /"(?:command|tool)"\s*:\s*"/;
 // `<|DSML|>tool_calls>` with no invoke and no name at all, and the marker
 // itself never occurs in ordinary prose.
 export const DSML_RE = /<[\s\/]*[|｜][\s|｜]*DSML[\s|｜]*[|｜]/i;
+
+// Cheap "does this text look like it contains a command?" test used by the chat
+// adapters to decide whether to mask a reply behind a chip.
+export const COMMAND_SHAPE_RE = /"(?:command|tool)"\s*:\s*"|###mcp_tool###/i;

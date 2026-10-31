@@ -91,21 +91,11 @@ const ZSProvider = (() => {
   }
   const streamText = (item) => textWithout(bodyOf(item));
   const streamLen = (item) => streamText(item === undefined ? lastAssistant() : item).length;
-  let sampledItem = null;
-  let sampledLen = 0;
-  let grewAt = 0;
+  // Reply-growth tracking (shared implementation: infrastructure/chat/stream-sampler.js).
+  const streamSampler = new ZSChat.StreamSampler({ minLen: 1 });
   function sampleStream() {
     const item = lastAssistant();
-    const length = streamLen(item);
-    const now = Date.now();
-    if (item !== sampledItem || length < sampledLen - 400) {
-      sampledItem = item;
-      sampledLen = length;
-      grewAt = now;
-    } else if (length > sampledLen) {
-      sampledLen = length;
-      grewAt = now;
-    }
+    streamSampler.sample(item, streamLen(item));
   }
   const stopButton = () => {
     const button = document.querySelector(S.send);
@@ -118,7 +108,7 @@ const ZSProvider = (() => {
   const isHardGenerating = () => !!stopButton();
   const isGenerating = () => {
     sampleStream();
-    return isHardGenerating() || (sampledLen > 0 && Date.now() - grewAt < timings.GEN_IDLE_MS);
+    return isHardGenerating() || streamSampler.grewWithin(timings.GEN_IDLE_MS);
   };
   const isBusyNow = isGenerating;
 
@@ -137,14 +127,7 @@ const ZSProvider = (() => {
       item,
     };
   }
-  async function waitFor(predicate, timeout) {
-    const start = Date.now();
-    while (Date.now() - start < timeout) {
-      if (predicate()) return true;
-      await sleep(120);
-    }
-    return false;
-  }
+  const { waitFor } = ZSChat;
 
   function setInputLock(on) {
     const editor = on ? getEditor() : (lockedEditor || getEditor());
@@ -185,8 +168,7 @@ const ZSProvider = (() => {
     5000);
   }
   function stopGeneration() {
-    const button = stopButton();
-    if (button) button.click();
+    ZSChat.clickIfPresent(stopButton);
   }
   const enforceComposer = () => ({ ready: !!getEditor() });
   async function ensureComposerReady(reason) {

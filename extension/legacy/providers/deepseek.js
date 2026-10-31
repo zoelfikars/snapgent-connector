@@ -473,20 +473,14 @@ const ZSProvider = (() => {
   // current turn has reached and WHEN it last advanced; DOM flicker of a few
   // chars never counts - only a new maximum (see content history for the full
   // war story: counting churn as growth froze the loop).
-  let _streamMax = -1, _streamAt = 0, _streamItem = null;
+  // Reply-growth tracking (shared implementation: infrastructure/chat/stream-sampler.js).
+  const streamSampler = new ZSChat.StreamSampler({ minLen: 2 });
 
   function sampleStream() {
     const item = lastAssistant();
-    const len = streamText(item).length;
-    const now = Date.now();
-    // A new turn - a different node, or a big length drop (a virtualized node
-    // recycled into a fresh turn) - starts tracking afresh and counts as active.
-    if (item !== _streamItem || len < _streamMax - 400) {
-      _streamItem = item; _streamMax = len; _streamAt = now; return;
-    }
-    if (len > _streamMax) { _streamMax = len; _streamAt = now; } // forward progress only
+    streamSampler.sample(item, streamText(item).length);
   }
-  const grewWithin = (ms) => _streamMax > 1 && Date.now() - _streamAt < ms;
+  const grewWithin = (ms) => streamSampler.grewWithin(ms);
 
   // True iff `item` is an assistant turn that has begun REASONING but produced no
   // answer yet and has NOT been halted.
@@ -565,8 +559,8 @@ const ZSProvider = (() => {
         stopBtn: isStopBtn(btn),
         btnGlyph: rp ? "rect" : (path ? (path.getAttribute("d") || "").slice(0, 6) : "none"),
         reasoning: reasoningInProgress(lastAssistant()),
-        streamMax: _streamMax,
-        streamAgeMs: _streamAt ? Date.now() - _streamAt : -1,
+        streamMax: streamSampler.max,
+        streamAgeMs: streamSampler.at ? Date.now() - streamSampler.at : -1,
         grewGen: grewWithin(timings.GEN_IDLE_MS),
         grewReason: grewWithin(timings.REASON_IDLE_MS),
         gen: isGenerating(),
@@ -615,26 +609,13 @@ const ZSProvider = (() => {
     };
   }
 
-  async function waitFor(pred, timeout) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeout) {
-      if (pred()) return true;
-      await sleep(120);
-    }
-    return false;
-  }
+  const { waitFor } = ZSChat;
 
   // ── Sending ───────────────────────────────────────────────────────────────
   // DeepSeek's composer is a <textarea> driven by React. We must set .value via
   // the native prototype setter so React's onChange fires, then dispatch an input
   // event, then click the primary send button (Enter inserts a newline).
-  function setTextareaValue(el, v) {
-    const proto = window.HTMLTextAreaElement && window.HTMLTextAreaElement.prototype;
-    const setter = proto && Object.getOwnPropertyDescriptor(proto, "value");
-    if (setter && setter.set) setter.set.call(el, v);
-    else el.value = v;
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  }
+  const { setNativeValue: setTextareaValue } = ZSChat;
 
   function pressEnter(editor) {
     const o = { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true };
@@ -741,14 +722,7 @@ const ZSProvider = (() => {
   const isBusyMsg = (text) => RE.busy.test(text);
 
   // ── Image attachment (Studio captures → composer) ────────────────────────
-  function fileFromImage(img, i) {
-    const mime = img.mimeType || "image/jpeg";
-    const bin = atob(img.data);
-    const arr = new Uint8Array(bin.length);
-    for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
-    const ext = mime.includes("png") ? "png" : "jpg";
-    return new File([arr], `snapgentV3_${Date.now()}_${i}.${ext}`, { type: mime });
-  }
+  const { fileFromImage } = ZSChat;
 
   // Staged composer attachments. DeepSeek's file-list uses fully HASHED classes
   // (validated live 2026-07-21: the old `.ds-file-list`/`[class*=thumbnail]`

@@ -249,17 +249,13 @@ const ZSProvider = (() => {
   }
   const streamLen = (item) => streamText(item === undefined ? lastAssistant() : item).length;
 
-  let _streamMax = -1, _streamAt = 0, _streamItem = null;
+  // Reply-growth tracking (shared implementation: infrastructure/chat/stream-sampler.js).
+  const streamSampler = new ZSChat.StreamSampler({ minLen: 2 });
   function sampleStream() {
     const item = lastAssistant();
-    const len = streamText(item).length;
-    const now = Date.now();
-    if (item !== _streamItem || len < _streamMax - 400) {
-      _streamItem = item; _streamMax = len; _streamAt = now; return;
-    }
-    if (len > _streamMax) { _streamMax = len; _streamAt = now; }
+    streamSampler.sample(item, streamText(item).length);
   }
-  const grewWithin = (ms) => _streamMax > 1 && Date.now() - _streamAt < ms;
+  const grewWithin = (ms) => streamSampler.grewWithin(ms);
 
   // GLM's stop button is present for the ENTIRE generation and reliably clears
   // when it ends (validated live), so we TRUST it directly. We must NOT gate it
@@ -308,26 +304,13 @@ const ZSProvider = (() => {
     };
   }
 
-  async function waitFor(pred, timeout) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeout) {
-      if (pred()) return true;
-      await sleep(120);
-    }
-    return false;
-  }
+  const { waitFor } = ZSChat;
 
   // ── Sending ─────────────────────────────────────────────────────────────────
   // Real <textarea> driven by Svelte: set .value via the native prototype setter
   // so the framework's input handler fires, dispatch an input event, then click
   // the send button ONCE it re-enables (a fresh value disables it for a frame).
-  function setTextareaValue(el, v) {
-    const proto = window.HTMLTextAreaElement && window.HTMLTextAreaElement.prototype;
-    const setter = proto && Object.getOwnPropertyDescriptor(proto, "value");
-    if (setter && setter.set) setter.set.call(el, v);
-    else el.value = v;
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  }
+  const { setNativeValue: setTextareaValue } = ZSChat;
 
   function clickSendButton() {
     if (isBusyNow()) return false;
@@ -376,8 +359,7 @@ const ZSProvider = (() => {
   }
 
   function stopGeneration() {
-    const b = stopButton();
-    if (b) try { b.click(); } catch {}
+    ZSChat.clickIfPresent(stopButton);
   }
 
   // No site modes to enforce (model / reasoning toggle left to the user).
@@ -404,14 +386,7 @@ const ZSProvider = (() => {
   const isBusyMsg = (text) => RE.busy.test(text);
 
   // ── Image attachment (best effort) ────────────────────────────────────────
-  function fileFromImage(img, i) {
-    const mime = img.mimeType || "image/jpeg";
-    const bin = atob(img.data);
-    const arr = new Uint8Array(bin.length);
-    for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
-    const ext = mime.includes("png") ? "png" : "jpg";
-    return new File([arr], `snapgentV3_${Date.now()}_${i}.${ext}`, { type: mime });
-  }
+  const { fileFromImage } = ZSChat;
   // The PENDING attachment chip. z.ai mounts each staged upload as a
   // `.chip-scroll > button` inside the composer card (barAnchor). A SENT image
   // renders separately in its `.user-message` turn, so scoping the probe to the
@@ -523,7 +498,7 @@ const ZSProvider = (() => {
   // command shape AND mark the reply root (`.chat-assistant`, which keeps its
   // identity) with .zs-cmd-mask so a CSS rule re-hides recreated wrappers with
   // zero flash. Also catch a stray bare inline command paragraph.
-  const CMD_SHAPE = /"(?:command|tool)"\s*:\s*"|###\s*lua|###mcp_tool###/i;
+  const CMD_SHAPE = ZSParse.COMMAND_SHAPE_RE;
   function findToolBlockSpot(item /*, chip */) {
     if (!item) return null;
     let hidAny = null;

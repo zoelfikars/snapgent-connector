@@ -204,17 +204,13 @@ const ZSProvider = (() => {
   }
   const streamLen = (item) => streamText(item === undefined ? lastAssistant() : item).length;
 
-  let _streamMax = -1, _streamAt = 0, _streamItem = null;
+  // Reply-growth tracking (shared implementation: infrastructure/chat/stream-sampler.js).
+  const streamSampler = new ZSChat.StreamSampler({ minLen: 2 });
   function sampleStream() {
     const item = lastAssistant();
-    const len = streamText(item).length;
-    const now = Date.now();
-    if (item !== _streamItem || len < _streamMax - 400) {
-      _streamItem = item; _streamMax = len; _streamAt = now; return;
-    }
-    if (len > _streamMax) { _streamMax = len; _streamAt = now; }
+    streamSampler.sample(item, streamText(item).length);
   }
-  const grewWithin = (ms) => _streamMax > 1 && Date.now() - _streamAt < ms;
+  const grewWithin = (ms) => streamSampler.grewWithin(ms);
 
   // CRITICAL Gemini quirk (validated live): the stop button can WEDGE in the ON
   // state after a generation finishes - the icon stays "stop" with the text
@@ -231,7 +227,7 @@ const ZSProvider = (() => {
     const now = Date.now();
     if (stop) {
       if (!_stopSince) _stopSince = now;
-      return (now - _streamAt < WEDGE_MS) || (now - _stopSince < 2000);
+      return (now - streamSampler.at < WEDGE_MS) || (now - _stopSince < 2000);
     }
     _stopSince = 0;
     return grewWithin(timings.GEN_IDLE_MS);
@@ -310,14 +306,7 @@ const ZSProvider = (() => {
     };
   }
 
-  async function waitFor(pred, timeout) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeout) {
-      if (pred()) return true;
-      await sleep(120);
-    }
-    return false;
-  }
+  const { waitFor } = ZSChat;
 
   // ── Sending ───────────────────────────────────────────────────────────────
   // Gemini's composer is a Quill editor wrapped by an Angular ControlValueAccessor.
@@ -462,8 +451,7 @@ const ZSProvider = (() => {
   }
 
   function stopGeneration() {
-    const b = stopButton();
-    if (b) try { b.click(); } catch {}
+    ZSChat.clickIfPresent(stopButton);
   }
 
   // No site modes to enforce on Gemini (model picker is left to the user).
@@ -490,14 +478,7 @@ const ZSProvider = (() => {
   const isBusyMsg = (text) => RE.busy.test(text);
 
   // ── Image attachment (best effort: paste onto the composer) ──────────────
-  function fileFromImage(img, i) {
-    const mime = img.mimeType || "image/jpeg";
-    const bin = atob(img.data);
-    const arr = new Uint8Array(bin.length);
-    for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
-    const ext = mime.includes("png") ? "png" : "jpg";
-    return new File([arr], `snapgentV3_${Date.now()}_${i}.${ext}`, { type: mime });
-  }
+  const { fileFromImage } = ZSChat;
   async function attachImages(images) {
     const ed = getEditor();
     if (!ed) { diag("attach.noEditor"); return false; }
@@ -620,7 +601,7 @@ const ZSProvider = (() => {
   // a code-block, so hiding the wrapper then fails. The core anchors the chip at
   // the turn level (chipAtItemLevel), so the returned position is unused; this
   // function's real job is applying the .zs-tool-hide classes correctly.
-  const CMD_SHAPE = /"(?:command|tool)"\s*:\s*"|###mcp_tool###/i;
+  const CMD_SHAPE = ZSParse.COMMAND_SHAPE_RE;
   function findToolBlockSpot(item /*, chip */) {
     const replies = [...item.querySelectorAll(S.reply)].filter((m) => !m.closest(S.thinking));
     let hidAny = null;

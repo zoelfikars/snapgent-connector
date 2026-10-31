@@ -1,6 +1,8 @@
 // Quick Node regression test for providers/meta.js (run: node --test test/).
 // Not shipped.
 const fs = require("fs");
+globalThis.ZSChat = require("../src/infrastructure/chat/index.js");
+globalThis.ZSParse = require("../src/domain/parser/index.js");
 const assert = require("assert");
 
 class StubTextArea {}

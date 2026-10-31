@@ -335,17 +335,13 @@ const ZSProvider = (() => {
   const streamLen = (item) =>
     streamText(item === undefined ? lastAssistant() : item).length;
 
-  let _streamMax = -1, _streamAt = 0, _streamItem = null;
+  // Reply-growth tracking (shared implementation: infrastructure/chat/stream-sampler.js).
+  const streamSampler = new ZSChat.StreamSampler({ minLen: 2 });
   function sampleStream() {
     const item = lastAssistant();
-    const len = streamText(item).length;
-    const now = Date.now();
-    if (item !== _streamItem || len < _streamMax - 400) {
-      _streamItem = item; _streamMax = len; _streamAt = now; return;
-    }
-    if (len > _streamMax) { _streamMax = len; _streamAt = now; }
+    streamSampler.sample(item, streamText(item).length);
   }
-  const grewWithin = (ms) => _streamMax > 1 && Date.now() - _streamAt < ms;
+  const grewWithin = (ms) => streamSampler.grewWithin(ms);
 
   // The stop class is present for the ENTIRE generation and clears when it ends
   // (validated live), so we trust it; the growth check only covers the brief
@@ -389,14 +385,7 @@ const ZSProvider = (() => {
     };
   }
 
-  async function waitFor(pred, timeout) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeout) {
-      if (pred()) return true;
-      await sleep(120);
-    }
-    return false;
-  }
+  const { waitFor } = ZSChat;
 
   // ── Sending ───────────────────────────────────────────────────────────────
   // Lexical contenteditable: select-all then a single execCommand("insertText")
@@ -441,8 +430,7 @@ const ZSProvider = (() => {
   }
 
   function stopGeneration() {
-    const b = stopButton();
-    if (b) try { b.click(); } catch {}
+    ZSChat.clickIfPresent(stopButton);
   }
 
   // Kimi's own agentic mode (see S.currentModelName above) makes the model favor
@@ -582,14 +570,7 @@ const ZSProvider = (() => {
   const isBusyMsg = (text) => RE.busy.test(text);
 
   // ── Image attachment (best effort: paste onto the composer) ──────────────
-  function fileFromImage(img, i) {
-    const mime = img.mimeType || "image/jpeg";
-    const bin = atob(img.data);
-    const arr = new Uint8Array(bin.length);
-    for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
-    const ext = mime.includes("png") ? "png" : "jpg";
-    return new File([arr], `snapgentV3_${Date.now()}_${i}.${ext}`, { type: mime });
-  }
+  const { fileFromImage } = ZSChat;
   // The PENDING upload's thumbnail (`.image-thumbnail`, in the composer's
   // `.carousel-scroll`). Kimi ALSO keeps every SENT image's `.image-thumbnail`
   // in the conversation history (inside a `.segment-user` turn), so a plain
@@ -711,7 +692,7 @@ const ZSProvider = (() => {
   // a command shape AND mark the assistant turn (.segment-assistant, which keeps
   // its identity) with .zs-cmd-mask so the overlay.css rule re-hides recreated
   // wrappers with zero flash. Also catch a stray bare inline command paragraph.
-  const CMD_SHAPE = /"(?:command|tool)"\s*:\s*"|###mcp_tool###/i;
+  const CMD_SHAPE = ZSParse.COMMAND_SHAPE_RE;
   // A block whose text STARTS with a command (optionally behind a ```json fence).
   // Used to hide a command Kimi rendered as a nested <div class="paragraph"> at
   // ANY length - the length-capped direct-children pass misses those on two

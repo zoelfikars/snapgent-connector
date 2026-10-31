@@ -327,17 +327,13 @@ const ZSProvider = (() => {
   }
   const streamLen = (item) => streamText(item === undefined ? lastAssistant() : item).length;
 
-  let _streamMax = -1, _streamAt = 0, _streamItem = null;
+  // Reply-growth tracking (shared implementation: infrastructure/chat/stream-sampler.js).
+  const streamSampler = new ZSChat.StreamSampler({ minLen: 2 });
   function sampleStream() {
     const item = lastAssistant();
-    const len = streamText(item).length;
-    const now = Date.now();
-    if (item !== _streamItem || len < _streamMax - 400) {
-      _streamItem = item; _streamMax = len; _streamAt = now; return;
-    }
-    if (len > _streamMax) { _streamMax = len; _streamAt = now; }
+    streamSampler.sample(item, streamText(item).length);
   }
-  const grewWithin = (ms) => _streamMax > 1 && Date.now() - _streamAt < ms;
+  const grewWithin = (ms) => streamSampler.grewWithin(ms);
 
   const WEDGE_MS = 10000;
   let _stopSince = 0;
@@ -347,7 +343,7 @@ const ZSProvider = (() => {
     const now = Date.now();
     if (stop) {
       if (!_stopSince) _stopSince = now;
-      return (now - _streamAt < WEDGE_MS) || (now - _stopSince < 2000);
+      return (now - streamSampler.at < WEDGE_MS) || (now - _stopSince < 2000);
     }
     _stopSince = 0;
     return grewWithin(timings.GEN_IDLE_MS);
@@ -383,14 +379,7 @@ const ZSProvider = (() => {
     };
   }
 
-  async function waitFor(pred, timeout) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeout) {
-      if (pred()) return true;
-      await sleep(120);
-    }
-    return false;
-  }
+  const { waitFor } = ZSChat;
 
   // ── Sending ───────────────────────────────────────────────────────────────
   // Arena's composer hard-caps the message at 120000 chars: past that the submit
@@ -417,13 +406,7 @@ const ZSProvider = (() => {
   // React-controlled <textarea>: set .value via the native prototype setter so
   // React's onChange fires, dispatch an input event, wait for the submit button
   // to re-enable, then click it (Enter would insert a newline).
-  function setTextareaValue(el, v) {
-    const proto = window.HTMLTextAreaElement && window.HTMLTextAreaElement.prototype;
-    const setter = proto && Object.getOwnPropertyDescriptor(proto, "value");
-    if (setter && setter.set) setter.set.call(el, v);
-    else el.value = v;
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  }
+  const { setNativeValue: setTextareaValue } = ZSChat;
 
   async function typeAndSend(text, images) {
     const editor = getEditor();
@@ -711,14 +694,7 @@ const ZSProvider = (() => {
   // blob: preview and only uploads the bytes when the message is SENT (a live
   // network trace showed no request on file-select, and the sent turn then
   // carries an https image). So "attach done" = the preview card has mounted.
-  function fileFromImage(img, i) {
-    const mime = img.mimeType || "image/jpeg";
-    const bin = atob(img.data);
-    const arr = new Uint8Array(bin.length);
-    for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
-    const ext = mime.includes("png") ? "png" : mime.includes("webp") ? "webp" : "jpg";
-    return new File([arr], `snapgentV3_${Date.now()}_${i}.${ext}`, { type: mime });
-  }
+  const { fileFromImage } = ZSChat;
   // The PENDING preview: each staged image mounts as
   // `.flex.flex-wrap.gap-2 > div.group > img` (alt = filename, blob: src) INSIDE
   // the composer <form>. A SENT image renders inside the chat <ol> turn instead
@@ -825,7 +801,7 @@ const ZSProvider = (() => {
   // on the next send (wiping per-element .zs-tool-hide), so also mark the turn
   // (its identity survives - the chip is anchored at item level) with
   // .zs-cmd-mask; the overlay.css rule keeps recreated code wrappers hidden.
-  const CMD_SHAPE = /"(?:command|tool)"\s*:\s*"|###\s*lua|###mcp_tool###/i;
+  const CMD_SHAPE = ZSParse.COMMAND_SHAPE_RE;
   function findToolBlockSpot(item /*, chip */) {
     const md = proseOf(item);
     if (!md) return null;

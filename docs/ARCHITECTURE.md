@@ -50,6 +50,7 @@ extension/
       prompt/                system-prompt · feedback · reminder
       tools/                 category · catalogue · result-summary
       constants.js
+    infrastructure/chat/     waitFor · StreamSampler · dom-helpers (shared by adapters)
     entry/                   background.js · popup.js · legacy-globals.js
   legacy/                    not yet migrated (see Status): main.js, providers/*
   manifests/base.json        shared manifest; per-browser deltas live in build/manifest.mjs
@@ -97,17 +98,22 @@ shippable.
 | Manifest, host lists, per-browser build | **Migrated** (`sites/`, `build/`) |
 | Bridge origin check | **Done** (`bridge.py`) |
 | `legacy/main.js` (~4.4k lines: loop + tool runner + session + chips + UI) | Next: split per the layer table |
-| `legacy/providers/*` (12 adapters, ~7.5k lines) | Next: shared `ChatAdapter` base |
+| `legacy/providers/*` (12 adapters, ~8.1k lines) | Shared primitives extracted; adapter family factory next |
 | `entry/background.js` | Bridge client + message router still in one file |
 
 ### Roadmap (each item is its own PR)
 
-1. **`infrastructure/chat/ChatAdapter` base.** Twelve adapters re-implement the
-   same ~12 functions (`typeAndSend`, `stopGeneration`, `waitFor`, `snapshot`,
-   `setInputLock`, `scanError`, `sampleStream`, `readAssistant`,
-   `installSendHooks`, `findToolBlockSpot`, `ensureComposerReady`, …) and seven
-   copy the `CMD_SHAPE` regex. The base class (template method) implements the
-   shared flow; each site supplies selectors and overrides only its quirks.
+1. **Shared chat-adapter primitives.** *(first part done)* Measuring the 12
+   adapters showed that most same-named functions (`typeAndSend`, `snapshot`,
+   `readAssistant`, `installSendHooks`, ...) are genuinely site-specific, so a
+   big base class would have hidden real differences. Only the code that was
+   truly identical moved to `infrastructure/chat/`: `waitFor`, `StreamSampler`
+   (reply-growth detection), `clickIfPresent`, `setNativeValue`, `fileFromImage`,
+   plus `COMMAND_SHAPE_RE` in the domain. ~250 duplicated lines are gone.
+   Still to do: the near-identical Claude/Grok/Mistral/Ptero family
+   (`getEditor`, `writeText`, `snapshot`, `readAssistant`) becomes a
+   `createGenericAdapter(selectors)` factory; the other eight keep their quirks
+   behind a documented adapter contract (`ChatPort`).
 2. **`application/`**: extract `ToolRunner` (isolation checks, `list_commands`,
    timeout/stop racing), `AgentLoop` (turn → parse → run → feed back) and
    `Session` (bootstrap, reminders, re-injection) from `main.js`, against the

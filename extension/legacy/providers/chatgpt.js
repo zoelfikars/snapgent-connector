@@ -398,17 +398,13 @@ const ZSProvider = (() => {
   }
   const streamLen = (item) => streamText(item === undefined ? lastAssistant() : item).length;
 
-  let _streamMax = -1, _streamAt = 0, _streamItem = null;
+  // Reply-growth tracking (shared implementation: infrastructure/chat/stream-sampler.js).
+  const streamSampler = new ZSChat.StreamSampler({ minLen: 2 });
   function sampleStream() {
     const item = lastAssistant();
-    const len = streamText(item).length;
-    const now = Date.now();
-    if (item !== _streamItem || len < _streamMax - 400) {
-      _streamItem = item; _streamMax = len; _streamAt = now; return;
-    }
-    if (len > _streamMax) { _streamMax = len; _streamAt = now; }
+    streamSampler.sample(item, streamText(item).length);
   }
-  const grewWithin = (ms) => _streamMax > 1 && Date.now() - _streamAt < ms;
+  const grewWithin = (ms) => streamSampler.grewWithin(ms);
 
   const WEDGE_MS = 10000;
   let _stopSince = 0;
@@ -420,7 +416,7 @@ const ZSProvider = (() => {
       if (!_stopSince) _stopSince = now;
       // Trust the stop button while the stream advances, or just after it
       // appeared (generation spinning up). Frozen past WEDGE_MS ⇒ treat as done.
-      return (now - _streamAt < WEDGE_MS) || (now - _stopSince < 2000);
+      return (now - streamSampler.at < WEDGE_MS) || (now - _stopSince < 2000);
     }
     _stopSince = 0;
     return grewWithin(timings.GEN_IDLE_MS);
@@ -495,14 +491,7 @@ const ZSProvider = (() => {
     };
   }
 
-  async function waitFor(pred, timeout) {
-    const t0 = Date.now();
-    while (Date.now() - t0 < timeout) {
-      if (pred()) return true;
-      await sleep(120);
-    }
-    return false;
-  }
+  const { waitFor } = ZSChat;
 
   // ── Sending ───────────────────────────────────────────────────────────────
   // ProseMirror listens to the browser's native editing pipeline, so
@@ -687,8 +676,7 @@ const ZSProvider = (() => {
   }
 
   function stopGeneration() {
-    const b = stopButton();
-    if (b) try { b.click(); } catch {}
+    ZSChat.clickIfPresent(stopButton);
   }
 
   // No site modes to enforce on ChatGPT (model picker is left to the user).
@@ -756,14 +744,7 @@ const ZSProvider = (() => {
   const isBusyMsg = (text) => RE.busy.test(text);
 
   // ── Image attachment (best effort: paste + hidden file input) ─────────────
-  function fileFromImage(img, i) {
-    const mime = img.mimeType || "image/jpeg";
-    const bin = atob(img.data);
-    const arr = new Uint8Array(bin.length);
-    for (let j = 0; j < bin.length; j++) arr[j] = bin.charCodeAt(j);
-    const ext = mime.includes("png") ? "png" : "jpg";
-    return new File([arr], `snapgentV3_${Date.now()}_${i}.${ext}`, { type: mime });
-  }
+  const { fileFromImage } = ZSChat;
   async function attachImages(images) {
     const ed = getEditor();
     if (!ed || !images || !images.length) return false;
@@ -891,7 +872,7 @@ const ZSProvider = (() => {
   // catches a stray inline one). React re-creates these nodes on every token, so
   // - like Gemini - we also mark the .markdown container with .zs-cmd-mask; the
   // overlay.css rule keeps every recreated <pre> hidden with no flash.
-  const CMD_SHAPE = /"(?:command|tool)"\s*:\s*"|###mcp_tool###/i;
+  const CMD_SHAPE = ZSParse.COMMAND_SHAPE_RE;
   // Marker pair, for the UNFENCED case below. Kept separate from CMD_SHAPE so the
   // opener test can't also match the closer.
   const CMD_OPEN = /###\s*MCP_TOOL\s*###/i;
