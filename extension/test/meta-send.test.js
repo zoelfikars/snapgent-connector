@@ -123,14 +123,25 @@ describe("Meta AI composer with the Lexical editor (captured 2026-10 structure)"
     const editor = document.querySelector("[data-lexical-editor]");
     const textarea = document.querySelector("textarea");
     const sent = [];
-    // Lexical applies a paste over the selection; the pre-hydration textarea does nothing for Meta.
-    editor.addEventListener("paste", (event) => { editor.textContent = event.clipboardData.getData("text/plain"); });
+    // Lexical learns the caret position from the asynchronous `selectionchange`: input that arrives right after focus()
+    // is ignored. It applies a paste over the selection; the pre-hydration textarea does nothing for Meta.
+    const lexical = { focusedAt: 0, acceptsPaste: true, acceptsInsert: true, accepts: () => Date.now() - lexical.focusedAt >= 100 };
+    const nativeFocus = editor.focus.bind(editor);
+    editor.focus = () => { lexical.focusedAt = Date.now(); nativeFocus(); };
+    editor.addEventListener("paste", (event) => {
+      if (lexical.acceptsPaste && lexical.accepts()) editor.textContent = event.clipboardData.getData("text/plain");
+    });
+    document.execCommand = (command, _ui, value) => {
+      if (command !== "insertText" || !lexical.acceptsInsert || !lexical.accepts()) return false;
+      editor.textContent = value;
+      return true;
+    };
     document.querySelector('[data-testid="composer-send-button"]').addEventListener("click", () => {
       if (!editor.textContent.trim()) return; // Meta reads Lexical, not the textarea
       sent.push(editor.textContent);
       editor.textContent = "";
     });
-    return { ...page, editor, textarea, sent };
+    return { ...page, editor, textarea, sent, lexical };
   }
 
   test("the text goes into the Lexical editor and is sent, not into the dead textarea", async () => {
@@ -159,12 +170,29 @@ describe("Meta AI composer with the Lexical editor (captured 2026-10 structure)"
     delete globalThis.window;
   });
 
-  test("an editor that ignores the paste is an error naming the cause, not a silent empty send", async () => {
+  test("a paste that arrives before Lexical has synced its selection is not lost: the adapter lets it settle first", async () => {
+    const page = lexicalPage(); // the fake ignores input within 100 ms of focus(), like the real editor
+    await page.provider.typeAndSend("⟦ZS-SYS⟧ right after focus", []);
+    assert.deepEqual(page.sent, ["⟦ZS-SYS⟧ right after focus"]);
+    page.window.close();
+    delete globalThis.window;
+  });
+
+  test("if the paste is ignored altogether, insertText is the second way in", async () => {
     const page = lexicalPage();
-    page.editor.addEventListener("paste", (event) => { event.stopImmediatePropagation(); }, true);
-    page.editor.textContent = "";
-    page.editor.replaceWith(page.editor.cloneNode(true)); // drop the listener the helper added
+    page.lexical.acceptsPaste = false;
+    await page.provider.typeAndSend("typed the other way", []);
+    assert.deepEqual(page.sent, ["typed the other way"]);
+    page.window.close();
+    delete globalThis.window;
+  });
+
+  test("an editor that takes nothing is an error naming the cause, not a silent empty send", async () => {
+    const page = lexicalPage();
+    page.lexical.acceptsPaste = false;
+    page.lexical.acceptsInsert = false;
     await assert.rejects(() => page.provider.typeAndSend("hello", []), /did not take the typed text/);
+    assert.deepEqual(page.sent, []);
     page.window.close();
     delete globalThis.window;
   });

@@ -551,20 +551,37 @@ const ZSProvider = (() => {
     }
     const want = text.trim().slice(0, 30);
     const landed = () => (lexical.textContent || "").includes(want);
-    lexical.focus();
-    selectContents(lexical);
-    const data = new DataTransfer();
-    data.setData("text/plain", text);
-    lexical.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
-    let ok = await waitFor(landed, 3000);
-    if (!ok) {
+    // Lexical learns where the selection is from the asynchronous `selectionchange` event, and ignores a paste or an insert
+    // while it still believes the caret is elsewhere. So focus, select, and give it a moment BEFORE every attempt.
+    const prepare = async () => {
       lexical.focus();
       selectContents(lexical);
-      try { document.execCommand("insertText", false, text); } catch {}
-      ok = await waitFor(landed, 3000);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    };
+    const attempts = [
+      ["paste", () => {
+        const data = new DataTransfer();
+        data.setData("text/plain", text);
+        lexical.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+      }],
+      ["insertText", () => { document.execCommand("insertText", false, text); }],
+      ["beforeinput", () => {
+        lexical.dispatchEvent(new InputEvent("beforeinput", { inputType: "insertText", data: text, bubbles: true, cancelable: true }));
+      }],
+    ];
+    let via = null;
+    for (const [name, attempt] of attempts) {
+      await prepare();
+      try { attempt(); } catch {}
+      if (await waitFor(landed, 2500)) { via = name; break; }
     }
-    diag("meta.tas.write", { via: "lexical", ok, len: (lexical.textContent || "").length });
-    if (!ok) throw new Error("Meta AI did not take the typed text. Click into the message box and try again.");
+    const selection = window.getSelection && window.getSelection();
+    diag("meta.tas.write", {
+      via, ok: !!via, len: (lexical.textContent || "").length,
+      activeIsEditor: document.activeElement === lexical,
+      selectionInside: !!(selection && selection.anchorNode && lexical.contains(selection.anchorNode)),
+    });
+    if (!via) throw new Error("Meta AI did not take the typed text. Click into the message box and try again.");
     return lexical;
   }
 
