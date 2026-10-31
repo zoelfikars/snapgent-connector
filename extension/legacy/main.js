@@ -489,7 +489,7 @@
     toolFinished: () => { A.toolRunning = false; },
     toolStopped(item, call, category) {
       // MARK the turn so the sweep classifier never repaints it done once generation ends.
-      if (item) { item.dataset.zStopped = "1"; rememberHalted(item); }
+      if (item) { item.dataset.zStopped = "1"; haltedTurns.remember(item); }
       decorate.toolBox(item, call.tool, "err", "stopped", true, "", category);
     },
     toolSettled(item, call, outcome) {
@@ -552,7 +552,7 @@
     visibility: visibilityPort,
     runner: toolRunner,
     tools: loopTools,
-    memory: { executed: (item) => rememberExecuted(item) },
+    memory: { executed: (item) => executedTurns.remember(item) },
     // A result becomes a turn, so it counts toward the system-prompt re-statement budget and may carry it.
     outbox: { prepare: (text) => { promptResender.bump("results"); return promptResender.attach(text); } },
     reminder: toolReminder,
@@ -579,7 +579,6 @@
   // remembered here, keyed independently of the DOM node (conversation +
   // position among assistant turns + a text prefix), and the sweep re-stamps
   // the marker whenever the node was swapped.
-  const halted = new Map(); // "conv|turnKey" → text prefix at halt time
   const assistantIdx = (item) => P.allItems().filter(P.isAssistantItem).indexOf(item);
   // Virtualization-stable map key for the off-DOM executed/halted memories.
   // assistantIdx is POSITIONAL within the currently-rendered window, so on a
@@ -595,36 +594,11 @@
     }
     return String(assistantIdx(item));
   };
-  function rememberHalted(item) {
-    try {
-      if (!item || assistantIdx(item) < 0) return;
-      const pref = (P.itemText(item) || "").slice(0, 60);
-      // A stop during the REASONING phase leaves the answer text EMPTY - an
-      // empty/short prefix would then startsWith-match ANY later turn at this
-      // index (seen live: a fresh streaming command went red "stopped" on the
-      // spot). Too little text to identify → rely on the dataset marker only.
-      if (pref.trim().length < 12) return;
-      halted.set(`${P.conversationKey()}|${turnKey(item)}`, pref);
-    } catch {}
-  }
-  function forgetHalted(item) {
-    if (!item || !halted.size) return;
-    try { halted.delete(`${P.conversationKey()}|${turnKey(item)}`); } catch {}
-  }
-  // The halt was recorded MID-stream, so the stored text is a PREFIX of the
-  // turn's final text - match on startsWith, never equality.
-  function isRememberedHalted(item, txt) {
-    if (!halted.size) return false;
-    try {
-      const pref = halted.get(`${P.conversationKey()}|${turnKey(item)}`);
-      return pref != null && (txt || "").startsWith(pref);
-    } catch { return false; }
-  }
   function markStoppedTurn() {
     const it = P.lastAssistant();
     if (!it) return;
     it.dataset.zStopped = "1";
-    rememberHalted(it);
+    haltedTurns.remember(it);
   }
 
   // Off-DOM record of assistant turns whose command has ALREADY been dispatched
@@ -638,26 +612,16 @@
   // the "already ran this" memory survives node recreation. This makes
   // re-execution IDEMPOTENT regardless of any isGenerating/lastGenAt heuristic
   // misfire - the hard part (is this a live turn?) can be wrong without harm.
-  const executed = new Map(); // "conv|turnKey" → text prefix at dispatch time
-  function rememberExecuted(item) {
-    if (!item) return;
-    try {
-      if (assistantIdx(item) < 0) return;
-      const pref = (P.itemText(item) || "").slice(0, 60);
-      // Same guard as rememberHalted: too little text to identify the turn (a
-      // command still streaming) would startsWith-match any later turn at this
-      // index. Fall back to the dataset marker until there is enough text.
-      if (pref.trim().length < 12) return;
-      executed.set(`${P.conversationKey()}|${turnKey(item)}`, pref);
-    } catch {}
-  }
-  function isRememberedExecuted(item, txt) {
-    if (!executed.size) return false;
-    try {
-      const pref = executed.get(`${P.conversationKey()}|${turnKey(item)}`);
-      return pref != null && (txt || "").startsWith(pref);
-    } catch { return false; }
-  }
+  const { TurnMemory } = ZSApp;
+  const turnMemoryPorts = {
+    conversationKey: () => P.conversationKey(),
+    keyOf: turnKey,
+    isRendered: (item) => assistantIdx(item) >= 0,
+    textOf: (item) => P.itemText(item),
+  };
+  const haltedTurns = new TurnMemory(turnMemoryPorts);
+  const executedTurns = new TurnMemory(turnMemoryPorts);
+
   function stopLoop() {
     if (A.stopping) return; // already winding down - ignore double-clicks
     diag("stopLoop");
@@ -686,7 +650,7 @@
     // now; the loop's own settle on resolve is idempotent.
     if (A.toolRunning && A.toolItem) {
       A.toolItem.dataset.zStopped = "1";
-      rememberHalted(A.toolItem);
+      haltedTurns.remember(A.toolItem);
       decorate.toolBox(A.toolItem, A.toolName, "err", "stopped", true, "", ZS.toolCategory(A.toolName));
     }
     ui.markStopping();    // instant feedback: button → "⏳ Stopping…", disabled
@@ -1093,11 +1057,11 @@
           (item === P.lastAssistant() && P.isGenerating()) ||
           (A.running && A.toolItem === item)
         );
-        if (regenerating) { delete item.dataset.zStopped; forgetHalted(item); }
+        if (regenerating) { delete item.dataset.zStopped; haltedTurns.forget(item); }
         const stopped = !regenerating && (
           item.dataset.zStopped === "1" ||
           (A.userStopped && item === P.lastAssistant()) ||
-          isRememberedHalted(item, txt));
+          haltedTurns.has(item, txt));
         // Self-heal: a site re-render that swapped this turn's node wiped the
         // dataset marker - re-stamp it so the stop survives the next wipe of
         // the A.userStopped latch (a fresh user message clears it by design).
@@ -1168,7 +1132,7 @@
         // memory keeps this virtualization-safe - a scrolled-back turn whose result
         // detached is still known-executed and never mislabelled).
         const neverRun = !item.dataset.zloop && !resultAfter &&
-          !isRememberedExecuted(item, txt);
+          !executedTurns.has(item, txt);
         // Superseded orphan: abandoned command - a NEWER assistant turn exists below
         // it yet it never ran (e.g. stopped then regenerated into a fresh turn on
         // Qwen). It will never execute, so it must show neither a green ✓ "done" NOR
@@ -1289,7 +1253,7 @@
               isLast: item === P.lastAssistant(), resultAfter,
               gen: P.isGenerating(), run: A.running, starting: A.starting,
               zStopped: item.dataset.zStopped === "1",
-              remembered: isRememberedHalted(item, txt),
+              remembered: haltedTurns.has(item, txt),
               lastGenAgoMs: Date.now() - A.lastGenAt,
               suspectDone,
               ...(P.genDebug ? { g: P.genDebug() } : {}),
@@ -2177,7 +2141,7 @@
         if (it) {
           delete it.dataset.zStopped; delete it.dataset.zResume;
           delete it.dataset.zResumeLen; delete it.dataset.zloop;
-          forgetHalted(it);
+          haltedTurns.forget(it);
           // Strip the OLD command's chip immediately. The regenerate reuses this
           // turn node, and without this the previous command chip (with its
           // spinner/settled state) lingers for ~200ms until the sweep repaints the
@@ -2554,7 +2518,7 @@
       A.userStopped = false;
       A.stop = false;
       const it = P.lastAssistant();   // a real resume → drop the stopped marker
-      if (it) { delete it.dataset.zStopped; forgetHalted(it); }
+      if (it) { delete it.dataset.zStopped; haltedTurns.forget(it); }
       diag("nativeContinue");
     },
   });
@@ -2630,7 +2594,7 @@
     // loop or a prior resume). The dataset guards below are wiped when the site
     // recreates the node on scroll, so without this off-DOM check the watchdog
     // re-runs a historical tool with no live generation. See the `executed` map.
-    if (isRememberedExecuted(item, txt)) return;
+    if (executedTurns.has(item, txt)) return;
     // Resume only when a COMPLETE, parseable command is present - and re-attempt
     // if the turn has GROWN since our last try.
     if (!ZSParse.parseToolCalls(txt).length) return;
@@ -2638,7 +2602,7 @@
     if (item.dataset.zResume && Number(item.dataset.zResumeLen || 0) >= len) return;
     item.dataset.zResume = "1";
     item.dataset.zResumeLen = String(len);
-    rememberExecuted(item);
+    executedTurns.remember(item);
     diag("autoResume", { len });
     // The reply turn is ALREADY present - act on it immediately. Null token makes
     // the identity-based newReply test unconditionally true (any current id != null).
