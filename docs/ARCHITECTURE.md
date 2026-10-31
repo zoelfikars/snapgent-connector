@@ -139,16 +139,42 @@ shippable.
    request/response correlation) separate from the message router.
 5. **Typing**: JSDoc `@typedef` for ports and messages + `tsc --checkJs` in CI.
 
-## Bridge (`bridge.py`)
+## Bridge (`snapgent_bridge/`)
 
-Responsibilities today: WebSocket server + auth, MCP subprocess client, tool
-catalogue, config persistence. Roadmap: split into a `bridge/` package
-(`server`, `mcp_client`, `catalog`, `config`, `protocol`) with the origin check
-in `server`, so each is testable without sockets or subprocesses.
+`bridge.py` is a three-line entry point (every launcher still runs it); the
+implementation is a package where each module has one reason to change.
+
+```
+bridge.py                  entry point -> snapgent_bridge.server.main()
+snapgent_bridge/
+  settings.py              paths, port, limits; the only module reading the environment
+  logs.py                  logging (stdout always, file once configured)
+  protocol.py              PURE: every message to/from the extension, tool-call parsing, result shaping
+  security.py              PURE: who may connect (extension origins only, optional pinning)
+  config.py                PURE validation + ConfigStore (atomic config.json writes)
+  mcp_client.py            one MCP server process over stdio JSON-RPC
+  registry.py              running servers: catalogue, name collisions, tool resolution, isolation
+  router.py                one handler per request type; talks through reply/broadcast, no sockets
+  server.py                WebSocket accept + origin check + client set + monitor loop + run()
+tests/                     unittest; pure modules need no processes or sockets
+```
+
+Dependencies point one way: `server -> router -> registry -> mcp_client`, with
+`protocol`, `security` and `config` validation as leaves. The router and
+registry are tested with fake servers; `test_server.py` uses real WebSockets and
+a mock MCP process; `test_entrypoint.py` runs `python bridge.py` as the
+launchers do and checks a clean SIGTERM shutdown.
 
 Security model: the socket only accepts connections whose `Origin` is a browser
 extension (`chrome-extension://`, `moz-extension://`); web pages cannot forge
-`Origin`, so they are rejected. Pin an exact extension with `ZS_ALLOWED_ORIGINS`.
+`Origin`, so they are rejected with close code 1008. Pin an exact extension
+with `ZS_ALLOWED_ORIGINS`. Tool calls carry the selected server and the
+registry refuses any tool that belongs to another one (isolation).
+
+Not covered yet: `add_server` lets a connected extension register an arbitrary
+command to spawn. Behind the origin check that is acceptable, but a pairing
+token or a confirmation step would remove the remaining trust in "any installed
+extension".
 
 ## MCP server (`vscode_mcp.py`)
 

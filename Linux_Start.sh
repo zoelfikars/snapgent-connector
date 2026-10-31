@@ -26,9 +26,9 @@ echo "  === Snapgent Bridge (Linux) ==="
 echo
 log "===== Linux_Start.sh launched ====="
 
-if [ ! -f "./bridge.py" ]; then
-    echo "  ERROR: bridge.py is missing. Extract the complete Snapgent release first."
-    log "FATAL: bridge.py not found."
+if [ ! -f "./bridge.py" ] || [ ! -f "./snapgent_bridge/__init__.py" ]; then
+    echo "  ERROR: bridge.py or the snapgent_bridge folder is missing. Extract the complete Snapgent release first."
+    log "FATAL: bridge.py or snapgent_bridge/ not found."
     pause_and_exit 1
 fi
 

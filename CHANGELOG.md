@@ -11,12 +11,19 @@ All notable changes to snapgentV3 Free are documented here.
 - **Firefox support.** One source tree builds both browsers (`npm run build` in
   `extension/` -> `dist/chrome`, `dist/firefox`). Firefox gets an event-page
   background and a gecko id; Chrome keeps the service worker.
+- **`bridge.py` is now a package** (`snapgent_bridge/`: protocol, security, config,
+  mcp client, registry, router, server). `bridge.py` stays as the entry point, so launchers
+  are unchanged; releases must include the `snapgent_bridge/` folder (the macOS/Linux
+  launchers now check for it). 79 bridge tests replace the old 6.
 - **New layered structure** (`docs/ARCHITECTURE.md`): parser, prompt and tool
   formatting moved into a pure, unit-tested domain layer; the supported-site list
   lives in one registry that generates the manifest, background and popup.
   `bridge.exe` / `vscode_mcp.exe` are not rebuilt by this change.
 
 ### Fixed
+- **A MCP server that crashed at startup stalled the bridge for 12 seconds** (the whole
+  `initialize` timeout) instead of failing at once, and requests in flight on a server that
+  died waited for their own timeout. They now fail immediately.
 - The system prompt for the VS Code target did not carry the session marker, so the
   bootstrap turn was not recognised for camouflage and session detection.
 

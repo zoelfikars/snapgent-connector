@@ -182,7 +182,7 @@ The extension and the bridge are two separate parts, and each one has to be upda
 
 If the popup shows `bridge old`, the bridge is still running old code: repeat steps 2 and 3. On macOS and Linux, also make sure there is no old executable file named `bridge` in the folder, because the launcher runs it instead of `bridge.py`.
 
-> **Windows note (V3.9.3):** `start.bat` runs the bundled `bridge.exe`, which was last rebuilt on 2026-10-23 and does not yet include the V3.9.2 fix for large MCP responses or the version display. On Windows the popup will therefore show `bridge old`. Until `bridge.exe` is rebuilt, you can run the current bridge with Python 3.9+: install it with `py -3 -m pip install websockets`, close `start.bat`, then run `py -3 bridge.py` in the project folder. macOS and Linux already use `bridge.py` and are not affected.
+> **Windows note:** `start.bat` runs the bundled `bridge.exe`, which was last rebuilt on 2026-10-23. It does **not** include the V3.9.2 fix for large MCP responses, the version display, or the **origin check that stops websites from controlling the bridge**. Until it is rebuilt, prefer the Python bridge below. On Windows the popup will therefore show `bridge old`. Until `bridge.exe` is rebuilt, you can run the current bridge with Python 3.9+: install it with `py -3 -m pip install websockets`, close `start.bat`, then run `py -3 bridge.py` in the project folder. macOS and Linux already use `bridge.py` and are not affected.
 
 ---
 
@@ -241,10 +241,11 @@ snapgent-full/
 ├── MacOS_Start.command        # macOS bridge launcher
 ├── Linux_Start.sh             # Linux bridge launcher
 ├── bridge.exe                 # Windows local bridge
-├── bridge.py                  # Cross-platform Python MCP bridge
+├── bridge.py                  # Bridge entry point (cross-platform Python)
+├── snapgent_bridge/           # Bridge implementation (protocol, registry, router, server)
+├── tests/                     # Bridge tests (python -m unittest discover -s tests -t .)
 ├── vscode_mcp.exe             # Default VS Code MCP server (28 workspace tools)
 ├── vscode_mcp.py              # VS Code MCP server source
-├── test_bridge.py             # MCP bridge protocol tests
 ├── test_setup_config.py       # MCP setup helper tests
 └── vscode_mcp.spec            # PyInstaller build recipe
 ```
