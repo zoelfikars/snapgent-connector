@@ -5,7 +5,7 @@
 // cannot see or alter them; only genuine clicks pick anything (picker.js).
 
 import { createPanel } from "./calibration-panel.js";
-import { FLOWS, PREVIEW_CHARS, STEPS } from "./calibration-steps.js";
+import { FLOWS, MARK_LABELS, PREVIEW_CHARS, STEPS } from "./calibration-steps.js";
 import { createPicker } from "./picker.js";
 
 async function defaultCopy(text) {
@@ -59,8 +59,9 @@ export function createCalibrationWizard({
         const problem = def.accept ? def.accept(el, picks) : null;
         if (problem) { error = problem; render({ text: def.text, hint: def.hint || "", buttons }); return; }
         error = "";
-        if (name_ === "answer") { picks.assistantInner = el; relearn(); return; }
+        if (name_ === "answer") { picks.assistantInner = el; panel.mark("answer", el, MARK_LABELS.answer); relearn(); return; }
         picks[name_] = el;
+        panel.mark(name_, el, MARK_LABELS[name_]);
         advance();
       },
       onCancel: () => cancel(),
@@ -99,9 +100,14 @@ export function createCalibrationWizard({
     const read = (provider.readAssistant().reply || "").trim();
     const shown = read.length > PREVIEW_CHARS ? `${read.slice(0, PREVIEW_CHARS)}…` : read;
     if (!read) error = error || "Nothing was read from the reply.";
+    // Every turn it found in this chat, in order, so a swapped or missed one is obvious before anything is saved.
+    const brief = (text) => { const one = text.replace(/\s+/g, " ").trim(); return one.length > 70 ? `${one.slice(0, 70)}…` : one || "(empty)"; };
+    const turns = provider.allItems().map((item) => `${provider.isUserItem(item) ? "You" : "AI "}: ${brief(provider.itemText(item))}`);
+    const overview = `Found ${provider.userCount()} message(s) of yours and ${provider.assistantCount()} AI reply(ies):\n${turns.join("\n")}`;
+    if (!provider.userCount() || !provider.assistantCount()) error = error || "It found no " + (provider.userCount() ? "AI reply." : "message of yours.");
     render({
-      text: "This is what will be read from the AI's last reply. Is that the answer, without labels or buttons?",
-      preview: shown || "(nothing)",
+      text: "Check that “You” lines are your messages and “AI” lines are the replies, and that the reply below is the answer without labels or buttons.",
+      preview: `${overview}\n\nLast AI reply, as it will be read:\n${shown || "(nothing)"}`,
       buttons: [
         { label: "Looks right", action: "looks-right", primary: !!read },
         { label: "Pick just the answer", action: "pick-answer" },
@@ -162,11 +168,11 @@ export function createCalibrationWizard({
       return;
     }
     if (action === "cancel" || action === "close") { cancel(); return; }
-    if (action === "back") { index = Math.max(0, index - 1); error = ""; pickStep(steps[index]); return; }
+    if (action === "back") { index = Math.max(0, index - 1); panel.unmark(steps[index]); error = ""; pickStep(steps[index]); return; }
     if (action === "enter-sends") { picks.send = null; error = ""; advance(); return; }
     if (action === "looks-right") { check(); return; }
     if (action === "pick-answer") { error = ""; pickStep("answer"); return; }
-    if (action === "redo-reply") { index = steps.indexOf("reply"); error = ""; pickStep("reply"); return; }
+    if (action === "redo-reply") { for (const name_ of ["reply", "message", "answer"]) panel.unmark(name_); picks.assistantInner = null; index = steps.indexOf("reply"); error = ""; pickStep("reply"); return; }
     if (action === "redo-composer") { flow = "composer"; steps = ["composer"]; index = 0; error = ""; pickStep("composer"); return; }
     if (action === "save") { save(); return; }
   }

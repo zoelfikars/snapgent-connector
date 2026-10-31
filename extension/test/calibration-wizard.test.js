@@ -68,6 +68,43 @@ describe("calibration wizard", () => {
     assert.equal(t.closed.length, 1);
   });
 
+  test("the preview lists every turn it found, labelled, so a swapped or missed one is visible before saving", () => {
+    const t = setup();
+    t.wizard.start();
+    t.walkToPreview();
+    const preview = t.panel().querySelector("pre").textContent;
+    assert.match(preview, /Found 1 message\(s\) of yours and 1 AI reply\(ies\)/);
+    assert.match(preview, /You: ⟦ZS-SYS⟧/);
+    assert.match(preview, /AI : .*command/);
+    assert.match(preview, /Last AI reply, as it will be read:/);
+  });
+
+  test("what was clicked stays on the page with a label, until it is redone or the dialog closes", () => {
+    const t = setup();
+    t.wizard.start();
+    const marks = () => [...t.panel().querySelectorAll(".mark span")].map((span) => span.textContent);
+    t.click(t.q("#line"));
+    assert.deepEqual(marks(), ["1 · Text box"]);
+    t.click(t.q("#icon"));
+    t.click(t.q("pre"));
+    t.click(t.q(".whitespace-pre-wrap"));
+    assert.deepEqual(marks(), ["1 · Text box", "2 · Send button", "3 · AI reply", "4 · Your message"]);
+    t.press("redo-reply");
+    assert.deepEqual(marks(), ["1 · Text box", "2 · Send button"], "the reply and message marks go with the redo");
+    t.wizard.cancel();
+    assert.equal(t.panel(), null);
+  });
+
+  test("the instructions say what to click: the words, not a button or the space around", () => {
+    const t = setup();
+    t.wizard.start();
+    t.click(t.q("#line"));
+    t.click(t.q("#icon"));
+    assert.match(t.text(), /WORDS of a reply written by the AI/);
+    t.click(t.q("pre"));
+    assert.match(t.text(), /WORDS of a message that YOU sent/);
+  });
+
   test("nothing is sent while calibrating: only the test text is written and then cleared", async () => {
     const t = setup();
     const sent = [];

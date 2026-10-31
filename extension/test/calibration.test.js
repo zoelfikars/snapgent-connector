@@ -200,6 +200,13 @@ describe("selector learning", () => {
   });
 });
 
+// What a send does on the stand-in sites: it takes what is in the box and empties it.
+function document_submit(editor, state) {
+  editor.ownerDocument.addEventListener("click", (event) => {
+    if (event.target.closest && event.target.closest("button") && editor.textContent.trim()) { state.sent.push(editor.textContent); editor.textContent = ""; }
+  });
+}
+
 describe("writing and sending", () => {
   // A stand-in for a rich editor: it takes a paste, and only once its caret has settled; the send button reads it.
   function liveSite(key, { enter = false } = {}) {
@@ -225,6 +232,35 @@ describe("writing and sending", () => {
       window.close();
     });
   }
+
+  // The real bootstrap message starts "⟦ZS-SYS⟧\nCONTEXT: ...". Rich editors (ProseMirror, Lexical) keep each line as its own
+  // paragraph, so the text they hold has no newline in it; a plain <textarea> keeps it.
+  test("a message whose first line break becomes a paragraph boundary is still recognised as written", async () => {
+    const { provider, editor, state, window } = liveSite("chatgpt");
+    editor.addEventListener("paste", (event) => {
+      editor.innerHTML = event.clipboardData.getData("text/plain").split("\n").map((line) => `<p>${line}</p>`).join("");
+    }, true);
+    editor.addEventListener("paste", (event) => event.stopImmediatePropagation(), true);
+    const message = "⟦ZS-SYS⟧\nCONTEXT: snapgentV3 is a browser extension that sends your plain-text JSON commands";
+    document_submit(editor, state);
+    await provider.typeAndSend(message, []);
+    assert.deepEqual(state.sent, ["⟦ZS-SYS⟧CONTEXT: snapgentV3 is a browser extension that sends your plain-text JSON commands"]);
+    window.close();
+  });
+
+  test("a send that does nothing is reported as not confirmed, even though the text sits in the box (it is not 'on the page')", async () => {
+    const site = SITES.chatgpt;
+    const { window, document } = pageWith(site.html(), site.url);
+    const learned = learnProfile({ hostname: site.hostname, name: site.name, picks: site.clicks(document) });
+    const provider = createCalibratedProvider({ document, location: window.location, profile: learned.profile, confirmMs: 150 });
+    const editor = provider.getEditor();
+    let settledAt = 0;
+    const nativeFocus = editor.focus.bind(editor);
+    editor.focus = () => { settledAt = Date.now(); nativeFocus(); };
+    editor.addEventListener("paste", (event) => { if (Date.now() - settledAt >= 100) editor.textContent = event.clipboardData.getData("text/plain"); });
+    await assert.rejects(() => provider.typeAndSend("a message the send button ignores", []), /did not confirm the message was sent/);
+    window.close();
+  });
 
   test("a site with no send button is sent with Enter", async () => {
     const { document, window, provider: reference } = calibrated(SITES.gemini);

@@ -20,7 +20,11 @@ const isValueEditor = (el) => !!el && (el.tagName === "TEXTAREA" || el.tagName =
 const byDocumentOrder = (a, b) => (a.compareDocumentPosition(b) & 4 ? -1 : 1); // 4: b follows a
 const outermost = (list) => list.filter((el) => !list.some((other) => other !== el && other.contains(el)));
 
-export function createCalibratedProvider({ document, location, profile, diag = () => {}, now = Date.now }) {
+// Text compared without whitespace: an editor that makes each line its own paragraph holds the same words with no newline in them.
+const squash = (text) => String(text).replace(/\s+/g, "");
+const occurrences = (haystack, needle) => (needle ? haystack.split(needle).length - 1 : 0);
+
+export function createCalibratedProvider({ document, location, profile, diag = () => {}, now = Date.now, confirmMs = 5000 }) {
   const win = document.defaultView;
   const sampler = new StreamSampler({ now, minLen: 1 });
   let preferredWrite = null; // the writing method that worked last time
@@ -105,8 +109,8 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   async function writeComposer(text) {
     const editor = getEditor();
     if (!editor) throw new Error("The text box is not on the page. Re-calibrate it.");
-    const want = text.trim().slice(0, 30);
-    const landed = () => editorText().includes(want);
+    const want = squash(text.trim().slice(0, 30));
+    const landed = () => squash(editorText()).includes(want);
     if (isValueEditor(editor)) {
       editor.focus();
       setNativeValue(editor, text, win);
@@ -177,8 +181,12 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   async function typeAndSend(text) {
     const usersBefore = userCount();
     const keyBefore = conversationKey();
-    const probe = text.trim().slice(0, 40);
-    const shown = () => (probe ? (document.body.textContent || "").split(probe).length - 1 : 0);
+    const probe = squash(text.trim().slice(0, 40));
+    // Our own text on the page OUTSIDE the box: what we just typed into the box must not count as "it was sent".
+    const shown = () => {
+      const box = getEditor();
+      return occurrences(squash(document.body.textContent || ""), probe) - (box ? occurrences(squash(box.textContent || ""), probe) : 0);
+    };
     const shownBefore = shown();
     await writeComposer(text);
     // Accepted when any of: the box emptied, a new user turn, a stop button, the conversation got an id, our text is on the page.
@@ -188,13 +196,13 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     if (profile.send.selector) {
       if (!(await waitFor(sendReady, 30000))) throw new Error("The send button did not become available. Re-calibrate it.");
       sendButton().click();
-      sent = await waitFor(accepted, 5000);
-      if (!sent && sendButton()) { diag("calibrated.pressFallback", {}); pressed(sendButton()); sent = await waitFor(accepted, 5000); }
+      sent = await waitFor(accepted, confirmMs);
+      if (!sent && sendButton()) { diag("calibrated.pressFallback", {}); pressed(sendButton()); sent = await waitFor(accepted, confirmMs); }
     } else {
       const editor = getEditor();
       const key = { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true };
       for (const type of ["keydown", "keypress", "keyup"]) editor.dispatchEvent(new win.KeyboardEvent(type, key));
-      sent = await waitFor(accepted, 5000);
+      sent = await waitFor(accepted, confirmMs);
     }
     if (!sent) throw new Error(`The page did not confirm the message was sent (text box: ${editorText().length} characters). Check the text box and try again.`);
   }

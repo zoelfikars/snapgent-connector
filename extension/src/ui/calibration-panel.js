@@ -14,6 +14,8 @@ pre { max-height: 180px; overflow: auto; background: #0e0e12; border-radius: 8px
 .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 button { all: unset; cursor: pointer; padding: 6px 12px; border-radius: 8px; border: 1px solid #3a3a45; color: #ececf1; font: 13px system-ui, sans-serif; }
 button.primary { background: #facc15; color: #111; border-color: #facc15; font-weight: 600; } button:hover { filter: brightness(1.15); }
+.mark { position: fixed; pointer-events: none; border: 2px dashed #60a5fa; border-radius: 4px; z-index: 2147483644; }
+.mark span { position: absolute; top: -20px; left: -2px; background: #60a5fa; color: #0b1020; font: 600 11px system-ui, sans-serif; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
 .outline { position: fixed; pointer-events: none; border: 2px solid #facc15; background: rgba(250,204,21,.12); border-radius: 4px; z-index: 2147483645; }
 `;
 
@@ -75,9 +77,43 @@ export function createPanel({ document, shadowMode, trusted, onAction }) {
     box.hidden = false;
   }
 
+  // What was already clicked stays on the page, labelled, so it is clear which element each step took.
+  const marks = new Map(); // name -> { el, box }
+  function placeMarks() {
+    for (const { el, box } of marks.values()) {
+      const r = el.getBoundingClientRect();
+      Object.assign(box.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+      box.hidden = !el.isConnected || !r.width;
+    }
+  }
+  function mark(name, el, label) {
+    if (!shadow) return;
+    unmark(name);
+    const box = document.createElement("div");
+    box.className = "mark";
+    box.innerHTML = "<span></span>";
+    box.firstChild.textContent = label;
+    shadow.appendChild(box);
+    marks.set(name, { el, box });
+    placeMarks();
+  }
+  function unmark(name) {
+    const entry = marks.get(name);
+    if (entry) { entry.box.remove(); marks.delete(name); }
+  }
+  const win = document.defaultView;
+  const follow = () => placeMarks();
+  win.addEventListener("scroll", follow, true);
+  win.addEventListener("resize", follow);
+
   /** Whether `target` is part of the panel (a closed shadow root shows up as its host). */
   const owns = (target) => !!host && (target === host || host.contains(target));
-  function remove() { if (host) { host.remove(); host = null; shadow = null; } }
+  function remove() {
+    marks.clear();
+    win.removeEventListener("scroll", follow, true);
+    win.removeEventListener("resize", follow);
+    if (host) { host.remove(); host = null; shadow = null; }
+  }
 
-  return { show, setHint, highlight, owns, remove, root: () => shadow, isOpen: () => !!host };
+  return { show, setHint, highlight, mark, unmark, owns, remove, root: () => shadow, isOpen: () => !!host };
 }
