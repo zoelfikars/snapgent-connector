@@ -14,3 +14,4 @@ export { SkillsService } from "./skills-service.js";
 export { SessionStarter } from "./session-starter.js";
 export { ServerDirectory } from "./server-directory.js";
 export { TurnMemory } from "./turn-memory.js";
+export { SessionTracker, textShowsSession } from "./session-tracker.js";

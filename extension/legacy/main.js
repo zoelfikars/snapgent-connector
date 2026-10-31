@@ -741,7 +741,7 @@
     },
     markStarted() {
       A.started = true;
-      rememberSession(P.conversationKey()); // survives virtualization AND reloads
+      sessionTracker.remember(P.conversationKey()); // survives virtualization AND reloads
       ui.setStarted(true);
     },
     end(alive) {
@@ -1012,7 +1012,7 @@
       // this gate, a plain never-started chat where the model merely EXPLAINS
       // the command format (a {"command":...} example in its answer) got the
       // example MASKED behind a tool chip - hiding genuine content the user
-      // asked for. Same principle as domHasZsSignal: a command shape alone is
+      // asked for. Same principle as textShowsSession: a command shape alone is
       // not proof of a session. (Branches 1/2 above key off OUR OWN injected
       // markers, which only exist in real sessions, so they need no gate.)
       if (P.isAssistantItem(item) && ZSParse.hasCommandShape(txt) &&
@@ -2167,122 +2167,43 @@
   bg({ type: "status" }).then(onStatus);
   statusTimer = setInterval(() => bg({ type: "status" }).then(onStatus), 5000);
 
-  // Session state is derived from the ACTUAL chat, but sites VIRTUALIZE their
-  // message lists: the system-prompt turn is dropped from the DOM once it
-  // scrolls out of the window. So we key "started" by conversation
-  // (P.conversationKey()): once we have seen the marker for a key, we remember
-  // it (persisted so it survives reloads). We never flip while busy.
-  const startedSessions = new Set();
-  let lastSyncPath = null;
-  function rememberSession(path) {
-    // A falsy key = a TRANSIENT conversation URL (e.g. Gemini's /app before an
-    // id is assigned). Remembering it would mark every future fresh chat as
-    // "already started" and kill the Start gate. The real key is remembered by
-    // the next sync once the site assigns the conversation its id.
-    if (!path) return;
-    if (startedSessions.has(path)) return;
-    startedSessions.add(path);
-    try { chrome.storage.local.set({ zsStartedSessions: [...startedSessions].slice(-300) }); } catch {}
-  }
-  // Load the persisted set once, then re-sync.
-  try {
-    chrome.storage.local.get("zsStartedSessions", (r) => {
-      if (r && Array.isArray(r.zsStartedSessions)) {
-        for (const p of r.zsStartedSessions) startedSessions.add(p);
-        syncSessionState();
-      }
-    });
-  } catch {}
-  // A conversation IS a snapgentV3 session if any rendered turn carries a
-  // telltale artefact: the system-prompt marker, an injected tool-result /
-  // system-note turn, or a snapgentV3 command an assistant wrote. Works even
-  // after a full cold start and regardless of scroll position.
-  function domHasZsSignal() {
-    for (const it of P.allItems()) {
-      const txt = it.textContent || "";
-      if (txt.includes(ZS.SYS_MARKER)) return true;
-      if (/(^|\n)\s*Output of '[^']+':/.test(txt) || txt.includes("(System note:")) return true;
-      // Deliberately NO bare command-shape test here. An assistant turn that
-      // merely CONTAINS {"command":...} is NOT proof of a session:
-      // in a plain, never-started chat the model can simply EXPLAIN the format
-      // (docs, examples, the user pasting our README) - that false positive
-      // flipped A.started on, which armed the auto-resume watchdog, EXECUTED
-      // the quoted JSON as a real command and injected its result into a chat
-      // that had no agent at all (user-reported). A command only counts as a
-      // session signal once it was actually RUN - and an executed command is
-      // always followed by our injected "Output of '...'" feedback turn, which
-      // the test above already catches. Virtualization (the marker turns
-      // scrolling out of the DOM) is covered by the persisted per-conversation
-      // key set (startedSessions / zsStartedSessions in rememberSession), not
-      // by this heuristic.
-    }
-    return false;
-  }
+  // Session state is derived from the ACTUAL chat and remembered per conversation (src/application/session-tracker.js).
+  const { SessionTracker, textShowsSession } = ZSApp;
+  const sessionTracker = new SessionTracker({
+    store: {
+      get: (key) => new Promise((resolve) => { try { chrome.storage.local.get(key, (r) => resolve(r && r[key])); } catch { resolve(undefined); } }),
+      set: (key, value) => { try { chrome.storage.local.set({ [key]: value }); } catch {} },
+    },
+  });
+  sessionTracker.ready.then(() => syncSessionState());
+  const markerInDom = () => P.allItems().some((item) => textShowsSession(item.textContent || "", ZS.SYS_MARKER));
+
   function syncSessionState() {
-    // While a bootstrap runs, track its conversation. The bootstrap chat gets a
-    // real id only AFTER the prompt lands (fresh "/app" → "/app/<id>"), so we pin
-    // the id the first time the chat has content. A change to a DIFFERENT, EMPTY
-    // chat means the user opened a new conversation → abort: bump the generation
-    // (the in-flight startSession bails at its next checkpoint) and clear state so
-    // the new chat shows its own status instead of a stale "Starting…".
-    if (A.starting) {
-      const key = P.conversationKey();
-      if (A.startingKey == null) {
-        if (key && !P.chatIsEmpty()) A.startingKey = key; // pin the stable id
-      } else if (key !== A.startingKey && P.chatIsEmpty()) {
-        A.startGen++;
-        A.starting = false;
-        A.startingKey = null;
-        P.setInputLock(false);
-        ui.setStarting(false);
-        // CRITICAL: startSession's own finally is gated on `alive()` (this abandon
-        // just invalidated it via startGen++), so it will NEVER run and never
-        // lift the "Agent is working…" cover. Without this line the cover was
-        // stuck forever on the fresh chat whenever the user opened a new,
-        // empty conversation WHILE the bootstrap's tool call (list_commands) was
-        // still in flight - validated live 2026-07 on Cloudflare AI Playground.
-        ui.inputCover(false);
-      }
+    const decide = () => sessionTracker.decide({
+      starting: A.starting, startingKey: A.startingKey, running: A.running, loopKey: A.loopKey, injecting: A.injecting,
+      started: A.started, key: P.conversationKey(), chatEmpty: P.chatIsEmpty(), markerInDom,
+    });
+    const loopKeyBefore = A.loopKey;
+    let decision = decide();
+    if (decision.startingKey !== undefined) A.startingKey = decision.startingKey;
+    if (decision.loopKey !== undefined) A.loopKey = decision.loopKey;
+    if (decision.abandonStart) {
+      // The in-flight startSession bails at its next checkpoint (startGen). Its own finally is gated on alive(), which this
+      // just invalidated, so it will NEVER lift the "Agent is working…" cover: lift it here, or it sticks on the fresh chat.
+      A.startGen++;
+      A.starting = false;
+      P.setInputLock(false);
+      ui.setStarting(false);
+      ui.inputCover(false);
+      decision = decide(); // no longer bootstrapping: the new chat's own state is computed in the same pass
     }
-    // Same idea for a RUNNING loop: if the user opens a NEW, empty conversation
-    // via the SITE's own new-chat (not snapgentV3's button), the loop is bound to
-    // a chat the user left, so abandon it. Otherwise A.running keeps this function
-    // early-returning below and the stale "Agent active" / Stop button lingers on
-    // the fresh chat instead of "Start agent". The "/app" → "/app/<id>" id
-    // assignment of the SAME chat is not a move (loopKey is pinned only once the
-    // chat has both an id and content), so a normal session is never disturbed.
-    if (A.running) {
-      const key = P.conversationKey();
-      if (A.loopKey == null) {
-        if (key && !P.chatIsEmpty()) A.loopKey = key; // pin the loop's conversation
-      } else if (key !== A.loopKey && P.chatIsEmpty()) {
-        diag("loop.abandonedNewChat", { from: A.loopKey, to: key });
-        A.stop = true;       // the loop breaks at its next checkpoint; its finally
-        A.loopKey = null;    // resets A.running / cover / lock, then state recomputes
-      }
+    if (decision.abandonLoop) {
+      diag("loop.abandonedNewChat", { from: loopKeyBefore, to: P.conversationKey() });
+      A.stop = true; // the loop breaks at its next checkpoint; its finally resets A.running / cover / lock
     }
-    if (A.starting || A.injecting || A.running) return;
-    const path = P.conversationKey();
-    const markerInDom = domHasZsSignal();
-    if (markerInDom) rememberSession(path);
-    let has;
-    if (path && path === lastSyncPath) {
-      // SAME, REAL conversation: never downgrade a known-started session just
-      // because virtualization scrolled the marker out of the DOM. "started" is
-      // sticky until the key actually changes (a different conversation).
-      // NOTE: a falsy key ("" = a transient/fresh chat with no id yet) is NEVER
-      // sticky - every fresh chat shares "", so a brief transient sweep during
-      // navigation would otherwise PIN lastSyncPath="" with has=true and then keep
-      // "Agent active" forever on the next empty chat (it would never recompute).
-      has = A.started || markerInDom || (!!path && startedSessions.has(path));
-    } else {
-      // Different conversation → recompute from scratch.
-      has = markerInDom || (!!path && startedSessions.has(path));
-      lastSyncPath = path;
-    }
-    if (has !== A.started) {
-      A.started = has;
-      ui.setStarted(has);
+    if (decision.started !== undefined) {
+      A.started = decision.started;
+      ui.setStarted(decision.started);
     }
   }
 
