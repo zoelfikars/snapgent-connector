@@ -5,7 +5,8 @@
 // cannot see or alter them; only genuine clicks pick anything (picker.js).
 
 import { createPanel } from "./calibration-panel.js";
-import { FLOWS, MARK_LABELS, PREVIEW_CHARS, STEPS } from "./calibration-steps.js";
+import { FLOWS, MARK_LABELS, STEPS } from "./calibration-steps.js";
+import { reviewOf } from "./calibration-review.js";
 import { createPicker } from "./picker.js";
 
 async function defaultCopy(text) {
@@ -48,7 +49,7 @@ export function createCalibrationWizard({
     const def = STEPS[name_];
     const buttons = [{ label: "Cancel", action: "cancel" }];
     if (name_ === "send") buttons.unshift({ label: "Enter sends", action: "enter-sends" });
-    if (index > 0 && name_ !== "answer") buttons.unshift({ label: "Back", action: "back" });
+    if (index > 0 && name_ !== "answer" && name_ !== "card") buttons.unshift({ label: "Back", action: "back" });
     render({ text: def.text, hint: def.hint || "", buttons });
     stopPicking = picker.start({
       // our own panel and the control bar are not part of the page being taught
@@ -59,6 +60,7 @@ export function createCalibrationWizard({
         const problem = def.accept ? def.accept(el, picks) : null;
         if (problem) { error = problem; render({ text: def.text, hint: def.hint || "", buttons }); return; }
         error = "";
+        if (name_ === "card") { picks.card = el; const u = calibration.updateProfile(draft, "card", { card: el }); if (u.error) { error = u.error; render({ text: def.text, hint: def.hint || "", buttons }); return; } draft = u.profile; error = ""; preview(); return; }
         if (name_ === "answer") { picks.assistantInner = el; panel.mark("answer", el, MARK_LABELS.answer); relearn(); return; }
         picks[name_] = el;
         panel.mark(name_, el, MARK_LABELS[name_]);
@@ -96,22 +98,18 @@ export function createCalibrationWizard({
 
   function preview() {
     step = "preview";
-    const provider = calibration.createProvider(draft);
-    const read = (provider.readAssistant().reply || "").trim();
-    const shown = read.length > PREVIEW_CHARS ? `${read.slice(0, PREVIEW_CHARS)}…` : read;
-    if (!read) error = error || "Nothing was read from the reply.";
-    // Every turn it found in this chat, in order, so a swapped or missed one is obvious before anything is saved.
-    const brief = (text) => { const one = text.replace(/\s+/g, " ").trim(); return one.length > 70 ? `${one.slice(0, 70)}…` : one || "(empty)"; };
-    const turns = provider.allItems().map((item) => `${provider.isUserItem(item) ? "You" : "AI "}: ${brief(provider.itemText(item))}`);
-    const overview = `Found ${provider.userCount()} message(s) of yours and ${provider.assistantCount()} AI reply(ies):\n${turns.join("\n")}`;
-    if (!provider.userCount() || !provider.assistantCount()) error = error || "It found no " + (provider.userCount() ? "AI reply." : "message of yours.");
+    panel.unmarkMatching("rv:");
+    const review = reviewOf(calibration.createProvider(draft));
+    for (const m of review.marks) panel.mark(m.name, m.el, m.label, m.kind);
+    if (review.warnings.length) error = [error, ...review.warnings].filter(Boolean).join(" ");
     render({
-      text: "Check that “You” lines are your messages and “AI” lines are the replies, and that the reply below is the answer without labels or buttons.",
-      preview: `${overview}\n\nLast AI reply, as it will be read:\n${shown || "(nothing)"}`,
+      text: "Look at the page: green boxes should be your messages, blue boxes the AI replies, “Read from here” the answer, yellow the box the bar sits in.",
+      preview: review.text,
       buttons: [
-        { label: "Looks right", action: "looks-right", primary: !!read },
+        { label: "Looks right", action: "looks-right", primary: !!review.read && !review.warnings.length },
         { label: "Pick just the answer", action: "pick-answer" },
         { label: "Redo the reply", action: "redo-reply" },
+        { label: "Pick the bar's box", action: "pick-card" },
         { label: "Cancel", action: "cancel" },
       ],
     });
@@ -170,7 +168,8 @@ export function createCalibrationWizard({
     if (action === "cancel" || action === "close") { cancel(); return; }
     if (action === "back") { index = Math.max(0, index - 1); panel.unmark(steps[index]); error = ""; pickStep(steps[index]); return; }
     if (action === "enter-sends") { picks.send = null; error = ""; advance(); return; }
-    if (action === "looks-right") { check(); return; }
+    if (action === "looks-right") { panel.unmarkMatching("rv:"); check(); return; }
+    if (action === "pick-card") { error = ""; panel.unmarkMatching("rv:"); pickStep("card"); return; }
     if (action === "pick-answer") { error = ""; pickStep("answer"); return; }
     if (action === "redo-reply") { for (const name_ of ["reply", "message", "answer"]) panel.unmark(name_); picks.assistantInner = null; index = steps.indexOf("reply"); error = ""; pickStep("reply"); return; }
     if (action === "redo-composer") { flow = "composer"; steps = ["composer"]; index = 0; error = ""; pickStep("composer"); return; }
@@ -190,6 +189,7 @@ export function createCalibrationWizard({
   function cancel(notify = true) {
     stopPicking();
     stopPicking = () => {};
+    panel.unmarkMatching("rv:");
     panel.remove();
     if (notify) onClose();
   }

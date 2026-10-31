@@ -15,6 +15,10 @@ pre { max-height: 180px; overflow: auto; background: #0e0e12; border-radius: 8px
 button { all: unset; cursor: pointer; padding: 6px 12px; border-radius: 8px; border: 1px solid #3a3a45; color: #ececf1; font: 13px system-ui, sans-serif; }
 button.primary { background: #facc15; color: #111; border-color: #facc15; font-weight: 600; } button:hover { filter: brightness(1.15); }
 .mark { position: fixed; pointer-events: none; border: 2px dashed #60a5fa; border-radius: 4px; z-index: 2147483644; }
+.mark.user { border-color: #4ade80; } .mark.user span { background: #4ade80; }
+.mark.ai { border-color: #60a5fa; } .mark.ai span { background: #60a5fa; }
+.mark.body { border-color: #e5e7eb; } .mark.body span { background: #e5e7eb; }
+.mark.card { border: 2px solid #facc15; } .mark.card span { background: #facc15; color: #111; }
 .mark span { position: absolute; top: -20px; left: -2px; background: #60a5fa; color: #0b1020; font: 600 11px system-ui, sans-serif; padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
 .outline { position: fixed; pointer-events: none; border: 2px solid #facc15; background: rgba(250,204,21,.12); border-radius: 4px; z-index: 2147483645; }
 `;
@@ -86,11 +90,11 @@ export function createPanel({ document, shadowMode, trusted, onAction }) {
       box.hidden = !el.isConnected || !r.width;
     }
   }
-  function mark(name, el, label) {
+  function mark(name, el, label, kind = "pick") {
     if (!shadow) return;
     unmark(name);
     const box = document.createElement("div");
-    box.className = "mark";
+    box.className = `mark ${kind}`;
     box.innerHTML = "<span></span>";
     box.firstChild.textContent = label;
     shadow.appendChild(box);
@@ -100,6 +104,9 @@ export function createPanel({ document, shadowMode, trusted, onAction }) {
   function unmark(name) {
     const entry = marks.get(name);
     if (entry) { entry.box.remove(); marks.delete(name); }
+  }
+  function unmarkMatching(prefix) {
+    for (const name of [...marks.keys()]) if (name.startsWith(prefix)) unmark(name);
   }
   const win = document.defaultView;
   const follow = () => placeMarks();
@@ -115,5 +122,5 @@ export function createPanel({ document, shadowMode, trusted, onAction }) {
     if (host) { host.remove(); host = null; shadow = null; }
   }
 
-  return { show, setHint, highlight, mark, unmark, owns, remove, root: () => shadow, isOpen: () => !!host };
+  return { show, setHint, highlight, mark, unmark, unmarkMatching, owns, remove, root: () => shadow, isOpen: () => !!host };
 }

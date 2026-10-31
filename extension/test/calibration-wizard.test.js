@@ -82,7 +82,7 @@ describe("calibration wizard", () => {
   test("what was clicked stays on the page with a label, until it is redone or the dialog closes", () => {
     const t = setup();
     t.wizard.start();
-    const marks = () => [...t.panel().querySelectorAll(".mark span")].map((span) => span.textContent);
+    const marks = () => [...t.panel().querySelectorAll(".mark.pick span")].map((span) => span.textContent);
     t.click(t.q("#line"));
     assert.deepEqual(marks(), ["1 · Text box"]);
     t.click(t.q("#icon"));
@@ -119,9 +119,43 @@ describe("calibration wizard", () => {
   test("a click that is not a text box is refused with a reason and the step stays", () => {
     const t = setup();
     t.wizard.start();
-    t.click(t.q("main"));
-    assert.match(t.errorText(), /does not look like a text box/);
+    t.click(t.q(".whitespace-pre-wrap"));
+    assert.match(t.errorText(), /No text field was found/);
     assert.equal(t.wizard.state().step, "composer");
+  });
+
+  test("a click on the box around the text field finds the one field inside it", () => {
+    const t = setup();
+    t.wizard.start();
+    t.click(t.q("form"));                                   // the card, not the field
+    assert.equal(t.wizard.state().step, "send", "the field inside was taken and the next step shown");
+    assert.equal(t.panel().querySelectorAll(".mark.pick").length, 1);
+  });
+
+  test("the review marks every turn (yours and the AI's), the part read and the bar's box on the page, and clears them after", () => {
+    const t = setup();
+    t.wizard.start();
+    t.walkToPreview();
+    const marks = (kind) => [...t.panel().querySelectorAll(`.mark.${kind}`)];
+    assert.ok(marks("user").length >= 1, "your messages");
+    assert.ok(marks("ai").length >= 1, "the AI replies");
+    assert.equal(marks("card").length, 1, "the box the bar sits in");
+    t.press("looks-right");
+    assert.equal(marks("user").length + marks("ai").length + marks("card").length, 0, "the review marks go away when leaving the review");
+  });
+
+  test("'Pick the bar's box' takes a box that holds the text box, and refuses one that does not", () => {
+    const t = setup();
+    t.wizard.start();
+    t.walkToPreview();
+    t.press("pick-card");
+    t.click(t.q("pre"));
+    assert.match(t.errorText(), /must contain the text box/);
+    t.q("form").setAttribute("data-testid", "composer-card");
+    t.click(t.q("form"));
+    assert.equal(t.wizard.state().step, "preview");
+    t.press("looks-right");
+    return waitFor(() => t.wizard.state().done, 5000).then(() => assert.ok(t.saved[0].card, "the profile keeps the chosen box"));
   });
 
   test("my own message must not be part of the reply", () => {
@@ -263,11 +297,11 @@ describe("calibration wizard", () => {
   test("a report can be copied when something is wrong or at the preview: where the clicks landed and the profile, never the conversation", async () => {
     const t = setup();
     t.wizard.start();
-    t.click(t.q("main"));                                   // not a text box: an error
+    t.click(t.q(".whitespace-pre-wrap"));                   // no text field there: an error
     t.panel().querySelector('[data-action="copy-report"]').click();
     await waitFor(() => t.copied.length === 1, 2000);
     assert.match(t.copied[0], /site: chatgpt.com \(ChatGPT\)/);
-    assert.match(t.copied[0], /error: That does not look like a text box/);
+    assert.match(t.copied[0], /error: No text field was found/);
   });
 
   test("the preview offers the report too, with the learned profile and the clicked elements, and none of the text", async () => {
@@ -283,7 +317,7 @@ describe("calibration wizard", () => {
   });
 
   test("a failed copy says so instead of pretending", async () => {
-    const { window, document } = pageWith("<body><div contenteditable='true' id='box'></div></body>");
+    const { window, document } = pageWith("<body><div contenteditable='true' id='box'></div><div contenteditable='true' id='box2'></div></body>");
     const wizard = createCalibrationWizard({
       document, hostname: "a.test", name: "A", current: null, calibration: { learnProfile, updateProfile, createProvider: () => ({}) },
       onSave: async () => ({ ok: true }), trusted: () => true, shadowMode: "open", copy: async () => { throw new Error("denied"); },
@@ -308,7 +342,7 @@ describe("calibration wizard", () => {
   });
 
   test("a click a page script fabricated moves nothing forward", () => {
-    const { window, document } = pageWith("<body><div contenteditable='true' id='box'></div></body>");
+    const { window, document } = pageWith("<body><div contenteditable='true' id='box'></div><div contenteditable='true' id='box2'></div></body>");
     const wizard = createCalibrationWizard({
       document, hostname: "a.test", name: "A", current: null, calibration: { learnProfile, updateProfile, createProvider: () => ({}) },
       onSave: async () => ({ ok: true }), // default trust: a dispatched event is never isTrusted

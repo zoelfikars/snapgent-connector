@@ -219,3 +219,9 @@ picker) can test. Next: phase 2.
 
 Not in phase 2: seed profiles shipped in `profiles/`, unknown sites, learning the stop button from a send, and deleting
 the leftovers listed under phase 3.
+
+## Review before saving
+
+- **Text box**: a click on or around the field resolves to the real field (the field, or the one visible field inside the box that was clicked, looked for a few levels up). Only when there is none, or several, is the click refused.
+- **Review overlays**: after the clicks, every turn of the chat is marked on the page ("You" green, "AI reply" blue), the part read is marked "Read from here", and the box the bar will sit in is yellow. Warnings are listed when nothing was found or when the part read leaves out code blocks of the reply (where commands are).
+- **Pick the bar's box**: from the review the user can click the box around the text box (must contain it); it is stored as `card` in the profile.
