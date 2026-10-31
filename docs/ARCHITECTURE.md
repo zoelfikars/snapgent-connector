@@ -50,10 +50,10 @@ extension/
       prompt/                system-prompt · feedback · reminder
       tools/                 category · catalogue · result-summary · names · isolation
                              virtual-commands · result-feedback
-      agent/                 turn-policy (what to do with each kind of reply)
+      agent/                 turn-policy (what to do with each reply) · reply-classifier
       constants.js
-    application/             AgentLoop · ToolRunner · ToolCatalogue · StallWatchdog · ToolReminder
-                             call-guard · ports (typedefs)
+    application/             AgentLoop · ResponseWatcher (+ WatchState) · ToolRunner · ToolCatalogue
+                             StallWatchdog · ToolReminder · call-guard · ports (typedefs)
     infrastructure/chat/     waitFor · StreamSampler · dom-helpers (shared by adapters)
     entry/                   background.js · popup.js · legacy-globals.js
   legacy/                    not yet migrated (see Status): main.js, providers/*
@@ -108,7 +108,8 @@ shippable.
 | Bridge origin check | **Done** (`bridge.py`) |
 | Tool execution (`runTool`, catalogue, isolation, `list_commands`, result shaping) | **Migrated** to `application/` + `domain/tools/`, tested with fake ports |
 | Agent loop (`agentLoop`: turn policy, lifecycle, stall watchdog, reminder cadence) | **Migrated** to `domain/agent` + `application/`, scripted-scenario tests |
-| `legacy/main.js` (~4.1k lines: session bootstrap + response watcher + chips + UI) | Next: `Session`, response watcher, then `ui/` |
+| Response watcher (`waitForResponse`: timing gates + reply classification) | **Migrated** to `application/response-watcher` + `domain/agent/reply-classifier`, fake-clock tests |
+| `legacy/main.js` (~3.7k lines: send path + session bootstrap + chips/camouflage + UI) | Next: `Session`/send path, then `ui/` |
 | `legacy/providers/*` (12 adapters, ~8.1k lines) | Shared primitives extracted; adapter family factory next |
 | `entry/background.js` | Bridge client + message router still in one file |
 
@@ -127,8 +128,10 @@ shippable.
    behind a documented adapter contract (`ChatPort`).
 2. **`application/`**: `ToolRunner` and `AgentLoop` *(done)*. Still to extract
    from `main.js`: `Session` (bootstrap, system-prompt re-injection, skills) and
-   the response watcher (`waitForResponse`, ~400 lines of classification), which
-   would complete the `ChatTurnsPort` the loop already depends on.
+   the send path (`submitAndGetBase`), which would complete the `ChatTurnsPort`
+   the loop depends on. `ResponseWatcher` is done: ~400 lines became a sequence
+   of small gates (pre-start, streaming, no-turn-yet, settle, warm-up, reasoning)
+   over one `WatchState`, plus a pure `classifyReply`.
 3. **`ui/`**: split the ~1.5k-line `ui` IIFE into `bar`, `target-menu`,
    `mcp-settings`, `banners`; split `decorate` (chips) into `chips` + `camouflage`.
    Rendering takes a state object and returns DOM, so view state is testable.

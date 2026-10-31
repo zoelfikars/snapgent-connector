@@ -76,4 +76,20 @@
  * @property {() => string} reminderText
  */
 
+/**
+ * @typedef {Object} ReplyReaderPort  Reads the assistant's reply from the chat page.
+ * @property {() => boolean} isGenerating
+ * @property {() => {item: object|null, reply: string, thinking?: string}} readAssistant
+ * @property {() => *} [lastAssistantId]       Stable id of the last assistant turn, when the site allows it.
+ * @property {() => number} assistantCount
+ * @property {() => string|null} scanError     Context-limit style error text on the page, if any.
+ * @property {(item: object) => boolean} turnHalted
+ * @property {(text: string) => boolean} isTooLongMsg
+ * @property {() => object|null} findContinueBtn
+ * @property {boolean} [reliableCounts]        Turn counts can be trusted (no list virtualisation).
+ * @property {(item: object) => boolean} [replyUnsettled]
+ * @property {(item: object) => boolean} [isComparisonTurn]
+ * @property {() => boolean} [resolveComparison]
+ */
+
 export {};
