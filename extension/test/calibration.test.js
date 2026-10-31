@@ -257,6 +257,17 @@ describe("conversation identity", () => {
     assert.equal(provider.conversationKey(), "", "otherwise every new chat looks like the session remembered for /app");
   });
 
+  test("a copy of a turn that is not laid out (a template, a script) is not a turn: the chat stays empty, so Start shows", () => {
+    const { provider, document } = calibrated(SITES.gemini);
+    const first = provider.allItems()[0];
+    const ghost = first.cloneNode(true);
+    for (const turn of provider.allItems()) turn.remove();
+    ghost.hidden = true;
+    document.body.append(ghost);
+    assert.equal(provider.chatIsEmpty(), true);
+    assert.equal(provider.isFreshChat(), true);
+  });
+
   test("a chat with turns is identified by its path", () => {
     const { provider, window } = calibrated(SITES.gemini);
     window.history.pushState({}, "", "/app/abc123");

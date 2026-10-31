@@ -153,9 +153,21 @@ export function createCalibrationWizard({
       return lines.join("\n");
     };
     const picked = Object.entries(picks).filter(([, el]) => el && el.nodeType === 1).map(([role, el]) => `  ${role}:\n${chain(el)}`);
+    // Where things sit on screen, to tell a wrong box from a right one without a screenshot: sizes only, no text.
+    const rect = (el) => { const r = el.getBoundingClientRect(); return `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`; };
+    const found = [];
+    if (draft) {
+      try {
+        const info = calibration.createProvider(draft).review();
+        for (const [role, el] of [["composer", info.composer], ["card (bar's box)", info.card], ["body (read from)", info.body]]) {
+          if (el) found.push(`  ${role}: ${rect(el)}\n${chain(el)}`);
+        }
+        found.push(`  turns: ${info.users.length} yours, ${info.assistants.length} AI; code blocks ${info.codeBlocksRead}/${info.codeBlocks} read`);
+      } catch (e) { found.push(`  (review failed: ${e.message})`); }
+    }
     return [
       "snapgent calibration report", `site: ${hostname} (${name})`, `step: ${step || "-"}`, `error: ${error || "-"}`,
-      `profile: ${draft ? JSON.stringify(draft) : "-"}`, "clicks (innermost first):", ...(picked.length ? picked : ["  -"]),
+      `profile: ${draft ? JSON.stringify(draft) : "-"}`, "clicks (innermost first):", ...(picked.length ? picked : ["  -"]), "found on the page:", ...(found.length ? found : ["  -"]),
     ].join("\n");
   }
 

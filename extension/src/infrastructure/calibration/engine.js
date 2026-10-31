@@ -37,8 +37,11 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   const firstVisible = (selector) => find(selector).find(visible) || null;
 
   // ── turns ─────────────────────────────────────────────────────────────────
-  const assistantTurns = () => outermost(find(profile.assistant.turn));
-  const userTurns = () => outermost(find(profile.user.turn));
+  // A turn is something laid out on the page (or hidden by us on purpose): a template, a script or a collapsed copy that
+  // happens to carry the same attributes is not a message, and would make an empty chat look started.
+  const turnsOf = (selector) => outermost(find(selector).filter((el) => visible(el) || !!el.closest(".zs-hidden")));
+  const assistantTurns = () => turnsOf(profile.assistant.turn);
+  const userTurns = () => turnsOf(profile.user.turn);
   const allItems = () => [...new Set([...assistantTurns(), ...userTurns()])].sort(byDocumentOrder);
   const isUserItem = (item) => !!item && item.matches(profile.user.turn);
   const isAssistantItem = (item) => !!item && item.matches(profile.assistant.turn);
