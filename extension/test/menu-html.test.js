@@ -42,3 +42,12 @@ describe("switch AI menu", () => {
     assert.equal(doc.querySelectorAll(".zs-site-here").length, 0);
   });
 });
+
+describe("calibration entries in the switch menu", () => {
+  test("only when asked for, and with the four actions the page wires up", () => {
+    const sites = [{ name: "ChatGPT", url: "https://chatgpt.com/" }];
+    assert.equal(parse(switchMenuHtml(sites, "chatgpt")).querySelector("#zs-cal-start"), null);
+    const doc = parse(switchMenuHtml(sites, "chatgpt", { calibration: true }));
+    for (const id of ["zs-cal-start", "zs-cal-export", "zs-cal-import", "zs-cal-remove"]) assert.ok(doc.querySelector(`#${id}`), id);
+  });
+});

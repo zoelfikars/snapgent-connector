@@ -52,6 +52,34 @@ export function learnProfile({ hostname, name, picks }) {
   };
 }
 
+/**
+ * Re-learn one part of an existing profile from new clicks, leaving the rest as it is.
+ * `role`: "composer" | "send" | "reply". "send" with no pick means "Enter sends". "reply" needs `assistant` and `user`.
+ * @returns {{ profile: Profile, warnings: string[] } | { error: string }}
+ */
+export function updateProfile(profile, role, picks) {
+  const warnings = [];
+  if (role === "composer") {
+    const selector = learnSelector(picks.composer, { onlyVisible: true, unique: true }) || learnSelector(picks.composer, { onlyVisible: true });
+    if (!selector) return { error: "Could not describe the text box in a way that finds it again." };
+    return { profile: { ...profile, composer: { selector } }, warnings };
+  }
+  if (role === "send") {
+    if (!picks.send) return { profile: { ...profile, send: { enter: true } }, warnings };
+    const selector = learnSelector(picks.send, { onlyVisible: true, unique: true }) || learnSelector(picks.send, { onlyVisible: true });
+    if (!selector) return { error: "Could not describe the send button in a way that finds it again." };
+    return { profile: { ...profile, send: { selector } }, warnings };
+  }
+  if (role === "reply") {
+    const turns = learnTurnSelectors(picks.assistant, picks.user);
+    if (turns.error) return { error: turns.error };
+    const body = learnBodySelector(turns.assistantTurn, picks.assistantInner || null);
+    if (picks.assistantInner && !body) warnings.push("Could not describe the part of the reply you chose; the whole reply is read.");
+    return { profile: { ...profile, assistant: { turn: turns.assistant, body }, user: { turn: turns.user } }, warnings };
+  }
+  return { error: `Unknown part "${role}".` };
+}
+
 /** What is wrong with a profile as stored (not whether the page still matches it). */
 export function profileProblems(profile) {
   const problems = [];

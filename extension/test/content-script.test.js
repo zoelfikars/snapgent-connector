@@ -54,16 +54,43 @@ async function startOn(html, url = "https://chatgpt.com/c/test", { storage = {} 
 
 // Until a site is calibrated (docs/CALIBRATION.md) the extension must still boot cleanly and say why it cannot start.
 describe("content script on a supported site that is not calibrated yet", () => {
-  test("shows the bar, keeps Start disabled with the reason, draws no chips and logs no warnings", async () => {
+  test("shows the bar with the reason and a Calibrate button instead of Start, draws no chips and logs no warnings", async () => {
     const page = await startOn("<html><body><main><p>a chat page</p></main></body></html>");
     try {
       assert.deepEqual(page.warnings, []);
       assert.ok(page.document.getElementById("zs-bar"), "the bar is there");
       assert.match(page.document.getElementById("zs-state").textContent, /Not calibrated for this site yet/);
-      assert.equal(page.document.getElementById("zs-action").disabled, true);
+      const action = page.document.getElementById("zs-action");
+      assert.deepEqual([action.textContent, action.dataset.kind, action.disabled], ["Calibrate", "calibrate", false]);
       assert.equal(page.count(".zs-chip"), 0);
     } finally {
       page.window.close(); // stops the content script's timers even when an assertion failed
+    }
+  });
+
+  test("pressing Calibrate opens the calibration panel, and Cancel closes it", async () => {
+    const page = await startOn("<html><body><main><p>a chat page</p></main></body></html>");
+    try {
+      page.document.getElementById("zs-action").click();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      assert.ok(page.document.getElementById("zs-calibrate"), "the panel is on the page");
+      page.document.dispatchEvent(new page.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      // an untrusted Escape must not close it: only a genuine key does
+      assert.ok(page.document.getElementById("zs-calibrate"), "a forged Escape does nothing");
+    } finally {
+      page.window.close();
+    }
+  });
+
+  test("the menu offers calibrating, exporting, importing and removing this site's calibration", async () => {
+    const page = await startOn("<html><body><main><p>a chat page</p></main></body></html>");
+    try {
+      page.document.getElementById("zs-switch").click();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const menu = page.document.getElementById("zs-menu");
+      for (const id of ["zs-cal-start", "zs-cal-export", "zs-cal-import", "zs-cal-remove"]) assert.ok(menu.querySelector(`#${id}`), id);
+    } finally {
+      page.window.close();
     }
   });
 

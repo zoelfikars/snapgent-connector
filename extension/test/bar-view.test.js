@@ -108,3 +108,20 @@ describe("escapeHtml", () => {
     assert.equal(escapeHtml(42), "42");
   });
 });
+
+describe("computeBarView: a site that needs calibrating", () => {
+  const base = { staleExtension: false, starting: false, started: false, running: false, parked: false, blankChat: true, bridge: { connected: true, servers: [] }, bridgeOk: true, target: { id: "vscode", name: "VS Code" }, activeToolCount: 0, workspaceReady: true, workspaceProbePending: false, modeWarning: "Cannot find the send button on this page. Re-calibrate it." };
+
+  test("the only action is Calibrate, with the reason, whatever else is going on", () => {
+    for (const blankChat of [true, false]) {
+      const result = computeBarView({ ...base, blankChat, needsCalibration: true });
+      assert.deepEqual([result.kind, result.label, result.disabled, result.warn], ["calibrate", "Calibrate", false, true]);
+      assert.match(result.message, /send button/);
+    }
+  });
+
+  test("a running session is not interrupted by it, and a site that does not need it is unchanged", () => {
+    assert.notEqual(computeBarView({ ...base, started: true, needsCalibration: true }).kind, "calibrate");
+    assert.equal(computeBarView({ ...base, needsCalibration: false, modeWarning: null }).kind, "start");
+  });
+});

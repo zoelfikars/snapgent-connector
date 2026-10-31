@@ -1236,6 +1236,11 @@
     function onActionClick() {
       const kind = actionBtn.dataset.kind;
       if (kind === "start") startSession();
+      else if (kind === "calibrate") {
+        // A part that stopped matching is redone on its own; a site never calibrated is done from the start.
+        const problem = P.health && P.health().problems[0];
+        openCalibration(problem && ["composer", "send"].includes(problem.role) ? problem.role : null);
+      }
     }
 
     const getTargetName = (id = selectedTargetId) => serverDirectory.name(id);
@@ -1319,8 +1324,53 @@
       });
     }
 
+    // ── Site calibration (docs/CALIBRATION.md): src/ui/calibration-wizard.js, profiles in src/application/profile-store.js ──
+    const profileStore = new ZSApp.ProfileStore({
+      store: {
+        get: (key) => new Promise((resolve) => { try { chrome.storage.local.get(key, (r) => resolve(r && r[key])); } catch { resolve(undefined); } }),
+        set: (key, value) => new Promise((resolve) => { try { chrome.storage.local.set({ [key]: value }, resolve); } catch { resolve(); } }),
+      },
+      problemsOf: ZSCalibration.profileProblems,
+    });
+    let calibrationWizard = null;
+    async function openCalibration(only) {
+      if (calibrationWizard) calibrationWizard.cancel(false);
+      calibrationWizard = ZSUi.createCalibrationWizard({
+        document, hostname: location.hostname, name: P.displayName, current: await profileStore.get(location.hostname),
+        calibration: {
+          learnProfile: ZSCalibration.learnProfile, updateProfile: ZSCalibration.updateProfile,
+          createProvider: (profile) => ZSCalibration.createCalibratedProvider({ document, location, profile }),
+        },
+        onSave: (profile) => profileStore.save(profile),
+      });
+      calibrationWizard.start({ only });
+    }
+    async function exportCalibration() {
+      const text = await profileStore.exportText(location.hostname);
+      if (!text) { notifications.toast("This site is not calibrated yet."); return; }
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+      link.download = `snapgent-${location.hostname}.json`;
+      document.documentElement.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    }
+    function importCalibration() {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "application/json,.json";
+      input.addEventListener("change", async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const result = await profileStore.importText(await file.text(), location.hostname);
+        notifications.toast(result.ok ? "Calibration imported." : result.error);
+      });
+      input.click();
+    }
+
     function buildMenu() {
-      menuEl.innerHTML = ZSUi.switchMenuHtml(AI_SITES, P.displayName);
+      menuEl.innerHTML = ZSUi.switchMenuHtml(AI_SITES, P.displayName, { calibration: true });
       const open = (url) => { try { window.open(url, "_blank", "noopener"); } catch {} menuEl.hidden = true; };
       menuEl.querySelectorAll("button.zs-site-opt, .zs-tip-opt").forEach((b) =>
         b.addEventListener("click", () => open(b.dataset.u)));
@@ -1328,6 +1378,14 @@
       if (gear) gear.addEventListener("click", (e) => { e.stopPropagation(); menuEl.hidden = true; openMcpSettings(); });
       const starBtn = menuEl.querySelector("#zs-skills-settings");
       if (starBtn) starBtn.addEventListener("click", (e) => { e.stopPropagation(); menuEl.hidden = true; openSkillsSettings(); });
+      const calibration = (id, action) => {
+        const button = menuEl.querySelector(id);
+        if (button) button.addEventListener("click", (e) => { e.stopPropagation(); menuEl.hidden = true; action(); });
+      };
+      calibration("#zs-cal-start", () => openCalibration(null));
+      calibration("#zs-cal-export", exportCalibration);
+      calibration("#zs-cal-import", importCalibration);
+      calibration("#zs-cal-remove", async () => { await profileStore.remove(location.hostname); notifications.toast("Calibration removed."); });
     }
 
     // ── First-time onboarding card (src/ui/setup-card.js) ───────────────────
@@ -1377,6 +1435,7 @@
         workspaceReady: bridgeMonitor.workspaceReady,
         workspaceProbePending: bridgeMonitor.workspaceProbePending,
         modeWarning: !A.started && !A.starting && P.modeWarning ? P.modeWarning() : null,
+        needsCalibration: !!P.needsCalibration,
       });
       const toneClass = view.tone, msg = view.message, label = view.label, kind = view.kind;
       const disabled = view.disabled, warn = view.warn;

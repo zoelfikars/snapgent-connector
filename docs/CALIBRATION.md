@@ -1,6 +1,6 @@
 # Calibration: teaching the extension a chat site instead of coding it
 
-Status: **design, agreed in discussion. Phases 0 and 1 are done (see "Phase 1 results"); the calibration UI and everything after it are not built yet.**
+Status: **design, agreed in discussion. Phases 0, 1 and 2 are built (see "Phase 1 results" and "Phase 2: what exists"); seed profiles, deleting the last old code and unknown sites are not.**
 
 ## Why
 
@@ -202,3 +202,20 @@ site, and nine sites have not been tried. The Meta page is the only one with a c
 **Verdict: go.** The profile-from-clicks approach reproduces the parts of the adapter contract that the old contract
 tests covered, on all three pages, with no site-specific code. The remaining risk is live pages, which only phase 2 (a real
 picker) can test. Next: phase 2.
+
+## Phase 2: what exists
+
+- **Picker** (`src/ui/picker.js`): while it runs the page gets none of the user's clicks; one genuine (`isTrusted`) click
+  chooses the element, Escape cancels, a fabricated click chooses nothing. Our own panel and control bar are not pickable.
+- **Wizard** (`src/ui/calibration-wizard.js`, closed shadow root): text box, send button (or "Enter sends"), a reply, one of
+  your messages; then a preview of the text it would read from the reply (with "Pick just the answer" when it includes
+  labels or buttons); then a write-and-read-back check of the text box that sends nothing; then save. "Back", "Cancel"
+  and Escape work throughout. One part can be redone alone (text box, send button, or reply + message), keeping the rest.
+- **Storage and files** (`src/application/profile-store.js`): profiles live in extension storage under `zsProfiles[host]`.
+  The menu entries **Calibrate this site / Export / Import / Remove** are in the "switch AI" menu; an import is accepted
+  only for the host it was made for. Storing or removing a profile switches the provider without a reload.
+- **Bar**: on a site that is not calibrated, or whose profile stopped matching the page, the only action is
+  **Calibrate** (with the reason as the message; a missing text box or send button redoes just that part).
+
+Not in phase 2: seed profiles shipped in `profiles/`, unknown sites, learning the stop button from a send, and deleting
+the leftovers listed under phase 3.

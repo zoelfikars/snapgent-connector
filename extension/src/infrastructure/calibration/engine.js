@@ -133,6 +133,38 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     throw new Error("The text box did not take the typed text. Click into it and try again.");
   }
 
+  /** Empty the composer the way a person would (select all, delete) and confirm it is empty. */
+  async function clearComposer() {
+    const editor = getEditor();
+    if (!editor) return false;
+    if (isValueEditor(editor)) { editor.focus(); setNativeValue(editor, "", win); return editorText() === ""; }
+    for (const attempt of [
+      () => document.execCommand("delete"),
+      () => editor.dispatchEvent(new win.InputEvent("beforeinput", { inputType: "deleteContentBackward", bubbles: true, cancelable: true })),
+    ]) {
+      editor.focus();
+      selectContents(editor);
+      await settle();
+      try { attempt(); } catch { /* try the next way */ }
+      if (await waitFor(() => editorText().trim() === "", 1500)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Calibration self-test: write a short text, read it back, empty the box. Nothing is sent.
+   * @returns {{ ok: boolean, via?: string, cleared?: boolean, error?: string }}
+   */
+  async function testWrite() {
+    try {
+      const via = await writeComposer("snapgent test");
+      const cleared = await clearComposer();
+      return { ok: true, via, cleared };
+    } catch (error) {
+      return { ok: false, error: String((error && error.message) || error) };
+    }
+  }
+
   const pressed = (button) => {
     for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
       try {
@@ -243,7 +275,8 @@ export function createCalibratedProvider({ document, location, profile, diag = (
       const { problems } = health();
       return problems.length ? `Cannot find the ${problems[0].role} on this page. Re-calibrate it.` : "";
     },
-    health, describeLayout: health,
+    health, describeLayout: health, testWrite,
+    get needsCalibration() { return !health().ok; },
 
     allItems, isUserItem, isAssistantItem, itemText, classifyText, assistantCount, userCount, lastAssistant,
     lastAssistantId: () => idOf(lastAssistant()), itemKey: idOf, readAssistant, chatIsEmpty,

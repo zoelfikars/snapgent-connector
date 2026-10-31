@@ -28,6 +28,8 @@ const ZSProvider = (() => {
     init() {},
     // The bar shows this and keeps Start disabled (the same path sites with an unsupported chat mode used).
     modeWarning: () => "Not calibrated for this site yet",
+    needsCalibration: true,
+    health: () => ({ ok: false, problems: [{ role: "all", reason: "not calibrated" }] }),
 
     // turns
     allItems: () => [], isUserItem: no, isAssistantItem: no, itemText: empty, classifyText: empty,

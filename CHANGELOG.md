@@ -14,6 +14,12 @@ All notable changes to snapgentV3 Free are documented here.
 - Frozen executables keep `config.json` and `logs/` next to the `.exe` (not in a temp folder).
 - `scripts/package_release.py` assembles the release zip (tested).
 
+### Added
+- **Calibration** replaces the built-in per-site adapters. On any supported chat site, press **Calibrate** in the bar:
+  click the text box, the send button (or choose "Enter sends"), a reply and one of your own messages, check the preview
+  of what will be read and the write test (nothing is sent), and the site is taught. One part can be redone alone; the
+  result can be exported, imported and removed from the switch-AI menu. See [docs/CALIBRATION.md](docs/CALIBRATION.md).
+
 ### Removed
 - **All per-site chat adapters** (ChatGPT, Gemini, Claude, DeepSeek, Grok, Mistral, Kimi, Qwen, GLM, Arena, Meta,
   Ptero), their main-world scripts, the ChatGPT layout table and every test and fixture that only exercised them.

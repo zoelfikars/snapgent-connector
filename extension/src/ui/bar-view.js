@@ -18,14 +18,15 @@ import { escapeHtml } from "./html.js";
  * @property {number} activeToolCount   Tools the model currently has.
  * @property {boolean} workspaceReady   VS Code has a folder open (only meaningful for the vscode target).
  * @property {boolean} workspaceProbePending
- * @property {string|null} modeWarning  The site is in a chat mode we cannot work in.
+ * @property {string|null} modeWarning  Why this page cannot be used as it is (shown as the message).
+ * @property {boolean} [needsCalibration]  The site is not calibrated, or part of its calibration no longer matches the page.
  *
  * @typedef {Object} BarView
  * @property {"standby"|"active"|"warn"|"noagent"|"starting"} tone
  * @property {boolean} spinner
  * @property {string} message           HTML.
  * @property {string} label             Text of the primary button.
- * @property {""|"start"|"starting"} kind  "" = no primary action.
+ * @property {""|"start"|"starting"|"calibrate"} kind  "" = no primary action.
  * @property {boolean} disabled
  * @property {boolean} warn
  */
@@ -60,6 +61,11 @@ function beforeStart(state) {
 export function computeBarView(state) {
   // An orphaned page can show nothing but "reload": everything else would be a frozen snapshot.
   if (state.staleExtension) return view("warn", "<b>Disconnected</b> · reload page", { warn: true });
+
+  // Nothing else can happen on a site the extension does not know how to read: the one thing to do is to teach it.
+  if (state.needsCalibration && !state.started && !state.starting) {
+    return view("warn", state.modeWarning || "Not calibrated for this site yet", { label: "Calibrate", kind: "calibrate", warn: true });
+  }
 
   let result;
   if (state.starting) result = view("starting", "Starting…", { spinner: true, label: "Starting…", kind: "starting", disabled: true });

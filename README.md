@@ -18,7 +18,8 @@
 > **Status: chat-site support is being rebuilt.** The built-in per-site adapters were removed in favour of a short
 > one-time *calibration* where you point the extension at your chat's text box, send button and a reply
 > ([design](docs/CALIBRATION.md)). Until that lands the extension loads, connects to the bridge and lets you switch
-> between AI sites, but cannot run the agent on them. The last version with the old adapters is the git tag `pre-calibration`.
+> between AI sites, and **Calibrate** (bar, or the switch-AI menu) teaches it a site in about a minute; export and import share
+> the result. Until a site is calibrated it cannot run the agent there. The last version with the old adapters is the git tag `pre-calibration`.
 
 ```console
 

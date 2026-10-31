@@ -17,10 +17,19 @@ export function targetMenuHtml(options, currentId) {
   return `<section class="zs-menu-sec"><div class="zs-sec-label"><span>MCP target</span></div>${rows}</section>`;
 }
 
+const CALIBRATION_SECTION = `
+         <section class="zs-menu-sec">
+           <div class="zs-sec-label"><span>This site</span></div>
+           <button class="zs-site-opt" id="zs-cal-start" type="button"><span class="zs-site-name"><span>Calibrate this site</span><span class="zs-site-host">teach it where the text box, send button and replies are</span></span></button>
+           <button class="zs-site-opt" id="zs-cal-export" type="button"><span class="zs-site-name"><span>Export calibration</span></span></button>
+           <button class="zs-site-opt" id="zs-cal-import" type="button"><span class="zs-site-name"><span>Import calibration</span></span></button>
+           <button class="zs-site-opt" id="zs-cal-remove" type="button"><span class="zs-site-name"><span>Remove calibration</span></span></button>
+         </section>`;
+
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; } };
 
 /** The Switch AI pop-over: every supported site, the current one badged instead of linked. */
-export function switchMenuHtml(sites, currentName) {
+export function switchMenuHtml(sites, currentName, { calibration = false } = {}) {
   const here = String(currentName || "").toLowerCase();
   const grid = sites.map((site) => {
     const label = `<span class="zs-site-name"><span>${escapeHtml(site.name)}</span><span class="zs-site-host">${escapeHtml(hostOf(site.url))}</span></span>`;
@@ -32,5 +41,5 @@ export function switchMenuHtml(sites, currentName) {
          <section class="zs-menu-sec">
            <div class="zs-sec-label zs-sec-label-row"><span>Switch AI</span><span><button id="zs-skills-settings" class="zs-gear" title="Skills" aria-label="Skills">&#9733;</button><button id="zs-mcp-settings" class="zs-gear" title="MCP settings" aria-label="MCP settings">&#9881;</button></span></div>
            <div class="zs-site-grid">${grid}</div>
-         </section>`;
+         </section>${calibration ? CALIBRATION_SECTION : ""}`;
 }
