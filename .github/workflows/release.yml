@@ -1,6 +1,7 @@
 name: Release
 
-# Push a tag like v3.9.4 to build and publish a release. The tag must match the version in the code.
+# Push a tag like v3.9.4 to build and publish a release. The tag must match the version in the code;
+# a suffix (v3.9.4-beta1) makes it a pre-release.
 on:
   push:
     tags: ["v*"]
@@ -18,6 +19,7 @@ jobs:
       - id: version
         run: |
           tag="${GITHUB_REF_NAME#v}"
+          tag="${tag%%-*}"
           code="$(PYTHONPATH=server python3 -c 'from snapgent_bridge import BRIDGE_VERSION; print(BRIDGE_VERSION)')"
           if [ "$tag" != "$code" ]; then
             echo "Tag v$tag does not match the version in the code ($code)." >&2
@@ -57,6 +59,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install pyinstaller websockets
+      - name: Configure git identity for the tests that make commits
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
       - run: python -m unittest discover -s tests -t .
       - run: pyinstaller --noconfirm bridge.spec
         working-directory: server
@@ -70,8 +76,36 @@ jobs:
             server/dist/vscode_mcp.exe
           if-no-files-found: error
 
+  linux-binary:
+    needs: check-version
+    runs-on: ubuntu-22.04   # built on an older glibc so the program runs on older distributions too
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pyinstaller websockets
+      - name: Configure git identity for the tests that make commits
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+      - run: python -m unittest discover -s tests -t .
+      - run: pyinstaller --noconfirm snapgent.spec
+        working-directory: server
+      - name: The program starts and answers as the VS Code MCP server
+        working-directory: server
+        run: |
+          ./dist/snapgent --version
+          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            | timeout 20 ./dist/snapgent --vscode-mcp | grep -q '"serverInfo"'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-binary
+          path: server/dist/snapgent
+          if-no-files-found: error
+
   publish:
-    needs: [check-version, extension, windows-binaries]
+    needs: [check-version, extension, windows-binaries, linux-binary]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,6 +117,10 @@ jobs:
         with:
           name: windows-binaries
           path: binaries
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-binary
+          path: linux-binary
       - name: Assemble the release
         run: >
           python3 scripts/package_release.py
@@ -90,9 +128,19 @@ jobs:
           --extension-dist extension-dist
           --binaries binaries
           --out out
+      - name: Assemble the extension zip and the Linux program
+        run: >
+          python3 scripts/package_release.py
+          --version "${{ needs.check-version.outputs.version }}"
+          --extension-dist extension-dist
+          --linux-binary linux-binary/snapgent
+          --out out
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "out/snapgent-v${{ needs.check-version.outputs.version }}.zip" \
-            --title "snapgentV3 ${GITHUB_REF_NAME}" --notes-file CHANGELOG.md --verify-tag
+          v="${{ needs.check-version.outputs.version }}"
+          flags=""
+          case "$GITHUB_REF_NAME" in *-*) flags="--prerelease";; esac
+          gh release create "$GITHUB_REF_NAME" "out/snapgent-v$v.zip" "out/snapgent-extension-v$v.zip" "out/snapgent-linux-x64-v$v.tar.gz" \
+            --title "snapgentV3 ${GITHUB_REF_NAME}" --notes-file CHANGELOG.md --verify-tag $flags

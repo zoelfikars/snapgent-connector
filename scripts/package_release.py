@@ -11,6 +11,7 @@ import argparse
 import shutil
 import stat
 import sys
+import tarfile
 import zipfile
 from pathlib import Path
 from typing import List
@@ -93,15 +94,51 @@ def make_zip(folder: Path) -> Path:
     return archive
 
 
+def make_extension_zip(extension_dist: Path, out: Path, version: str) -> Path:
+    """`snapgent-extension-v<version>.zip`: the built chrome/ and firefox/ folders, the same on every OS."""
+    archive = out / f"snapgent-extension-v{version}.zip"
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name in EXTENSION_TARGETS:
+            source = extension_dist / name
+            if not source.is_dir():
+                raise ReleaseError(f"Missing release input: {source}")
+            for path in sorted(source.rglob("*")):
+                if path.is_file():
+                    zf.write(path, path.relative_to(extension_dist).as_posix())
+    return archive
+
+
+def make_linux_archive(binary: Path, repo: Path, out: Path, version: str) -> Path:
+    """`snapgent-linux-x64-v<version>.tar.gz`: the single `snapgent` program with its execute bit (a .tar.gz keeps it)."""
+    if not binary.is_file():
+        raise ReleaseError(f"Missing release input: {binary}")
+    archive = out / f"snapgent-linux-x64-v{version}.tar.gz"
+    with tarfile.open(archive, "w:gz") as tf:
+        info = tf.gettarinfo(str(binary), arcname="snapgent")
+        info.mode = 0o755
+        info.uid = info.gid = 0
+        info.uname = info.gname = ""
+        with binary.open("rb") as handle:
+            tf.addfile(info, handle)
+        tf.add(str(repo / "LICENSE"), arcname="LICENSE")
+    return archive
+
+
 def main(argv: List[str] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--version", required=True)
     parser.add_argument("--extension-dist", type=Path, required=True, help="folder holding chrome/ and firefox/")
     parser.add_argument("--binaries", type=Path, help="folder holding bridge.exe and vscode_mcp.exe (omit for a dry run)")
+    parser.add_argument("--linux-binary", type=Path, help="the Linux `snapgent` program; adds the extension zip and the Linux archive")
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parent.parent)
     args = parser.parse_args(argv)
     try:
+        if args.linux_binary:
+            args.out.mkdir(parents=True, exist_ok=True)
+            print(make_extension_zip(args.extension_dist, args.out, args.version))
+            print(make_linux_archive(args.linux_binary, args.repo, args.out, args.version))
+            return 0
         folder = assemble(args.repo, args.out, args.version, args.extension_dist, args.binaries)
     except ReleaseError as error:
         print(f"ERROR: {error}", file=sys.stderr)

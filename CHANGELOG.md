@@ -15,6 +15,10 @@ All notable changes to snapgentV3 Free are documented here.
 - `scripts/package_release.py` assembles the release zip (tested).
 
 ### Added
+- **One program for Linux (beta)**: `snapgent` runs the bridge, and `snapgent --vscode-mcp` runs the VS Code MCP server the bridge
+  starts, so a release needs no Python. It writes its own `config.json`, replaces an older Snapgent bridge on the port, and is built by
+  CI on Ubuntu 22.04. Releases now also publish the extension on its own (`snapgent-extension-v<version>.zip`) and the Linux program
+  (`snapgent-linux-x64-v<version>.tar.gz`); a tag with a suffix (`v3.9.4-beta1`) is published as a pre-release. Windows is unchanged for now.
 - **Calibration** replaces the built-in per-site adapters. On any supported chat site, press **Calibrate** in the bar:
   click the text box, the send button (or choose "Enter sends"), a reply and one of your own messages, check the preview
   of what will be read and the write test (nothing is sent), and the site is taught. One part can be redone alone; the

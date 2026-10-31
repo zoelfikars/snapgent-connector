@@ -138,7 +138,11 @@ For VS Code, open the project folder you want to work on before clicking **Start
   EffectCraft CLI, then writes their machine-specific paths to the ignored
   local `config.json`. This launcher uses `bridge.py`; it does not run the
   Windows-only `bridge.exe`.
-- **Linux** — open a terminal in the extracted release folder and run
+- **Linux (beta)** — download `snapgent-linux-x64-v<version>.tar.gz` from the pre-release, then in a terminal:
+  `tar xzf snapgent-linux-x64-*.tar.gz && ./snapgent`. One program, no Python needed: it writes its own VS Code
+  MCP configuration next to itself, replaces an older Snapgent bridge that still holds the port, and runs the bridge.
+  Keep the terminal open while you use Snapgent. The extension comes as `snapgent-extension-v<version>.zip` (`chrome/` and `firefox/`).
+- **Linux from a clone (Python)** — open a terminal in the `server` folder and run
   `bash Linux_Start.sh`. It detects the bundled VS Code MCP server and
   installed EffectCraft CLI, then writes
   machine-specific paths to the ignored local `config.json`. It uses
