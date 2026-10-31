@@ -62,6 +62,7 @@ describe("calibration wizard", () => {
     const provider = createCalibratedProvider({ document: t.document, location: t.window.location, profile });
     assert.deepEqual([provider.userCount(), provider.assistantCount()], [1, 1]);
     assert.match(provider.readAssistant().reply, /"command"/);
+    assert.match(t.text(), /Open a new chat/, "Start is only offered in a new chat, so it says so");
     t.press("close");
     assert.equal(t.panel(), null, "the panel is gone");
     assert.equal(t.closed.length, 1);

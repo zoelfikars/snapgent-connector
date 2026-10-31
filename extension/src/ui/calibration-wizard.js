@@ -137,7 +137,7 @@ export function createCalibrationWizard({
     done = true;
     error = "";
     step = "done";
-    render({ text: `${name} is calibrated. You can press Start.`, buttons: [{ label: "Close", action: "close", primary: true }] });
+    render({ text: `${name} is calibrated. Open a new chat and press Start there.`, buttons: [{ label: "Close", action: "close", primary: true }] });
   }
 
   // What a bug report needs and nothing private: where the clicks landed (tag and stable attributes of the element and what is

@@ -137,13 +137,24 @@ describe("health and re-calibration", () => {
     const health = provider.health();
     assert.equal(health.ok, false);
     assert.equal(health.problems[0].role, "composer");
-    assert.match(provider.modeWarning(), /composer|text box|Re-calibrate/i);
+    assert.equal(provider.modeWarning(), "Text box not found");
   });
 
-  test("a missing send button is named", () => {
+  test("a missing send button is named once there is text to send", () => {
     const { provider, document } = calibrated(SITES.chatgpt);
     document.querySelector('[data-testid="send-button"]').remove();
+    document.querySelector("#prompt-textarea").textContent = "hello";
     assert.equal(provider.health().problems[0].role, "send");
+    assert.equal(provider.modeWarning(), "Send button not found");
+  });
+
+  test("a send button that only appears with text (Gemini) is not a problem while the box is empty", () => {
+    const { provider, document } = calibrated(SITES.gemini);
+    document.querySelector('button[aria-label="Send message"]').remove();
+    assert.equal(provider.getEditor().textContent, "");
+    assert.deepEqual(provider.health().problems, []);
+    assert.equal(provider.modeWarning(), "");
+    assert.equal(provider.needsCalibration, false);
   });
 
   test("a healthy page says nothing", () => {

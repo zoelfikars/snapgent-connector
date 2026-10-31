@@ -257,7 +257,8 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     const problems = profileProblems(profile).map((reason) => ({ role: "profile", reason }));
     if (!problems.length) {
       if (!getEditor()) problems.push({ role: "composer", reason: "text box not found" });
-      if (profile.send.selector && !sendButton()) problems.push({ role: "send", reason: "send button not found" });
+      // Some sites only draw the send button once there is text, so its absence in an empty box proves nothing.
+      if (profile.send.selector && !sendButton() && editorText().trim() !== "") problems.push({ role: "send", reason: "send button not found" });
     }
     return { ok: problems.length === 0, problems, assistantTurns: assistantCount(), userTurns: userCount() };
   }
@@ -273,7 +274,9 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     init() {},
     modeWarning() {
       const { problems } = health();
-      return problems.length ? `Cannot find the ${problems[0].role} on this page. Re-calibrate it.` : "";
+      if (!problems.length) return "";
+      const part = { composer: "Text box", send: "Send button" }[problems[0].role] || "Setup";
+      return `${part} not found`;
     },
     health, describeLayout: health, testWrite,
     get needsCalibration() { return !health().ok; },
