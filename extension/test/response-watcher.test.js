@@ -151,6 +151,28 @@ describe("ResponseWatcher: gates", () => {
   });
 });
 
+describe("ResponseWatcher: a page the adapter cannot read", () => {
+  test("generating with no reply turn visible ends as 'unreadable' with layout diagnostics, not after minutes of silence", async () => {
+    const h = createWatchHarness({ initial: { gen: true, reply: "", item: null, lastId: null, count: 0 } });
+    const res = await wait(h);
+    assert.deepEqual(res, { kind: "unreadable" });
+    assert.ok(h.elapsed() >= 15000 && h.elapsed() < 17000, `took ${h.elapsed()} ms`);
+    assert.deepEqual(h.diags.find(([e]) => e === "layout.unreadable")[1], { layout: null, users: 1, assistants: 0 });
+  });
+
+  test("the reply turn appearing in time cancels the verdict", async () => {
+    const h = createWatchHarness({ initial: { gen: true, reply: "", item: null, lastId: null, count: 0 } })
+      .at(10000, { item: { id: "t1" }, lastId: "t1", count: 1, reply: "hello", gen: false });
+    const res = await wait(h);
+    assert.deepEqual([res.kind, res.text], ["text", "hello"]);
+  });
+
+  test("before the reply has started nothing is expected to be readable", async () => {
+    const h = createWatchHarness({ initial: { gen: false, reply: "", item: null, lastId: null, count: 0 } });
+    assert.equal((await wait(h)).kind, "empty"); // the 60 s silent-start path, not 'unreadable'
+  });
+});
+
 describe("WatchState", () => {
   test("shift slides every running deadline but leaves unset ones at zero", () => {
     let t = 1000;
@@ -179,6 +201,13 @@ describe("WatchState", () => {
     s.observeStability({ reply: "x" }, false);
     s.observeStability({ reply: "x" }, true);
     assert.equal(s.genFlickers, 1);
+  });
+
+  test("shift also slides the unreadable clock", () => {
+    const s = new WatchState(() => 1000);
+    s.unreadableSince = 1200;
+    s.shift(300);
+    assert.equal(s.unreadableSince, 1500);
   });
 
   test("a new turn node forgets the previous turn's text", () => {

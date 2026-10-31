@@ -122,6 +122,30 @@ describe("SessionStarter", () => {
     assert.equal(t.log.at(-1), "end:true");
   });
 
+  test("replies the adapter cannot read abort the start with an explanation, never 'ready'", async () => {
+    const t = setup({ state: { responses: [{ kind: "unreadable" }] } });
+    await t.starter.start();
+    assert.deepEqual(banners(t.log)[0].slice(1), ["Can't read TestAI's replies", "The site layout may have changed. Details are in the console ([zs-diag] layout.unreadable)."]);
+    assert.ok(!t.log.includes("markStarted"));
+    assert.equal(t.log.at(-1), "end:true");
+  });
+
+  test("a sent message that is not recognised as a user turn warns and logs the page, but the start continues", async () => {
+    const layout = { sentMessageVisible: async () => false, describe: () => ({ chain: ["div[x]"] }) };
+    const t = setup({ state: { responses: [ready] }, deps: { layout } });
+    await t.starter.start();
+    assert.deepEqual(banners(t.log)[0].slice(1), ["TestAI page not fully recognised", "Your message was sent but not detected as a user turn, so hiding it may not work."]);
+    assert.ok(t.log.includes("diag:layout.sentMissing"));
+    assert.ok(t.log.includes("markStarted"));
+  });
+
+  test("a recognised sent message raises no warning", async () => {
+    const layout = { sentMessageVisible: async () => true, describe: () => ({}) };
+    const t = setup({ state: { responses: [ready] }, deps: { layout } });
+    await t.starter.start();
+    assert.equal(banners(t.log).length, 0);
+  });
+
   test("non-vscode targets skip the workspace probe and skills", async () => {
     const t = setup({ state: { targetId: "other", responses: [ready] } });
     await t.starter.start();

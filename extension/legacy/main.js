@@ -301,6 +301,17 @@
     isComparisonTurn: providerMethod("isComparisonTurn"),
     resolveComparison: providerMethod("resolveComparison"),
   };
+  // What the page looks like, for diagnostics when the adapter cannot find what it expects: the element
+  // chains around text we KNOW is there (our marker, the model's command) are exactly what is needed to
+  // teach an adapter a new page layout.
+  const layoutReport = () => ({
+    provider: P.id,
+    layout: typeof P.describeLayout === "function" ? P.describeLayout() : undefined,
+    users: P.userCount(),
+    assistants: P.assistantCount(),
+    markerChain: ZSChat.describeAnchor(document, ZS.SYS_MARKER),
+    replyChain: ZSChat.describeAnchor(document, '"command"'),
+  });
   const responseWatcher = new ResponseWatcher({
     chat: replyReader,
     visibility: { isHidden: () => document.hidden, parkHidden: () => parkHidden() },
@@ -310,6 +321,7 @@
     timings: T,
     knowsTool: (name) => catalogue.knows(name),
     catalogueSize: () => catalogue.names().size,
+    describeLayout: layoutReport,
     diag,
   });
   const waitForResponse = (base) => responseWatcher.wait(base);
@@ -817,6 +829,14 @@
       banner: (level, title, text) => ui.banner(level, title, text),
       showStartingChip: () => decorate.sweep(),
       handshake: (item, phase, detail) => decorate.toolBox(item, "Loading commands", phase, detail, true),
+    },
+    layout: {
+      // Our prompt must show up as a user turn carrying the session marker: that is how it gets hidden.
+      sentMessageVisible: () => waitFor(
+        () => P.allItems().some((item) => P.isUserItem(item) && P.classifyText(item, ".zs-chip").includes(ZS.SYS_MARKER)),
+        5000,
+      ),
+      describe: layoutReport,
     },
     isStopped: () => A.stop,
     diag,
@@ -2152,6 +2172,7 @@
             ((selected.tools || 0) > 0 || activeTools().length > 0);
           if (!workspaceTool) {
             workspaceReady = false;
+            return;
           }
           return bg({
             type: "call_tool",

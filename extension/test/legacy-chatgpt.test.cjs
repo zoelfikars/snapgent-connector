@@ -172,17 +172,7 @@ const proseMirrorComposer = {
 composerNodes = [proseMirrorComposer];
 ok("accessible ChatGPT composer is detected", P.getEditor() === proseMirrorComposer);
 
-// The current ChatGPT layout renders assistant replies in a DilResponseRoot
-// without the classic data-message-author-role/data-message-id attributes.
-const dilReply = el("div", { class: "DilResponseRoot-HfQrEh" }, [
-  el("p", {}, ['{"command":"list_commands","params":{"server":"vscode"}}']),
-]);
-messageNodes = [dilReply];
-ok("DilResponseRoot is counted as an assistant reply", P.assistantCount() === 1);
-const dilReplyText = P.readAssistant().reply;
-ok("DilResponseRoot reply text is readable", dilReplyText.includes('"command":"list_commands"'));
-const dilReplyCalls = ZSParse.parseToolCalls(dilReplyText);
-ok("command in DilResponseRoot reply is parsed", dilReplyCalls.length === 1 && dilReplyCalls[0].tool === "list_commands");
+// (Turn reading for the DilResponseRoot and newer layouts is covered with real DOM in test/chatgpt-layouts.test.js.)
 
 // ChatGPT's newer compact composer is a controlled textarea instead of the
 // ProseMirror #prompt-textarea. It still needs the bar anchor and send path.

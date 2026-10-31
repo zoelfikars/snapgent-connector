@@ -21,6 +21,15 @@ All notable changes to snapgentV3 Free are documented here.
   `bridge.exe` / `vscode_mcp.exe` are not rebuilt by this change.
 
 ### Fixed
+- **ChatGPT's new page layout was not recognised** (replies are wrapped in
+  `data-content-search-unit-key` elements; the old `data-message-author-role`/`.markdown`
+  markers are gone). The adapter saw no turns at all, so the start stalled and the system
+  prompt and commands were shown unhidden. Page layouts are now data
+  (`chatgpt-layouts.js`), the whole code block is hidden, and both old layouts still work.
+- **A site the adapter cannot read now fails loudly** (banner after 15 s plus a `layout.unreadable`
+  diagnostic with the surrounding markup) instead of hanging for minutes.
+- **Firefox could not connect to the bridge**: its default extension CSP upgrades `ws://` to
+  `wss://`. The manifest now sets an explicit CSP.
 - **A MCP server that crashed at startup stalled the bridge for 12 seconds** (the whole
   `initialize` timeout) instead of failing at once, and requests in flight on a server that
   died waited for their own timeout. They now fail immediately.

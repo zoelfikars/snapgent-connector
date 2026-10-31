@@ -20,6 +20,13 @@ describe("planTurn: ending the loop", () => {
     });
   }
 
+  test("an unreadable page layout ends with an explanation that points at the diagnostics", () => {
+    const plan = planTurn({ kind: "unreadable" }, ctx());
+    assert.equal(plan.type, "end");
+    assert.equal(plan.banner.title, "Can't read TestAI's replies");
+    assert.match(plan.banner.text, /layout\.unreadable/);
+  });
+
   test("an empty reply is also traced", () => assert.equal(planTurn({ kind: "empty" }, ctx()).diag, "empty.end"));
 
   test("a plain-text answer ends quietly and resets the truncation count", () => {

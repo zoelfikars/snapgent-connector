@@ -41,6 +41,7 @@ export function createWatchHarness({ initial = {}, timings = {}, tabs = {}, reli
       timings: { RESPONSE_TIMEOUT_MS: 300000, STABLE_MS: 9000, WARMUP_MS: 45000, REASON_NOREPLY_MS: 90000, ...timings },
       knowsTool: (name) => name === "read_file",
       catalogueSize: () => 1,
+      describeLayout: () => ({ layout: null, users: 1, assistants: 0 }),
       diag: (event, data) => diags.push([event, data]),
     },
     elapsed: () => now - 1000,

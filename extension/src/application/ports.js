@@ -121,6 +121,12 @@
  */
 
 /**
+ * @typedef {Object} LayoutCheckPort  Does the chat adapter understand the page it is on?
+ * @property {() => Promise<boolean>} sentMessageVisible  Our just-sent message is recognised as a user turn (waits briefly).
+ * @property {() => object} describe                      What the page looks like, for the log.
+ */
+
+/**
  * @typedef {Object} StartViewPort
  * @property {(text: string) => void} toast
  * @property {(level: string, title: string, text: string) => void} banner

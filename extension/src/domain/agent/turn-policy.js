@@ -16,6 +16,13 @@ const PARSE_ERROR_DETAIL = {
 };
 export const parseErrorDetail = (reason) => PARSE_ERROR_DETAIL[reason] || "bad JSON";
 
+/** The adapter cannot find the reply the site is generating: the page layout is not understood. */
+export const unreadableBanner = (displayName) => ({
+  level: "warn",
+  title: `Can't read ${displayName}'s replies`,
+  text: "The site layout may have changed. Details are in the console ([zs-diag] layout.unreadable).",
+});
+
 const end = (extra = {}) => ({ type: "end", ...extra });
 const banner = (level, title, text) => ({ level, title, text });
 
@@ -40,6 +47,9 @@ export function planTurn(res, { displayName, truncCount, isHalted, maxResumes = 
       return { ...end({ banner: banner("limit", "Conversation too long", "Too long. Start a new chat.") }), truncCount };
     case "timeout":
       return { ...end({ banner: banner("warn", `No response from ${displayName}`, "Timed out. Agent stopped.") }), truncCount };
+    case "unreadable":
+      // Generating, but no reply turn can be found: the adapter does not understand the page layout.
+      return { ...end({ banner: unreadableBanner(displayName) }), truncCount };
     case "empty":
       // A dropped reply must be explained: ending silently leaves a grey "not run" chip with no clue why.
       return { ...end({ diag: "empty.end", banner: banner("warn", `${displayName} returned an empty reply`, "Nothing received. Try again.") }), truncCount };

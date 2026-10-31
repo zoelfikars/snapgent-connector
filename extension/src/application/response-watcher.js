@@ -15,6 +15,7 @@ const UNSETTLED_GRACE_MS = 8000;     // max hold-off while a provider reports it
 const GEN_STOP_GRACE_MS = 2500;      // gen off this long => an "open tool block" is DOM churn, not live output
 const OPEN_BLOCK_QUIET_MS = 6000;    // an open block only counts as streaming while the text keeps changing
 const PRE_START_SILENCE_MS = 60000;  // a reply turn that never appears
+const UNREADABLE_MS = 15000;         // generating, yet the adapter sees no reply turn: the page layout is not understood
 const SETTLE_MS = 500;               // DOM must be stable this long before we parse
 
 const pass = null;
@@ -32,6 +33,7 @@ export class ResponseWatcher {
    *   timings: { RESPONSE_TIMEOUT_MS: number, STABLE_MS: number, WARMUP_MS: number, REASON_NOREPLY_MS: number },
    *   knowsTool: (name: string) => boolean,
    *   catalogueSize: () => number,
+   *   describeLayout?: () => object,   // what the page looks like, logged when replies cannot be read
    *   diag?: (event: string, data?: object) => void,
    * }} deps
    */
@@ -77,6 +79,7 @@ export class ResponseWatcher {
 
     return (
       this._gateContextLimit(s) ||
+      this._gateUnreadable(s, d) ||
       this._gateStreaming(s, d, gen) ||
       this._gateNoTurnYet(s, d, gen, newReply, base) ||
       this._gateSettle(s) ||
@@ -114,6 +117,18 @@ export class ResponseWatcher {
     s.lastLimitScan = s.now();
     const detail = this._d.chat.scanError();
     return detail ? finish({ kind: "context_limit", detail }) : pass;
+  }
+
+  /**
+   * The site says it is generating but the adapter finds no reply turn at all. Waiting longer cannot
+   * help: the adapter does not understand this page (the site changed its markup). Say so, with data.
+   */
+  _gateUnreadable(s, d) {
+    if (d.item || !s.started) { s.unreadableSince = 0; return pass; }
+    if (!s.unreadableSince) s.unreadableSince = s.now();
+    if (s.now() - s.unreadableSince < UNREADABLE_MS) return pass;
+    this._diag("layout.unreadable", this._d.describeLayout ? this._d.describeLayout() : {});
+    return finish({ kind: "unreadable" });
   }
 
   /** Keep waiting while the model is still writing: generating, or a command block opened but not closed. */

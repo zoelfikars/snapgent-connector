@@ -56,7 +56,7 @@ extension/
     application/             AgentLoop · ResponseWatcher (+ WatchState) · MessageSender · SessionStarter
                              ToolRunner · ToolCatalogue · SkillsService · PromptResender (+ SysTally)
                              StallWatchdog · ToolReminder · call-guard · ports (typedefs)
-    infrastructure/chat/     waitFor · StreamSampler · dom-helpers (shared by adapters)
+    infrastructure/chat/     chatgpt-layouts (page layouts as data) · dom-diagnostics · waitFor · StreamSampler · dom-helpers (shared by adapters)
     entry/                   background.js · popup.js · legacy-globals.js
   legacy/                    not yet migrated (see Status): main.js, providers/*
   manifests/base.json        shared manifest; per-browser deltas live in build/manifest.mjs
@@ -182,3 +182,22 @@ Roadmap: split into `tools/{fs,search,git,process}` behind a `policy` module
 (path confinement, protected paths, command allow-list / confirmation for
 destructive tools) and a `workspace` module (detecting the active folder), with
 the JSON-RPC stdio loop as a thin shell.
+
+## When a chat site changes its markup
+
+Sites change their DOM without notice; this is the expected failure mode, so it is built to be
+visible and cheap to fix.
+
+1. **It fails loudly.** If the site is generating but the adapter sees no reply turn for 15 s,
+   the wait ends as `unreadable` with a banner, and `layout.unreadable` is logged with the element
+   chains around text we know is on the page (our `⟦ZS-SYS⟧` marker and the model's `"command"`).
+   If our own prompt is not recognised as a user turn, `layout.sentMissing` is logged and a warning
+   is shown. Read them from the page console: `[zs-diag] layout.unreadable`.
+2. **Layouts are data.** ChatGPT's turn selectors, role, reply container and id live in
+   `src/infrastructure/chat/chatgpt-layouts.js`, one entry per layout; the adapter uses the first
+   one that matches the page.
+3. **Fixtures pin it.** Save the captured markup in `test/fixtures/`, add a test in
+   `test/chatgpt-layouts.test.js`; `test/content-script.test.js` runs the whole extension on it.
+
+Automatic discovery of turns by anchoring on known text was considered and deliberately not built:
+a wrong guess hides or targets the wrong element silently, which is worse than failing loudly.

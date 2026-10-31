@@ -63,10 +63,8 @@ const ZSProvider = (() => {
   let diag = () => {}; // injected by core via init()
 
   const S = {
-    msg: '[data-message-author-role],[class*="DilResponseRoot"]',
     userRole: "user",
     assistantRole: "assistant",
-    reply: ".markdown",
     editor: '#prompt-textarea,[data-mobile-composer-prompt],textarea[aria-label="Chat with ChatGPT"],[role="textbox"][aria-label="Ask ChatGPT"]',
     // The ONE submit control; its data-testid says whether it is currently a
     // send or a stop button (see isStopBtn). Id first - it survives testid churn.
@@ -75,6 +73,7 @@ const ZSProvider = (() => {
     // stop control wherever it lives.
     stopBtn: "button[data-testid='stop-button']",
     codeWrap: "pre",
+    codeBlockChrome: '[data-code-block="true"]',
     // composer frame: the <form> that wraps the ProseMirror editor.
     errorSurfaces: '[role="alert"],[data-testid*="error"],[class*="error-message"]',
   };
@@ -115,13 +114,25 @@ const ZSProvider = (() => {
   };
 
   // ── Turn classification ───────────────────────────────────────────────────
-  const role = (item) => (item && item.getAttribute ? item.getAttribute("data-message-author-role") : null);
+  // Which elements are turns, who wrote them, and where the reply text is depends on the page layout
+  // ChatGPT is serving; those facts live in infrastructure/chat/chatgpt-layouts.js (one entry per layout).
+  const { pickLayout, layoutOf, ANY_TURN_SELECTOR } = ZSChat;
+  const role = (item) => {
+    const layout = layoutOf(item);
+    return layout ? layout.role(item) : null;
+  };
   const isUserItem = (item) => role(item) === S.userRole;
+  const isAssistantItem = (item) => role(item) === S.assistantRole;
   const isDilReply = (item) => !!(item && item.matches && item.matches('[class*="DilResponseRoot"]'));
-  const isAssistantItem = (item) => role(item) === S.assistantRole || isDilReply(item);
-  const replyNodes = (item) => isDilReply(item)
-    ? [item]
-    : [...item.querySelectorAll(S.reply)];
+  const replyNodes = (item) => {
+    if (isDilReply(item)) return [item];
+    const layout = layoutOf(item);
+    return layout ? [...item.querySelectorAll(layout.reply)] : [];
+  };
+  const describeLayout = () => {
+    const layout = pickLayout(document);
+    return layout ? layout.name : null;
+  };
 
   // Text extraction that can skip our own chip (and any excluded subtree).
   //
@@ -230,7 +241,10 @@ const ZSProvider = (() => {
   }
 
   // ── DOM primitives ────────────────────────────────────────────────────────
-  const allItems = () => [...document.querySelectorAll(S.msg)];
+  const allItems = () => {
+    const layout = pickLayout(document);
+    return layout ? [...document.querySelectorAll(layout.turns)] : [];
+  };
   const assistantItems = () => allItems().filter(isAssistantItem);
   const assistantCount = () => assistantItems().length;
   const userCount = () => allItems().filter(isUserItem).length;
@@ -257,8 +271,10 @@ const ZSProvider = (() => {
   // a monotonic number, so the core's numeric "old id" shortcut simply doesn't
   // apply here (Number(uuid) is NaN and that guard is skipped) - the
   // settled-history guard covers the same case provider-agnostically.
-  const itemKey = (item) =>
-    (item && item.getAttribute ? item.getAttribute("data-message-id") : null) || null;
+  const itemKey = (item) => {
+    const layout = layoutOf(item);
+    return (layout && layout.id(item)) || null;
+  };
   const lastAssistantId = () => itemKey(lastAssistant());
 
   const chatIsEmpty = () => allItems().length === 0;
@@ -722,7 +738,7 @@ const ZSProvider = (() => {
     try {
       for (const el of document.querySelectorAll(S.errorSurfaces)) {
         if (el.offsetParent === null) continue;
-        if (el.closest(S.msg)) continue; // model content, not UI chrome
+        if (el.closest(ANY_TURN_SELECTOR)) continue; // model content, not UI chrome
         const t = (el.innerText || "").trim();
         if (t.length > 8 && t.length < 600 && RE.contextLimit.test(t)) return t.slice(0, 240);
       }
@@ -890,7 +906,8 @@ const ZSProvider = (() => {
       // 1. Fenced code blocks carrying a command.
       mc.querySelectorAll(S.codeWrap).forEach((pre) => {
         if (pre.closest(".zs-chip")) return;
-        if (CMD_SHAPE.test(pre.textContent || "")) hide(pre, mc);
+        // Hide the whole block (header label and copy buttons included), not just the <pre>.
+        if (CMD_SHAPE.test(pre.textContent || "")) hide(pre.closest(S.codeBlockChrome) || pre, mc);
       });
       // 2. Bare top-level blocks with an inline command (no <pre> inside).
       const kids = [...mc.children];
@@ -978,7 +995,7 @@ const ZSProvider = (() => {
     },
     // turns
     allItems, isUserItem, isAssistantItem, itemText, classifyText,
-    assistantCount, userCount, lastAssistant, lastAssistantId, itemKey, readAssistant,
+    assistantCount, userCount, lastAssistant, lastAssistantId, itemKey, readAssistant, describeLayout,
     streamLen, snapshot,
     // composer / state
     getEditor, editorText, chatIsEmpty, isFreshChat, composerFrame, barMount, barAnchor,

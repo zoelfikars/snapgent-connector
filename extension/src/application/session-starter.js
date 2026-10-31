@@ -6,6 +6,7 @@
 import {
   WORKSPACE_PROBE_TOOL, checkStartPreconditions, handshakeUnavailable, isHandshake, probeSucceeded, workspaceRequiredBanner,
 } from "../domain/agent/session-start.js";
+import { unreadableBanner } from "../domain/agent/turn-policy.js";
 import { bareToolName } from "../domain/tools/names.js";
 
 export class SessionStarter {
@@ -20,6 +21,7 @@ export class SessionStarter {
    *   systemPrompt: () => string,
    *   chat: { submit: (text: string) => Promise<*>, next: (base: *) => Promise<object> },
    *   runner: { run: (call: object) => Promise<string> },
+   *   layout?: import("./ports.js").LayoutCheckPort,   // verifies the adapter understands the page
    *   view: import("./ports.js").StartViewPort,
    *   isStopped: () => boolean,
    *   diag?: (event: string, data?: object) => void,
@@ -79,14 +81,33 @@ export class SessionStarter {
     return alive();
   }
 
+  /**
+   * After sending, the prompt must show up as a user turn that carries the session marker; that is
+   * how it gets hidden behind the "Starting Up" chip. If it does not, the adapter does not fully
+   * understand the page: warn (and log what the page looks like) but let the start continue.
+   */
+  async _checkSentMessageIsRecognised() {
+    const { layout, view, page } = this._d;
+    if (!layout || (await layout.sentMessageVisible())) return;
+    this._diag("layout.sentMissing", layout.describe());
+    view.banner("warn", `${page.displayName()} page not fully recognised`, "Your message was sent but not detected as a user turn, so hiding it may not work.");
+  }
+
   /** Send the prompt; if the model answers with list_commands as instructed, run it and wait for "ready". */
   async _handshake(alive) {
     const { chat, runner, view, target, catalogue, isStopped } = this._d;
     const base = await chat.submit(this._d.systemPrompt());
     if (!alive()) return false;
+    await this._checkSentMessageIsRecognised();
     view.showStartingChip(); // the animated "Starting Up" chip, immediately
     const first = await chat.next(base);
     if (!alive()) return false;
+    if (first.kind === "unreadable") {
+      // Nothing we do next can work if replies cannot be read: say so instead of hanging.
+      const banner = unreadableBanner(this._d.page.displayName());
+      view.banner(banner.level, banner.title, banner.text);
+      return false;
+    }
     // The user halted the bootstrap: do NOT declare the session ready, so "Start" stays available.
     if (isStopped() || first.kind === "stopped") { this._diag("start.aborted", { kind: first.kind }); return false; }
 
