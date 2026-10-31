@@ -139,19 +139,26 @@ For VS Code, open the project folder you want to work on before clicking **Start
   `bridge.py`; the first launch installs `websockets` for your user, or creates
   a local Python environment if your distribution blocks user installs.
 
-**First connection: approve your extension.** The first time an extension connects, the bridge window asks:
+**First connection: approve your extension.** The first time an extension connects, the terminal running the bridge asks:
 
 ```
-A browser extension wants to control this bridge:
-    moz-extension://1f2e3d4c-...
-Allow? [y/N]
+  ----------------------------------------------------------------
+  A browser extension wants to control this bridge:
+
+      moz-extension://1f2e3d4c-...
+
+  Approve it ONLY if it is your own snapgentV3 extension (it will stay approved).
+  Type y and press Enter to allow it, or anything else to refuse.
+
+  Allow? [y/N]
 ```
 
-Type `y` only for your own snapgentV3 extension. The answer is remembered in `trusted_origins.json` (so a
-different extension installed in your browser cannot drive your project). The extension's popup says
-*Approve in the bridge window* until you answer. Without a terminal to ask in, pin the exact origin with the
-`ZS_ALLOWED_ORIGINS` environment variable instead. Reinstalling the extension in Firefox changes its origin, so
-you will be asked once more.
+Type `y` only for your own snapgentV3 extension. The question is answered in **the same terminal** where
+you started the bridge, not in the browser; until you press Enter the extension keeps retrying and the popup
+says *Approve in the bridge terminal*. The answer is remembered in `trusted_origins.json` (so a
+different extension installed in your browser cannot drive your project). Without a terminal to ask in, pin
+the exact origin with the `ZS_ALLOWED_ORIGINS` environment variable instead. Reloading a temporary Firefox
+add-on gives it a new origin, so you will be asked once more.
 
 Keep the terminal window open while the bridge runs. On macOS, the first
 launch may show a Gatekeeper warning; select **Done**, then allow the script
@@ -308,7 +315,7 @@ The dialog keeps the dangerous one-liners visible to you.
 |---|---|---|
 | snapgentV3 bar is missing | Extension is disabled or site access is blocked | Check the extension is enabled and allowed on the current AI chat site, then reload the tab |
 | Bridge is offline | Bridge is not running | Start `start.bat` (Windows), `MacOS_Start.command` (macOS), or run `bash Linux_Start.sh` (Linux) |
-| Popup says *Approve in the bridge window* | This extension has not been approved yet | Answer `y` in the bridge terminal (only if it is your own extension); to reset, delete `trusted_origins.json` |
+| Popup says *Approve in the bridge terminal* | This extension has not been approved yet | Answer `y` in the terminal running the bridge (only if it is your own extension); to reset, delete `trusted_origins.json` |
 | AI replies without using tools | Provider/model stopped following commands | Remind it to use snapgentV3 commands or start a new chat |
 | VS Code target is unavailable | The bridge is offline or the release is incomplete | Run `start.bat` from the extracted release folder and keep the project open in VS Code |
 | A configured MCP server is missing from the target dropdown | The server was switched off in the **MCP servers** panel, or the extension is outdated | Open **MCP servers** from the ⋯ menu on the snapgent bar and tick the server, then reload the extension in `chrome://extensions` and refresh the chat tab |

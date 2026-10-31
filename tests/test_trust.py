@@ -157,6 +157,32 @@ class TerminalPromptTests(unittest.IsolatedAsyncioTestCase):
             await trust.ask_in_terminal(ORIGIN)
         self.assertIn(ORIGIN, shown[0])
         self.assertIn("ONLY if it is your own", shown[0])
+        self.assertIn("Type y and press Enter", shown[0])
+        self.assertTrue(shown[0].startswith("\n"), "the question starts on a fresh line instead of after a log line")
+        self.assertTrue(shown[0].rstrip().endswith("[y/N]"), "the answer is typed on the question's own line")
+
+    async def test_a_terminal_that_closes_counts_as_no(self):
+        class Tty:
+            def isatty(self):
+                return True
+        with patch.object(trust.sys, "stdin", Tty()), patch("builtins.input", side_effect=EOFError):
+            self.assertFalse(await trust.ask_in_terminal(ORIGIN))
+
+    async def test_two_extensions_are_asked_one_after_the_other(self):
+        class Tty:
+            def isatty(self):
+                return True
+        asked = []
+
+        def answer(text):
+            asked.append(text)
+            return "n"
+
+        with patch.object(trust.sys, "stdin", Tty()), patch("builtins.input", side_effect=answer):
+            await asyncio.gather(trust.ask_in_terminal(ORIGIN), trust.ask_in_terminal(OTHER))
+        self.assertEqual(len(asked), 2, "both questions reach the terminal")
+        self.assertTrue(any(ORIGIN in text for text in asked))
+        self.assertTrue(any(OTHER in text for text in asked), "the second question is not swallowed by the first")
 
 
 if __name__ == "__main__":

@@ -12,10 +12,15 @@ extension reconnects every few seconds and succeeds as soon as the answer is "ye
 import asyncio
 import json
 import sys
+import threading
 from pathlib import Path
 from typing import Awaitable, Callable, Iterable, Optional, Set
 
 Ask = Callable[[str], Awaitable[bool]]
+
+# Two unknown extensions can connect at the same time. Their prompts are read from the same terminal,
+# so they must take turns: otherwise two threads read one answer and one question is silently swallowed.
+_ASK_LOCK = threading.Lock()
 
 
 class TrustStore:
@@ -46,17 +51,32 @@ class TrustStore:
             temp.replace(self._path)
 
 
+def _read_answer(prompt: str) -> str:
+    """Blocking part of the question: only one prompt may own the terminal at a time."""
+    with _ASK_LOCK:
+        try:
+            return input(prompt)
+        except (EOFError, OSError):
+            return ""  # terminal closed or no input: treat it as a refusal
+
+
 async def ask_in_terminal(origin: str) -> bool:
     """Ask the person running the bridge. Without a terminal there is nobody to ask: the answer is no."""
     if not sys.stdin or not sys.stdin.isatty():
         return False
     prompt = (
-        "\n  A browser extension wants to control this bridge:\n"
+        "\n"
+        "  ----------------------------------------------------------------\n"
+        "  A browser extension wants to control this bridge:\n"
+        "\n"
         f"      {origin}\n"
+        "\n"
         "  Approve it ONLY if it is your own snapgentV3 extension (it will stay approved).\n"
+        "  Type y and press Enter to allow it, or anything else to refuse.\n"
+        "\n"
         "  Allow? [y/N] "
     )
-    answer = await asyncio.get_running_loop().run_in_executor(None, input, prompt)
+    answer = await asyncio.get_running_loop().run_in_executor(None, _read_answer, prompt)
     return answer.strip().lower() in ("y", "yes")
 
 

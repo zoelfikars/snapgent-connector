@@ -18,13 +18,13 @@ function render(s) {
   dot.className = "dot " + (!s.connected ? "bad" : mcpOk ? "ok" : "warn");
   state.textContent = s.connected
     ? (mcpOk ? "Connected" : "MCP server down")
-    : s.needsApproval ? "Approve in the bridge window" : "Bridge offline";
+    : s.needsApproval ? "Approve in the bridge terminal" : "Bridge offline";
   const ver = document.getElementById("ver");
   const extVer = chrome.runtime.getManifest().version;
   ver.textContent = !s.connected ? `ext v${extVer}`
     : s.bridgeVersion ? `ext v${extVer} · bridge v${s.bridgeVersion}`
     : `ext v${extVer} · bridge old`;
-  tools.textContent = s.connected ? `${s.tools || 0} tools` : s.needsApproval ? "Answer the question in the bridge window" : "Start the bridge";
+  tools.textContent = s.connected ? `${s.tools || 0} tools` : s.needsApproval ? "Answer the question in the bridge terminal" : "Start the bridge";
   servers.textContent = s.connected
     ? list.map((x) => `${x.alive ? "●" : "○"} ${x.id} (${x.alive ? x.tools + " tools" : "down"})`).join("\n")
     : "";

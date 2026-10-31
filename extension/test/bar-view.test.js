@@ -23,9 +23,9 @@ describe("bar view: before a session", () => {
 
   test("bridge running but waiting for the user to approve this extension", () => {
     const v = bar({ bridge: { connected: false, needsApproval: true, servers: [] }, bridgeOk: false });
-    assert.equal(v.message, "Approve this extension in the <b>bridge window</b>");
+    assert.equal(v.message, "Approve this extension in the <b>bridge terminal</b>");
     assert.deepEqual([v.disabled, v.warn], [true, true]);
-    assert.equal(bar({ started: true, bridge: { connected: false, needsApproval: true, servers: [] } }).message, "<b>Active</b> · approve in the bridge window");
+    assert.equal(bar({ started: true, bridge: { connected: false, needsApproval: true, servers: [] } }).message, "<b>Active</b> · approve in the bridge terminal");
   });
 
   test("bridge up but VS Code has no folder open", () => {

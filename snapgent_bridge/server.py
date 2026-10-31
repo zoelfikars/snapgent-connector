@@ -66,8 +66,9 @@ class BridgeServer:
             await websocket.close(1008, "origin not allowed")
             return
         if not self._trust.allows(origin):
-            self._log(f"extension {origin!r} is not approved (yet); see the bridge window")
-            await websocket.close(1008, "extension not approved: answer the question in the bridge window")
+            # Do not log here: the extension retries every few seconds and the rejection would flood the
+            # terminal, burying the question TrustPolicy is asking. Approval/refusal is logged once.
+            await websocket.close(1008, "extension not approved: answer the question in the terminal running the bridge")
             return
         async with self._lock:
             self.clients.add(websocket)
