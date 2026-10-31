@@ -12,6 +12,12 @@ function page(providerOver = () => ({})) {
   const { window } = dom;
   open.push(window);
   const { document } = window;
+  // A real browser throws "Illegal invocation" when getComputedStyle is called without its window (a detached reference).
+  const nativeComputedStyle = window.getComputedStyle.bind(window);
+  window.getComputedStyle = function (node) {
+    if (this !== window) throw new TypeError("'getComputedStyle' called on an object that does not implement interface Window.");
+    return nativeComputedStyle(node);
+  };
   window.HTMLElement.prototype.getBoundingClientRect = function () {
     return this.id === "card" ? { left: 90, top: 380, width: 640, height: 100, right: 730, bottom: 480 } : { left: 100, top: 400, width: 600, height: 30, right: 700, bottom: 430 };
   };

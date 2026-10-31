@@ -70,7 +70,7 @@ export function createInputCover({ document, provider }) {
       const frame = provider.composerFrame && provider.composerFrame();
       const rect = computeCoverRect({
         target: boxOf(covNode.getBoundingClientRect()),
-        ancestors: measureClippingAncestors(covNode, document, win.getComputedStyle),
+        ancestors: measureClippingAncestors(covNode, document, (node) => win.getComputedStyle(node)), // a bound call: the browser rejects getComputedStyle without its window
         frame: frame ? boxOf(frame.getBoundingClientRect()) : null,
         pad: provider.coverPad || 0, // some composers (Gemini's Quill) keep text near rounded corners
         offsetY: provider.coverOffsetY || 0,
