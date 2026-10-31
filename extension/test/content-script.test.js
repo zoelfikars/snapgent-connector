@@ -25,7 +25,16 @@ async function startOn(html) {
   const { window } = dom;
   window.chrome = {
     storage: { local: { get: (_key, callback) => callback && callback({}), set() {} } },
-    runtime: { sendMessage: (_message, callback) => callback && callback({ ok: true }), onMessage: { addListener() {} }, lastError: null },
+    // A bridge that is connected with a live VS Code server but advertises no tools yet.
+    runtime: {
+      sendMessage: (message, callback) => callback && callback(
+        message.type === "status" ? { connected: true, mcpAlive: true, tools: 0, servers: [{ id: "vscode", alive: true, tools: 3 }] }
+        : message.type === "list_tools" ? { ok: true, tools: [] }
+        : { ok: true },
+      ),
+      onMessage: { addListener() {} },
+      lastError: null,
+    },
   };
   // Classic scripts share one global lexical scope, as in a real content script.
   const context = dom.getInternalVMContext();
@@ -40,20 +49,26 @@ async function startOn(html) {
 describe("content script on the 2026-10 ChatGPT layout", () => {
   test("hides the system prompt, replaces the command with a chip, and starts without warnings", async () => {
     const page = await startOn(fixture("chatgpt-search-units-2026-10.html"));
-    assert.deepEqual(page.warnings, []);
-    assert.ok(page.count(".zs-chip") >= 1, "a chip is drawn");
-    assert.ok(page.document.querySelector('[data-code-block="true"]').classList.contains("zs-tool-hide"), "the JSON block is hidden");
-    const user = page.document.querySelector('[data-content-search-unit-key$=":user"]');
-    assert.ok(user.classList.contains("zs-hidden"), "the bootstrap prompt is camouflaged");
-    page.window.close();
+    try {
+      assert.deepEqual(page.warnings, []);
+      assert.ok(page.count(".zs-chip") >= 1, "a chip is drawn");
+      assert.ok(page.document.querySelector('[data-code-block="true"]').classList.contains("zs-tool-hide"), "the JSON block is hidden");
+      const user = page.document.querySelector('[data-content-search-unit-key$=":user"]');
+      assert.ok(user.classList.contains("zs-hidden"), "the bootstrap prompt is camouflaged");
+    } finally {
+      page.window.close(); // stops the content script's timers even when an assertion failed
+    }
   });
 });
 
 describe("content script on a page it does not understand", () => {
   test("starts quietly and draws nothing", async () => {
     const page = await startOn("<html><body><main><p>some other page</p></main></body></html>");
-    assert.deepEqual(page.warnings, []);
-    assert.equal(page.count(".zs-chip"), 0);
-    page.window.close();
+    try {
+      assert.deepEqual(page.warnings, []);
+      assert.equal(page.count(".zs-chip"), 0);
+    } finally {
+      page.window.close();
+    }
   });
 });
