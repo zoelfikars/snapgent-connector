@@ -1553,8 +1553,9 @@
           menuEl.hidden = true;
       }, true);
 
-      applyTheme();
-      setInterval(applyTheme, 2000); // follow the host page toggling its theme
+      const syncTheme = () => ZSUi.applyTheme(document);
+      syncTheme();
+      setInterval(syncTheme, 2000); // follow the host page toggling its theme
       renderBar();
       placeBar(); // start the per-frame anchoring loop
     }
@@ -2023,52 +2024,7 @@
       setTimeout(() => actionBtn.classList.remove("zs-flash"), 1200);
     }
 
-    // ── Theme auto-detection (light / dark) ─────────────────────────────────
-    // The panel and the in-conversation chips are dark-themed by default. On a
-    // LIGHT host page the chips' light text on a near-transparent tint becomes
-    // invisible, so we detect the page's effective background luminance and add
-    // `.zs-light` to <html>; overlay.css then flips to readable light colours.
-    // Most chat sites declare their theme EXPLICITLY (a `dark`/`light` class on
-    // <html>/<body>, a data-theme attribute, or CSS color-scheme) - far more
-    // reliable than luminance, since many (e.g. z.ai) leave <html>/<body> with a
-    // transparent background and paint the theme on a deeper container. Returns
-    // "light" | "dark" | null (no explicit signal).
-    function pageThemeHint() {
-      const de = document.documentElement, b = document.body;
-      const cls = (de.className + " " + (b ? b.className : "")).toLowerCase();
-      if (/\bdark\b/.test(cls)) return "dark";
-      if (/\blight\b/.test(cls)) return "light";
-      const attr = (de.getAttribute("data-theme") || de.getAttribute("data-color-mode") ||
-                    de.getAttribute("data-color-scheme") || "").toLowerCase();
-      if (/dark/.test(attr)) return "dark";
-      if (/light/.test(attr)) return "light";
-      const cs = (getComputedStyle(de).colorScheme || "").toLowerCase();
-      if (/dark/.test(cs) && !/light/.test(cs)) return "dark";
-      if (/light/.test(cs) && !/dark/.test(cs)) return "light";
-      return null;
-    }
-    // Fallback only: luminance of the first opaque background up the tree.
-    function effectiveBg() {
-      let n = document.body;
-      while (n && n !== document.documentElement) {
-        const c = getComputedStyle(n).backgroundColor;
-        if (c && !/(transparent)/.test(c) && !/,\s*0\s*\)$/.test(c)) return c;
-        n = n.parentElement;
-      }
-      return getComputedStyle(document.documentElement).backgroundColor || "rgb(255,255,255)";
-    }
-    function applyTheme() {
-      let light;
-      const hint = pageThemeHint();
-      if (hint) {
-        light = hint === "light";
-      } else {
-        const m = (effectiveBg().match(/\d+(?:\.\d+)?/g) || []).map(Number);
-        if (m.length < 3) return;
-        light = 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2] > 140;
-      }
-      document.documentElement.classList.toggle("zs-light", light);
-    }
+    // Theme auto-detection (light / dark) lives in ui/page-theme.js; see ZSUi.applyTheme.
 
     // Where the bar lives INSIDE the site's composer. We insert it as a real,
     // in-flow DOM node (between the model tabs and the input on DeepSeek), so it
