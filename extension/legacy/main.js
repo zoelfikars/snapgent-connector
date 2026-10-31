@@ -1960,12 +1960,9 @@
       return (m && m.parent && m.parent.isConnected) ? m : null;
     }
 
-    // Floating fallback geometry (used only when no inline mount is available).
-    const BAR_MAX_W = 560, BAR_GAP = 8;
-
     // Anchored mode bookkeeping: the composer element whose top padding we are
-    // borrowing to seat the bar (see the anchored branch below). Cleared when we
-    // leave anchored mode so the site's composer returns to its normal layout.
+    // borrowing to seat the bar (see seatAnchored). Cleared when we leave anchored
+    // mode so the site's composer returns to its normal layout.
     let anchorPadEl = null;
     function clearAnchorPad() {
       if (anchorPadEl) { try { anchorPadEl.style.paddingTop = ""; } catch {} anchorPadEl = null; }
@@ -1975,107 +1972,65 @@
     function placeUnstable() {
       const u = unstableEl;
       if (!u) return;
-      if (!bar || bar.style.display === "none") { if (!u.hidden) u.hidden = true; return; }
-      const br = bar.getBoundingClientRect();
-      if (!br.width) { if (!u.hidden) u.hidden = true; return; }
+      const pos = bar && bar.style.display !== "none" ? ZSUi.pillPosition(bar.getBoundingClientRect(), u.offsetHeight) : null;
+      if (!pos) { if (!u.hidden) u.hidden = true; return; }
       if (u.hidden) u.hidden = false;
-      const uh = u.offsetHeight || 20;
-      u.style.left = Math.round(br.left) + "px";
-      u.style.top = Math.round(Math.max(4, br.top - uh - 5)) + "px";
+      u.style.left = pos.left + "px";
+      u.style.top = pos.top + "px";
     }
 
-    function placeBar() {
-      barRaf = requestAnimationFrame(placeBar);
-      if (!bar) return;
+    // Which of the four modes applies, and the geometry of each, is src/ui/bar-placement.js. These four
+    // functions only do the DOM work for one mode each.
+    function hideBar() {
+      bar.style.display = "none";
+      clearAnchorPad();
+      if (menuEl) menuEl.hidden = true;
+    }
 
-      // Self-heal: a SPA navigation or a full re-render on the host (seen on Arena
-      // when the message frame jumps/teleports to the bottom) can detach our whole
-      // #zs-root from <html>, taking the bar with it - and nothing re-adds it, so
-      // the panel just vanishes. Re-append it whenever it's been detached; this
-      // rAF loop is resilient (its next frame is scheduled before any body code),
-      // so the panel reappears on the very next frame.
-      if (root && !root.isConnected) {
-        try { document.documentElement.appendChild(root); } catch {}
+    // Preferred: a real node inside the composer (no overlap, full width).
+    function seatInline(mount) {
+      clearAnchorPad();
+      if (bar.parentElement !== mount.parent || bar.nextElementSibling !== mount.before) {
+        try { mount.parent.insertBefore(bar, mount.before || null); } catch {}
       }
-
-      // The instability warning floats just ABOVE the bar (not inside it), so it
-      // never crowds the row on narrow composers like Gemini. Positioned from the
-      // bar's current rect every frame - works in all bar modes since it only
-      // reads where the bar ended up. One frame of lag is imperceptible.
-      placeUnstable();
-
-      // While a bot-check challenge OR a blocking modal (login / consent) is on
-      // screen, get fully out of the way: the (often transparent) anchored bar is
-      // a real full-width element over the composer's top edge and would silently
-      // intercept clicks on the challenge's / modal's buttons (e.g. "Continue with
-      // Google" at sign-in). Hide the bar and drop the reserved padding strip; it
-      // reappears on the next frame once the overlay clears.
-      if (
-        (P.captchaPresent && P.captchaPresent()) ||
-        (P.overlayBlocking && P.overlayBlocking())
-      ) {
-        bar.style.display = "none";
-        clearAnchorPad();
-        if (menuEl) menuEl.hidden = true;
-        return;
+      if (!bar.classList.contains("zs-bar-inline")) {
+        bar.classList.add("zs-bar-inline");
+        bar.style.cssText = ""; // drop any leftover float positioning
       }
+      // Transparent (blends in) when mounted INSIDE the input box; surface card when mounted ABOVE it.
+      bar.classList.toggle("zs-bar-inside", !!mount.inside);
+      bar.style.display = "flex";
+      if (menuEl && !menuEl.hidden) positionMenu(bar.getBoundingClientRect());
+    }
 
-      // Preferred: in-flow mount inside the composer (no overlap, full width).
-      const mount = computeBarMount();
-      if (mount) {
-        clearAnchorPad();
-        if (bar.parentElement !== mount.parent || bar.nextElementSibling !== mount.before) {
-          try { mount.parent.insertBefore(bar, mount.before || null); } catch {}
-        }
-        if (!bar.classList.contains("zs-bar-inline")) {
-          bar.classList.add("zs-bar-inline");
-          bar.style.cssText = ""; // drop any leftover float positioning
-        }
-        // Transparent (blends in) when mounted INSIDE the input box; surface card
-        // when mounted ABOVE it. The provider's barMount() signals which via .inside.
-        bar.classList.toggle("zs-bar-inside", !!mount.inside);
-        bar.style.display = "flex";
-        if (menuEl && !menuEl.hidden) {
-          const br = bar.getBoundingClientRect();
-          positionMenu(br);
-        }
-        return;
+    // The provider wants the in-composer LOOK but its composer is a framework-reconciled subtree we must
+    // NOT insert into (Kimi's Vue tree would reuse the bar node as a host and nest the editor inside it).
+    // So the bar stays in our own #zs-root, fixed to the composer's top edge, with that strip RESERVED as
+    // padding-top on the composer so it reads as in-flow without becoming a child of the framework's DOM.
+    function seatAnchored(anchorEl) {
+      bar.classList.remove("zs-bar-inline", "zs-bar-inside");
+      bar.classList.add("zs-bar-anchored");
+      if (root && bar.parentElement !== root) root.appendChild(bar);
+      const r = anchorEl.getBoundingClientRect();
+      if (!r.width) { hideBar(); return; }
+      bar.style.display = "flex";
+      const g = ZSUi.anchoredGeometry(r, bar.offsetHeight);
+      if (anchorPadEl && anchorPadEl !== anchorEl) clearAnchorPad();
+      anchorPadEl = anchorEl;
+      anchorEl.style.paddingTop = g.paddingTop + "px";
+      bar.style.left = g.left + "px";
+      bar.style.top = g.top + "px";
+      bar.style.width = g.width + "px";
+      if (menuEl && !menuEl.hidden) {
+        bar.classList.remove("zs-bar-inline"); // ensure fixed geometry for the menu maths
+        positionMenu({ left: r.left, right: r.left + r.width, top: r.top, bottom: r.top + (bar.offsetHeight || 34) });
       }
+    }
 
-      // Anchored mode: the provider wants the integrated, in-composer LOOK but
-      // its composer is a framework-reconciled subtree we must NOT insert our
-      // node into (e.g. Kimi's Vue tree - inserting #zs-bar there makes Vue's
-      // next diff reuse the bar node as a host and nest the editor inside it).
-      // So we keep the bar in our own #zs-root, position it (position:fixed) to
-      // hug the composer's top edge at full width, and RESERVE that strip with
-      // padding-top on the composer so it reads as in-flow without ever becoming
-      // a child of the framework's DOM. barAnchor() returns the element to hug.
-      const anchorEl = (P.barAnchor && P.barAnchor()) || null;
-      if (anchorEl && anchorEl.isConnected) {
-        bar.classList.remove("zs-bar-inline", "zs-bar-inside");
-        bar.classList.add("zs-bar-anchored");
-        if (root && bar.parentElement !== root) root.appendChild(bar);
-        const r = anchorEl.getBoundingClientRect();
-        if (!r.width) { bar.style.display = "none"; clearAnchorPad(); if (menuEl) menuEl.hidden = true; return; }
-        bar.style.display = "flex";
-        const bh = bar.offsetHeight || 34;
-        if (anchorPadEl && anchorPadEl !== anchorEl) clearAnchorPad();
-        anchorPadEl = anchorEl;
-        anchorEl.style.paddingTop = (bh + 6) + "px"; // reserve the strip the bar sits in (+gap)
-        bar.style.left = Math.round(r.left) + "px";
-        bar.style.top = Math.round(r.top) + "px";
-        bar.style.width = Math.round(r.width) + "px";
-        if (menuEl && !menuEl.hidden) {
-          bar.classList.remove("zs-bar-inline"); // ensure fixed geometry for menu math
-          positionMenu({ left: r.left, right: r.left + r.width, top: r.top, bottom: r.top + (bar.offsetHeight || 34) });
-        }
-        return;
-      }
+    // Fallback: float just above the editor, for sites where no clean mount could be resolved.
+    function seatFloating() {
       bar.classList.remove("zs-bar-anchored");
       clearAnchorPad();
-
-      // Fallback: float just above the editor (fixed positioning), for sites
-      // where no clean inline mount could be resolved.
       if (bar.classList.contains("zs-bar-inline")) {
         bar.classList.remove("zs-bar-inline");
         if (root && bar.parentElement !== root) root.appendChild(bar);
@@ -2083,20 +2038,42 @@
       const f = (P.getEditor && P.getEditor()) || (P.composerFrame && P.composerFrame());
       if (!f) { bar.style.display = "none"; if (menuEl) menuEl.hidden = true; return; }
       bar.style.display = "flex";
-      const r = f.getBoundingClientRect();
-      if (!r.width) { bar.style.display = "none"; return; }
-      const w = Math.min(r.width, BAR_MAX_W);
-      const left = Math.round(r.left + (r.width - w) / 2);
-      const bh = bar.offsetHeight || 40;
-      const top = Math.max(4, Math.round(r.top - bh - BAR_GAP));
-      bar.style.width = w + "px";
-      bar.style.left = left + "px";
-      bar.style.top = top + "px";
+      const g = ZSUi.floatingGeometry(f.getBoundingClientRect(), bar.offsetHeight);
+      if (!g) { bar.style.display = "none"; return; }
+      bar.style.width = g.width + "px";
+      bar.style.left = g.left + "px";
+      bar.style.top = g.top + "px";
       // Keep the open "more" menu anchored to the bar, opening upward.
-      if (menuEl && !menuEl.hidden) {
-        const br = bar.getBoundingClientRect();
-        positionMenu(br);
+      if (menuEl && !menuEl.hidden) positionMenu(bar.getBoundingClientRect());
+    }
+
+    function placeBar() {
+      barRaf = requestAnimationFrame(placeBar);
+      if (!bar) return;
+
+      // Self-heal: a SPA navigation or a full re-render on the host (seen on Arena when the message frame
+      // teleports) can detach our whole #zs-root from <html>, taking the bar with it. Re-append it; this
+      // rAF loop is resilient (its next frame is scheduled before any body code).
+      if (root && !root.isConnected) {
+        try { document.documentElement.appendChild(root); } catch {}
       }
+
+      // The instability warning floats just ABOVE the bar, so it never crowds the row on narrow composers.
+      placeUnstable();
+
+      const mount = computeBarMount();
+      const anchorEl = (P.barAnchor && P.barAnchor()) || null;
+      const mode = ZSUi.chooseBarMode({
+        // A bot check or a blocking modal (login / consent) is up: the (often transparent) full-width bar
+        // would silently intercept clicks on its buttons, so get out of the way until it clears.
+        obstructed: !!((P.captchaPresent && P.captchaPresent()) || (P.overlayBlocking && P.overlayBlocking())),
+        hasInlineMount: !!mount,
+        hasAnchor: !!(anchorEl && anchorEl.isConnected),
+      });
+      if (mode === "hidden") hideBar();
+      else if (mode === "inline") seatInline(mount);
+      else if (mode === "anchored") seatAnchored(anchorEl);
+      else seatFloating();
     }
 
     // Called by the core's sweep + after state changes: refresh the bar content.
