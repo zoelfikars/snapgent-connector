@@ -1017,185 +1017,58 @@
       // markers, which only exist in real sessions, so they need no gate.)
       if (P.isAssistantItem(item) && ZSParse.hasCommandShape(txt) &&
           (A.started || A.starting)) {
-        // Regenerate transition (see zRegenLen capture in regenResume): the site is
-        // still showing the OLD command text after a post-stop regenerate, before it
-        // wipes and re-streams. Keep the coherent red "stopped" look instead of
-        // re-animating the stale old call as a fresh "run" spinner. Clears the moment
-        // the content is actually replaced (stream length drops below the captured
-        // baseline) or a short safety window elapses, after which normal
-        // classification paints the freshly regenerated command.
+        // The decisions below are pure and live in src/ui/command-phase.js; this gathers the facts and paints.
+        // After a post-stop regenerate the site still shows the OLD command (see zRegenLen in regenResume):
+        // keep the coherent red "stopped" look until the content is replaced or a short window elapses.
         if (item.dataset.zRegenLen) {
-          const baseLen = Number(item.dataset.zRegenLen);
-          const armedAt = Number(item.dataset.zRegenAt || 0);
-          const replaced = txt.length < baseLen - 8;      // old content wiped
-          const expired = Date.now() - armedAt > 6000;    // safety fallback
-          if (!replaced && !expired) {
-            const nm = ZSParse.toolNameFromText(txt) || "command";
-            this.toolBox(item, nm, "err", "stopped", false);
+          if (ZSUi.holdsRegenerateLook({
+            baseLength: Number(item.dataset.zRegenLen), armedAt: Number(item.dataset.zRegenAt || 0), textLength: txt.length, now: Date.now(),
+          })) {
+            this.toolBox(item, ZSParse.toolNameFromText(txt) || "command", "err", "stopped", false);
             return;
           }
           delete item.dataset.zRegenLen;
           delete item.dataset.zRegenAt;
         }
-        // A turn the user manually halted (Stop / native stop) stays "stopped" -
-        // never let this sweep repaint it ✓ done (or worse, re-spin it) just
-        // because generation is still settling. The dataset marker is set where we
-        // halt, but on Arena the A/B carousel re-renders the turn node on every
-        // token, wiping the marker - so the spinner came back even after Stop. Also
-        // derive "stopped" from the userStopped latch (which survives node swaps)
-        // for the last turn; it's cleared on the next user message / deliberate
-        // resume, so a settled turn is never falsely frozen later.
-        // A turn that is GENERATING again (or whose tool the loop is actively
-        // running), with NO active user-stop latch, has been REGENERATED - it is no
-        // longer the halted turn. Clear its stale halt so isRememberedHalted (index
-        // + text-prefix based) can't keep repainting the FRESH command red: a Gemini
-        // regenerate reuses the same assistant index and a similar opening prefix,
-        // so the old halt otherwise matches and the running command shows "stopped"
-        // (red) until it settles. Gated on !A.userStopped so a real Stop that is
-        // still settling (isGenerating can lag true for a beat) is NEVER cleared.
-        const regenerating = !A.userStopped && (
-          (item === P.lastAssistant() && P.isGenerating()) ||
-          (A.running && A.toolItem === item)
-        );
+        const isLast = item === P.lastAssistant();
+        const generating = isLast && P.isGenerating();
+        // The dataset marker alone is not enough (sites swap the node on re-render), so the off-DOM memory and the
+        // userStopped latch count too; a turn generating again with no stop latch was regenerated, so its stale halt is dropped.
+        const { regenerating, stopped } = ZSUi.haltState({
+          userStopped: A.userStopped, isLast, generating, toolRunningOnThisTurn: A.running && A.toolItem === item,
+          marked: item.dataset.zStopped === "1", remembered: haltedTurns.has(item, txt),
+        });
         if (regenerating) { delete item.dataset.zStopped; haltedTurns.forget(item); }
-        const stopped = !regenerating && (
-          item.dataset.zStopped === "1" ||
-          (A.userStopped && item === P.lastAssistant()) ||
-          haltedTurns.has(item, txt));
-        // Self-heal: a site re-render that swapped this turn's node wiped the
-        // dataset marker - re-stamp it so the stop survives the next wipe of
-        // the A.userStopped latch (a fresh user message clears it by design).
+        // Self-heal: a node swap wiped the marker - re-stamp it so the stop survives the next wipe of the latch.
         if (stopped && item.dataset.zStopped !== "1") {
           item.dataset.zStopped = "1";
           diag("chip.rehalt", { name: ZSParse.toolNameFromText(txt) });
         }
-        // The loop already SETTLED this very call (tool finished, we're waiting
-        // for the model's next turn) but the site swapped the turn's DOM node,
-        // wiping the chip, the zloop ownership AND the __zsChip opts. Without
-        // this, the fresh node re-classifies as a spinning "run" chip (A.running
-        // is still true) on an already-executed call. Re-own it with the settled
-        // outcome. The count guard skips this once the model's NEXT turn exists,
-        // so a follow-up call to the same tool still classifies live.
-        if (!stopped && A.running && !A.toolRunning && A.toolSettle &&
-            // Same TURN check. Node identity when available (virtualization-proof:
-            // on Qwen the count doesn't grow for a new turn, and a back-to-back
-            // call to the same tool defeats the name guard - the old outcome then
-            // repainted the STREAMING next turn's chip as done/err). Falls back to
-            // the count guard for providers without lastAssistantId.
-            (A.toolSettle.id !== undefined && P.lastAssistantId
-              ? P.lastAssistantId() === A.toolSettle.id
-              : A.toolSettle.count === P.assistantCount()) &&
-            item === P.lastAssistant() &&
-            ZSParse.toolNameFromText(txt) === A.toolName) {
-          diag("chip.reown", { name: A.toolName, phase: A.toolSettle.phase });
-          this.toolBox(item, A.toolName, A.toolSettle.phase, A.toolSettle.detail,
-            true, A.toolSettle.body, A.toolSettle.category);
+        // The loop already SETTLED this very call but the site swapped the node, wiping the chip, the zloop
+        // ownership and the __zsChip opts: re-own it with the settled outcome instead of re-spinning it. "Same turn" is
+        // node identity when the provider has lastAssistantId (virtualization-proof), else the assistant count.
+        const settle = A.toolSettle;
+        if (ZSUi.shouldReown({
+          stopped, running: A.running, toolRunning: A.toolRunning, hasSettled: !!settle,
+          sameTurn: !!settle && (settle.id !== undefined && P.lastAssistantId ? P.lastAssistantId() === settle.id : settle.count === P.assistantCount()),
+          isLast, sameTool: ZSParse.toolNameFromText(txt) === A.toolName,
+        })) {
+          diag("chip.reown", { name: A.toolName, phase: settle.phase });
+          this.toolBox(item, A.toolName, settle.phase, settle.detail, true, settle.body, settle.category);
           return;
         }
-        // Is this command turn the IN-FLIGHT call - the one a running loop or the
-        // bootstrap is about to own? The tell: it has NO injected result turn after
-        // it yet. Every ALREADY-EXECUTED command turn is followed by its injected
-        // result (a user turn matching isInjectedFeedback), so keying off that,
-        // rather than item === lastAssistant(), robustly separates the in-flight
-        // turn from settled history. This gives us the best of both:
-        //  - The Kimi/bootstrap flash fix: while a loop/bootstrap is active, the
-        //    in-flight turn stays "run" in the window between generation ending and
-        //    the loop painting its own chip, WITHOUT depending on the flickery
-        //    lastAssistant() (Kimi's Vue swaps the node) - no premature green flash.
-        //  - No re-spin on REVISIT: when a started chat is re-opened and the loop
-        //    or bootstrap runs again, every PAST command turn already has its result
-        //    below it, so it settles to "done" instead of every old chip re-loading
-        //    to a blue spinner (the Arena "all chips restarted loading" report).
-        const resultAfter = next && P.isUserItem(next) &&
-          ZSParse.isInjectedFeedback(P.classifyText(next, ".zs-chip"));
-        const inFlight = (A.running || A.starting) && !resultAfter;
-        // Regenerate grace: keep the freshly-regenerated command turn "run" in the
-        // gap between regenResume clearing the stop latch and the watchdog starting
-        // the loop, so it never flashes a premature ✓ "done" (see regenResume). The
-        // anchor slides with generation and expires ~2.5s after it truly stops.
-        const resumeGrace = A.resumeArmed && item === P.lastAssistant() &&
-          Date.now() - (A.resumeArmedAt || 0) < 2500;
-        const live = !stopped && (
-          inFlight || resumeGrace || (item === P.lastAssistant() && P.isGenerating())
-        );
-        // Orphaned command: a COMPLETE command turn that is the last assistant with
-        // NO result below it, not live and not loop-owned, whose generation is now
-        // stale (typically the page/extension was reloaded while this command sat
-        // un-executed). The auto-resume watchdog deliberately refuses to run a
-        // reload-restored generation (the "command leaked into the new chat"
-        // leak guard - same lastGenAt staleness test used here), so it will NEVER
-        // execute. Painting it a green ✓ "done" falsely implies the tool ran and
-        // succeeded; show a neutral, greyed "not run" state instead (cosmetic only -
-        // we intentionally do NOT auto-execute it).
-        // A command turn we have no evidence ever executed: not loop-owned, no
-        // injected result below it, and not in the off-DOM executed memory (the
-        // memory keeps this virtualization-safe - a scrolled-back turn whose result
-        // detached is still known-executed and never mislabelled).
-        const neverRun = !item.dataset.zloop && !resultAfter &&
-          !executedTurns.has(item, txt);
-        // Superseded orphan: abandoned command - a NEWER assistant turn exists below
-        // it yet it never ran (e.g. stopped then regenerated into a fresh turn on
-        // Qwen). It will never execute, so it must show neither a green ✓ "done" NOR
-        // a live spinner. inFlight is not turn-specific: with the loop running the
-        // NEW turn, this old no-result turn would otherwise also read as "run" - the
-        // "both the old and the new chip spinning at once" seen live.
-        const supersededOrphan = neverRun && item !== P.lastAssistant();
-        // Reload orphan: the LAST command turn, not live, whose generation is stale -
-        // the page/extension was reloaded while it sat un-executed and the watchdog
-        // refuses to run a reload-restored generation (leak guard). Also never a
-        // false green ✓; show a neutral, greyed "not run" (we do NOT auto-execute it).
-        // Tied to RESUME_FRESH_MS, never a separate literal: this must not paint
-        // "not run" while the resume watchdog is still entitled to execute the
-        // command. With the two numbers out of step (8s here vs the watchdog's
-        // window) a command that WAS about to run got labelled dead first.
-        const staleLastOrphan = neverRun && item === P.lastAssistant() && !live &&
-          Date.now() - A.lastGenAt > RESUME_FRESH_MS;
-        const orphanPending = !stopped && (supersededOrphan || staleLastOrphan);
-        // Handoff window: a JUST-finished last-assistant command with no result yet
-        // that the loop has not taken over (A.running not yet true, so `live` is
-        // false). Without this it flashes a premature ✓ "done" for the frames
-        // between generation ending and the loop starting, THEN re-spins when the
-        // loop paints its own chip - most visible on the instant virtual commands
-        // (list_mcp_servers/list_commands). Keep it spinning instead; staleLastOrphan
-        // takes over after 8s if the loop genuinely never runs it.
-        // Same window as the watchdog: while it can still fire, the honest state
-        // is "waiting to run" (spinner), not a settled verdict either way.
-        const pendingExec = !stopped && !orphanPending && !live &&
-          neverRun && item === P.lastAssistant() && Date.now() - A.lastGenAt <= RESUME_FRESH_MS;
-        let phase = stopped ? "err" : (orphanPending ? "idle" : ((live || pendingExec) ? "run" : "done"));
-        let detail = stopped ? "stopped" : (orphanPending ? "not run" : "");
-        // A DSML turn is the model calling a tool in its OWN markup, which can
-        // never be executed - it always resolves to the "dsml" parse_error. So
-        // once it has FINISHED streaming, "waiting to run" (spinner) and "not
-        // run" (grey) are both wrong: it is not pending, it is already decided.
-        // Left alone it inherited pendingExec and span for the whole
-        // RESUME_FRESH_MS window before settling grey (reported live 2026-08-22).
-        // Gated on !live on purpose: while the model is still WRITING the block
-        // it must behave like any other command and show the spinner, or a slow
-        // generation gives the user no feedback at all that anything is happening
-        // - the chip paints "run" as it streams, then repaints red here the
-        // moment generation ends. When our error result lands below, the
-        // error-aware settle just below is skipped (phase is no longer "done") so
-        // the more precise "bad format" wording survives.
-        if (!stopped && !live && phase !== "err" && ZSParse.DSML_RE.test(txt)) {
-          phase = "err"; detail = "wrong format";
-        }
-        // Error-aware settle: a command whose injected result RIGHT BELOW is an
-        // ERROR must never wear a green ✓. The loop paints this correctly while
-        // it owns the turn, but a revisited conversation (or a node swap that
-        // dropped ownership) re-derives the phase here - from the conversation
-        // itself, so it stays correct without any loop state.
-        if (phase === "done" && next && P.isUserItem(next)) {
-          const nt = P.classifyText(next, ".zs-chip");
-          // feedbackIsError also catches an MCP tool's in-body error (the result
-          // reads "Output of '…': Error executing code…", which our ERROR prefix
-          // test would miss - e.g. a tool that echoes JSON), so a revisited conversation
-          // re-settles it red, matching what the loop painted live.
-          if (ZSParse.isInjectedFeedback(nt) && feedbackIsError(nt)) {
-            phase = "err"; detail = "error";
-            if (item.dataset.zphase !== "err") diag("chip.errSettle", { name: ZSParse.toolNameFromText(txt) });
-          }
-        }
+        // Every ALREADY-EXECUTED command turn is followed by its injected result, which separates the in-flight turn
+        // from settled history without depending on the flickery lastAssistant().
+        const nextText = next && P.isUserItem(next) ? P.classifyText(next, ".zs-chip") : "";
+        const resultAfter = !!nextText && ZSParse.isInjectedFeedback(nextText);
+        const verdict = ZSUi.commandPhase({
+          stopped, isLast, generating, running: A.running, starting: A.starting, resultBelow: resultAfter,
+          executedBefore: executedTurns.has(item, txt), resumeArmed: A.resumeArmed, resumeArmedAt: A.resumeArmedAt,
+          lastGenAt: A.lastGenAt, freshMs: RESUME_FRESH_MS, now: Date.now(), dsml: ZSParse.DSML_RE.test(txt),
+          errorBelow: resultAfter && feedbackIsError(nextText),
+        });
+        const { phase, detail, live, inFlight, resumeGrace, pendingExec } = verdict;
+        if (verdict.errorSettled && item.dataset.zphase !== "err") diag("chip.errSettle", { name: ZSParse.toolNameFromText(txt) });
         // A command block that is VISIBLE right now (its hide classes live on
         // child nodes that sites like Gemini re-create on every update, and the
         // block may render only AFTER the chip was first placed mid-stream).
@@ -1246,11 +1119,11 @@
             // report. genDebug() (if the provider exposes it) breaks isGenerating
             // into its sub-signals so we can see WHICH one flickered false.
             const suspectDone = phase === "done" &&
-              item === P.lastAssistant() && !resultAfter;
+              isLast && !resultAfter;
             diag("chip.why", {
               name: nm, to: phase,
               stopped, live, inFlight, resumeGrace, pendingExec,
-              isLast: item === P.lastAssistant(), resultAfter,
+              isLast, resultAfter,
               gen: P.isGenerating(), run: A.running, starting: A.starting,
               zStopped: item.dataset.zStopped === "1",
               remembered: haltedTurns.has(item, txt),
