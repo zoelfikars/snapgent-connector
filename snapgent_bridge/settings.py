@@ -1,9 +1,22 @@
 """Paths, ports and limits. The only module that reads the environment."""
 
 import os
+import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+
+def app_root(frozen: bool = getattr(sys, "frozen", False), executable: str = sys.executable, module_file: str = __file__) -> Path:
+    """The folder holding config.json and logs/.
+
+    From source that is the repository (or release) folder. Inside a PyInstaller executable `__file__`
+    points into a temporary unpack directory, so the folder next to the .exe is used instead.
+    """
+    if frozen:
+        return Path(executable).resolve().parent
+    return Path(module_file).resolve().parent.parent
+
+
+ROOT = app_root()
 CONFIG_PATH = ROOT / "config.json"
 LOG_PATH = ROOT / "logs" / "bridge_debug.log"
 

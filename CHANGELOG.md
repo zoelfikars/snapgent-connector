@@ -4,6 +4,13 @@ All notable changes to snapgentV3 Free are documented here.
 
 ## [Unreleased]
 
+### Build and release
+- **CI and automatic releases** (`.github/workflows`): lint, tests on three operating systems, and
+  Windows executables built from source on every release tag. `bridge.exe` and `vscode_mcp.exe`
+  are no longer committed; this also fixes the Windows executable shipping without the security fixes.
+- Frozen executables keep `config.json` and `logs/` next to the `.exe` (not in a temp folder).
+- `scripts/package_release.py` assembles the release zip (tested).
+
 ### Changed
 - **Project is now VS Code only.** Roblox Studio, EffectCraft and Luau (`###LUA###`)
   support was removed from the extension, bridge and setup scripts (`start-effectcraft.ps1`

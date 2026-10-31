@@ -210,6 +210,25 @@ Residual risk, stated plainly: code execution is inherent to a coding agent (wri
 tests). The policy removes silent destructive/exfiltrating one-liners and secrets and makes the rest
 visible; it is not a sandbox.
 
+## CI and releases
+
+- **`.github/workflows/ci.yml`** (every push/PR): extension lint + tests + both browser builds;
+  Python tests on Ubuntu, Windows and macOS (3.9 and 3.14, plus 3.12 on Ubuntu); and a Windows job
+  that builds `bridge.exe`/`vscode_mcp.exe` with PyInstaller and starts them.
+- **`.github/workflows/release.yml`** (push a tag `vX.Y.Z`): refuses a tag that disagrees with
+  `BRIDGE_VERSION`, builds the extension and the Windows executables, assembles the zip with
+  `scripts/package_release.py` and publishes it. The executables are therefore never committed.
+- **`scripts/package_release.py`** is the only place that knows what a release contains and where
+  (launchers at the zip root so they can be double-clicked; execute bits set; no tests/docs/dev files).
+  If the repository layout changes, change its tables, not the workflows.
+- `tests/test_release.py` also pins the version: `extension/package.json`, `BRIDGE_VERSION`, the README
+  badge and a CHANGELOG section must agree.
+- The `.spec` files collect `websockets` and the package submodules; inside an `.exe`, `config.json`
+  and `logs/` live next to the executable, not in PyInstaller's temp unpack folder (`settings.app_root`).
+
+To cut a release: bump the version in `snapgent_bridge/__init__.py`, `extension/package.json` and the
+README badge, add the CHANGELOG section, commit, then `git tag vX.Y.Z && git push --tags`.
+
 ## When a chat site changes its markup
 
 Sites change their DOM without notice; this is the expected failure mode, so it is built to be

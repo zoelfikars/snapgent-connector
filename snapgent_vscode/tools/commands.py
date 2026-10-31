@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -22,6 +23,16 @@ def package_manager(root: Path) -> str:
         if (root / lockfile).exists():
             return manager
     return "npm"
+
+
+def python_interpreter(frozen: bool = getattr(sys, "frozen", False)) -> str:
+    """The Python that runs the project's tests. In a packaged .exe `sys.executable` is the .exe itself."""
+    if not frozen:
+        return sys.executable
+    found = shutil.which("python3") or shutil.which("python") or shutil.which("py")
+    if not found:
+        raise FileNotFoundError("Python was not found on PATH, so pytest cannot be run.")
+    return found
 
 
 def shell_wrap(command: List[str], windows: Optional[bool] = None) -> List[str]:
@@ -72,7 +83,7 @@ def run_tests(ctx: Context) -> str:
     if (root / "package.json").is_file():
         return run_project_script(ctx, "test")
     if (root / "pyproject.toml").is_file() or (root / "pytest.ini").is_file():
-        return run_process([sys.executable, "-m", "pytest"], root, timeout=SCRIPT_TIMEOUT_SECONDS)
+        return run_process([python_interpreter(), "-m", "pytest"], root, timeout=SCRIPT_TIMEOUT_SECONDS)
     if any(root.glob("*.sln")) or any(root.glob("*.csproj")):
         return run_process(["dotnet", "test"], root, timeout=SCRIPT_TIMEOUT_SECONDS)
     raise FileNotFoundError("No supported test setup found (package.json, pytest, or .NET project).")

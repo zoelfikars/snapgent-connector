@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  extension:
+    name: Extension (lint, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Both browsers were built
+        run: test -f dist/chrome/manifest.json && test -f dist/firefox/manifest.json
+
+  python:
+    name: Python ${{ matrix.python }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.9", "3.12", "3.14"]
+        exclude:
+          # Keep the matrix small: the oldest and newest on the other systems are enough.
+          - os: windows-latest
+            python: "3.12"
+          - os: macos-latest
+            python: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install websockets
+      - name: Configure git identity for the tests that make commits
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+      - run: python -m unittest discover -s tests -t . -v
+      - run: python -m unittest test_setup_config -v
+
+  frozen:
+    name: Windows executables build and start
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pyinstaller websockets
+      - run: pyinstaller --noconfirm bridge.spec
+      - run: pyinstaller --noconfirm vscode_mcp.spec
+      - name: The VS Code server answers an MCP handshake
+        shell: python
+        run: |
+          import json, subprocess
+          request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}) + "\n"
+          out = subprocess.run(["dist/vscode_mcp.exe"], input=request, capture_output=True, text=True, timeout=60).stdout
+          assert json.loads(out.splitlines()[0])["result"]["serverInfo"]["name"] == "vscode-mcp", out
+      - name: The bridge starts and listens
+        shell: python
+        run: |
+          import os, socket, subprocess, time
+          env = dict(os.environ, ZS_BRIDGE_PORT="17999")
+          process = subprocess.Popen(["dist/bridge.exe"], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+          try:
+              for _ in range(100):
+                  try:
+                      socket.create_connection(("127.0.0.1", 17999), timeout=0.5).close(); break
+                  except OSError:
+                      time.sleep(0.2)
+              else:
+                  raise SystemExit("bridge.exe never listened")
+          finally:
+              process.kill()

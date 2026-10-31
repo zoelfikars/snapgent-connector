@@ -1,4 +1,4 @@
-﻿# Local-only folders
+# Local-only folders
 Compressed/
 Deprecated/
 ExtensionPresentation/
@@ -22,3 +22,9 @@ node_modules/
 extension/dist/
 
 .env
+
+# Build outputs (PyInstaller and release assembly). The Windows .exe files are built by CI, not committed.
+/build/
+/dist/
+/out/
+*.exe

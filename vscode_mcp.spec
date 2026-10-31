@@ -1,12 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
-
+# Build: pyinstaller --noconfirm vscode_mcp.spec   ->   dist/vscode_mcp (vscode_mcp.exe on Windows)
+from PyInstaller.utils.hooks import collect_submodules
 
 a = Analysis(
     ["vscode_mcp.py"],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=[],
+    hiddenimports=collect_submodules("snapgent_vscode"),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -26,8 +27,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
+    upx=False,
     runtime_tmpdir=None,
     console=True,
     disable_windowed_traceback=False,

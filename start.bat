@@ -10,7 +10,10 @@ set "LOGFILE=%~dp0logs\start.log"
 if not exist "%~dp0bridge.exe" (
     echo.
     echo   ERROR: bridge.exe not found next to start.bat.
-    echo   Extract the whole download, then run start.bat from that folder.
+    echo   Extract the whole release download, then run start.bat from that folder.
+    echo   Running from a git clone? The .exe files are only in releases. Use Python instead:
+    echo       py -3 -m pip install websockets
+    echo       py -3 bridge.py
     echo.
     pause
     exit /b 1

@@ -182,7 +182,7 @@ The extension and the bridge are two separate parts, and each one has to be upda
 
 If the popup shows `bridge old`, the bridge is still running old code: repeat steps 2 and 3. On macOS and Linux, also make sure there is no old executable file named `bridge` in the folder, because the launcher runs it instead of `bridge.py`.
 
-> **Windows note:** `start.bat` runs the bundled `bridge.exe`, which was last rebuilt on 2026-10-23. It does **not** include the V3.9.2 fix for large MCP responses, the version display, or the **origin check that stops websites from controlling the bridge**. Until it is rebuilt, prefer the Python bridge below. On Windows the popup will therefore show `bridge old`. Until `bridge.exe` is rebuilt, you can run the current bridge with Python 3.9+: install it with `py -3 -m pip install websockets`, close `start.bat`, then run `py -3 bridge.py` in the project folder. macOS and Linux already use `bridge.py` and are not affected.
+> **Windows note:** releases up to V3.9.3 shipped `bridge.exe`/`vscode_mcp.exe` built before the **origin check that stops websites from controlling the bridge** (and without the V3.9.2 large-response fix). From the next release the executables are built automatically from the same source (see `docs/ARCHITECTURE.md`). Until then, run the Python bridge: install it with `py -3 -m pip install websockets`, close `start.bat`, then run `py -3 bridge.py` in the project folder. macOS and Linux already use `bridge.py` and are not affected.
 
 ---
 
