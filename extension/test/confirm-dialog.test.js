@@ -98,7 +98,12 @@ describe("confirm dialog", () => {
     assert.equal(p.shadow().querySelector(".action").textContent, "first");
     p.click(".deny");
     assert.equal(await first, false);
-    await sleep(60);
+    // The second question appears a moment later and its Allow arms after allowDelayMs; wait for that, not for a fixed time.
+    for (let waited = 0; waited < 2000; waited += 10) {
+      const allow = p.shadow() && p.shadow().querySelector(".allow");
+      if (allow && !allow.disabled && p.shadow().querySelector(".action").textContent === "second") break;
+      await sleep(10);
+    }
     assert.equal(p.shadow().querySelector(".action").textContent, "second");
     p.click(".allow");
     assert.equal(await second, true);

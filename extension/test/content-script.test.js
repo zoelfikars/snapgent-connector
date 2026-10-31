@@ -55,8 +55,11 @@ describe("content script on the 2026-10 ChatGPT layout", () => {
       assert.ok(page.document.querySelector('[data-code-block="true"]').classList.contains("zs-tool-hide"), "the JSON block is hidden");
       const user = page.document.querySelector('[data-content-search-unit-key$=":user"]');
       assert.ok(user.classList.contains("zs-hidden"), "the bootstrap prompt is camouflaged");
-      // The bootstrap turn is a system chip; the model's command, with no result yet and generation fresh, is running.
-      assert.deepEqual([...page.document.querySelectorAll("[data-zphase]")].map((el) => el.dataset.zphase), ["sys", "run"]);
+      // The bootstrap turn is a system chip. The model's command has no result yet, so it is never settled (done/err):
+      // "run" while generation is fresh, "idle" ("not run") once the watchdog's window has passed on a slow machine.
+      const phases = [...page.document.querySelectorAll("[data-zphase]")].map((el) => el.dataset.zphase);
+      assert.equal(phases[0], "sys");
+      assert.ok(["run", "idle"].includes(phases[1]), `command phase was ${phases[1]}`);
     } finally {
       page.window.close(); // stops the content script's timers even when an assertion failed
     }
