@@ -35,7 +35,7 @@ const ZSProvider = (() => {
     allItems: () => [], isUserItem: no, isAssistantItem: no, itemText: empty, classifyText: empty,
     assistantCount: () => 0, userCount: () => 0, lastAssistant: none, lastAssistantId: none, itemKey: none,
     readAssistant: () => ({ present: false, reply: "", thinking: "", item: null }),
-    chatIsEmpty: () => true, isFreshChat: no, conversationKey: () => location.pathname,
+    chatIsEmpty: () => true, isFreshChat: no, conversationKey: () => "", // no turns are read, so no chat has an identity
     // generation
     isGenerating: no, isHardGenerating: no, isBusyNow: no, streamLen: () => 0, snapshot: () => ({ th: 0, rp: 0 }),
     turnHalted: no, stopGeneration() {},

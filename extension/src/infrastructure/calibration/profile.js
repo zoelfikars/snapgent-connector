@@ -15,12 +15,13 @@ export const PROFILE_VERSION = 1;
  * @property {{ turn: string, body: string|null }} assistant
  * @property {{ turn: string }} user
  * @property {{ selector: string }|null} stop    optional; otherwise found by label next to the composer
+ * @property {{ selector: string }|null} [card]   optional: the box around the text box and its buttons; otherwise found by looking
  */
 
 /**
  * Learn a profile from the elements the user clicked.
  * @param {{ hostname: string, name: string,
- *           picks: { composer: Element, send?: Element|null, assistant: Element, user: Element, assistantInner?: Element|null } }} input
+ *           picks: { composer: Element, send?: Element|null, assistant: Element, user: Element, assistantInner?: Element|null, card?: Element|null } }} input
  * @returns {{ profile: Profile, warnings: string[] } | { error: string }}
  */
 export function learnProfile({ hostname, name, picks }) {
@@ -41,12 +42,18 @@ export function learnProfile({ hostname, name, picks }) {
   const body = learnBodySelector(turns.assistantTurn, picks.assistantInner || null);
   if (picks.assistantInner && !body) warnings.push("Could not describe the part of the reply you chose; the whole reply is read.");
 
+  let card = null;
+  if (picks.card) {
+    const selector = learnSelector(picks.card, { onlyVisible: true });
+    if (selector) card = { selector }; else warnings.push("Could not describe the box you chose; it is found by looking instead.");
+  }
+
   return {
     profile: {
       version: PROFILE_VERSION, site: hostname, name,
       composer: { selector: composer }, send,
       assistant: { turn: turns.assistant, body }, user: { turn: turns.user },
-      stop: null,
+      stop: null, card,
     },
     warnings,
   };
@@ -54,7 +61,7 @@ export function learnProfile({ hostname, name, picks }) {
 
 /**
  * Re-learn one part of an existing profile from new clicks, leaving the rest as it is.
- * `role`: "composer" | "send" | "reply". "send" with no pick means "Enter sends". "reply" needs `assistant` and `user`.
+ * `role`: "composer" | "send" | "reply" | "card". "send" with no pick means "Enter sends". "reply" needs `assistant` and `user`.
  * @returns {{ profile: Profile, warnings: string[] } | { error: string }}
  */
 export function updateProfile(profile, role, picks) {
@@ -76,6 +83,11 @@ export function updateProfile(profile, role, picks) {
     const body = learnBodySelector(turns.assistantTurn, picks.assistantInner || null);
     if (picks.assistantInner && !body) warnings.push("Could not describe the part of the reply you chose; the whole reply is read.");
     return { profile: { ...profile, assistant: { turn: turns.assistant, body }, user: { turn: turns.user } }, warnings };
+  }
+  if (role === "card") {
+    const selector = learnSelector(picks.card, { onlyVisible: true });
+    if (!selector) return { error: "Could not describe that box in a way that finds it again." };
+    return { profile: { ...profile, card: { selector } }, warnings };
   }
   return { error: `Unknown part "${role}".` };
 }

@@ -13,7 +13,8 @@ import { profileProblems } from "./profile.js";
 
 const TIMINGS = { GEN_IDLE_MS: 2000, REASON_IDLE_MS: 15000, WARMUP_MS: 60000, REASON_NOREPLY_MS: 120000, STABLE_MS: 10000, RESPONSE_TIMEOUT_MS: 300000 };
 const STOP_LABEL = /\b(stop|cancel|halt|arr[êe]ter)\b/i;
-const CHROME_TEXT_LIMIT = 40; // header or "Copy" text a code block's wrapper may carry and still be hidden with it
+const CHROME_WORDS = 2;   // a label like "JSON" or "Copy code" may share a wrapper with the block and be hidden with it
+const CHROME_CHARS = 24;
 const SETTLE_MS = 150;        // let a rich editor learn where the caret is before input arrives
 
 const isValueEditor = (el) => !!el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT");
@@ -52,7 +53,9 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     return { present: !!item, reply: item ? readText(bodyOf(item)).trim() : "", thinking: "", item };
   };
   const chatIsEmpty = () => allItems().length === 0;
-  const conversationKey = () => (location.pathname === "/" ? "" : location.pathname);
+  // A chat with no turns has no identity yet: its URL is a placeholder (Gemini's is /app) that every new chat shares, and
+  // remembering a started session under it would make every new chat look started.
+  const conversationKey = () => (chatIsEmpty() || location.pathname === "/" ? "" : location.pathname);
 
   // A stable key for a turn when the page gives one (an id-like attribute on the turn or inside it), else null.
   const ID_ATTRIBUTE = /message-id|msg-id|turn-id|item-id/;
@@ -76,12 +79,20 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     const button = sendButton();
     return !!button && !button.disabled && button.getAttribute("aria-disabled") !== "true";
   };
-  // The card around the composer: the nearest ancestor that also holds the send button.
+  // The box that holds the text field together with its buttons (attach, mode, microphone, send): what the bar is seated in and
+  // the cover lies over. The user may have pointed at it; otherwise it is the smallest ancestor with the field and two or more
+  // controls (our own bar excluded, so seating the bar inside it does not change the answer).
   function composerFrame() {
     const editor = getEditor();
     if (!editor) return null;
-    const send = sendButton();
-    if (send) for (let n = editor.parentElement, i = 0; n && i < 8; n = n.parentElement, i++) if (n.contains(send)) return n;
+    if (profile.card && profile.card.selector) {
+      const chosen = find(profile.card.selector).find((box) => box.contains(editor));
+      if (chosen) return chosen;
+    }
+    for (let n = editor.parentElement, i = 0; n && n !== document.body && i < 8; n = n.parentElement, i++) {
+      const controls = [...n.querySelectorAll("button, [role=button]")].filter((b) => visible(b) && !b.closest("#zs-root"));
+      if (controls.length >= 2) return n;
+    }
     return editor.closest("form") || editor.parentElement;
   }
   const stopButton = () => {
@@ -234,14 +245,20 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   const stopGeneration = () => { const button = stopButton(); if (button) try { button.click(); } catch { /* gone */ } };
 
   // ── chips ─────────────────────────────────────────────────────────────────
-  // The raw command block is found by what it says, not by where a site puts it, and hidden with the chrome that
-  // comes with it (a language label, a copy button): the largest ancestor that adds only a little text of its own.
+  // The raw command block is found by what it says, not by where a site puts it, and hidden together with the chrome that
+  // belongs to it (a language label, a copy button). Climbing from the block, a parent is taken in only while everything
+  // else in it is chrome: a button, an empty element, or a label of a word or two. A paragraph or a sentence is the reply
+  // itself, and hiding it would make the answer vanish with the command.
+  const isChrome = (sibling) => {
+    if (sibling.nodeType !== 1) return !(sibling.textContent || "").trim();
+    if (sibling.matches("p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, table, ul, ol") || sibling.querySelector("p, li, blockquote, pre, table")) return false;
+    const words = (sibling.textContent || "").trim().split(/\s+/).filter(Boolean);
+    return words.length <= CHROME_WORDS && words.join("").length <= CHROME_CHARS;
+  };
   function blockWrapper(el, item, body) {
     let wrapper = el;
-    const words = (node) => (node.textContent || "").replace(/\s+/g, "").length; // markup whitespace is not text
-    const own = words(el);
     for (let n = el.parentElement; n && n !== item && n !== body; n = n.parentElement) {
-      if (words(n) - own > CHROME_TEXT_LIMIT) break;
+      if (![...n.childNodes].filter((child) => child !== wrapper).every(isChrome)) break;
       wrapper = n;
     }
     return wrapper;
@@ -258,6 +275,17 @@ export function createCalibratedProvider({ document, location, profile, diag = (
       found = found || { parent: wrapper.parentElement, ref: wrapper };
     }
     return found;
+  }
+
+  // ── what the profile finds on the page, for the calibration review ───────────
+  function review() {
+    const last = lastAssistant();
+    const body = last ? bodyOf(last) : null;
+    const codeBlocks = last ? [...last.querySelectorAll("pre")].filter((el) => !el.closest(".zs-chip")) : [];
+    return {
+      users: userTurns(), assistants: assistantTurns(), body: body && body !== last ? body : null, card: composerFrame(), composer: getEditor(), send: sendButton(),
+      codeBlocks: codeBlocks.length, codeBlocksRead: body ? codeBlocks.filter((el) => body.contains(el)).length : codeBlocks.length,
+    };
   }
 
   // ── health ────────────────────────────────────────────────────────────────
@@ -278,7 +306,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     supportsVision: false,
     sendRetryLimit: 1,
     get reliableCounts() { return !!idOf(lastAssistant()); },
-    chipAtItemLevel: true,
+    chipAtItemLevel: false, // the chip takes the place of the hidden block, in the reply's own column (it is repainted if the site wipes it)
     init() {},
     modeWarning() {
       const { problems } = health();
@@ -286,7 +314,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
       const part = { composer: "Text box", send: "Send button" }[problems[0].role] || "Setup";
       return `${part} not found`;
     },
-    health, describeLayout: health, testWrite,
+    health, describeLayout: health, testWrite, review,
     get needsCalibration() { return !health().ok; },
 
     allItems, isUserItem, isAssistantItem, itemText, classifyText, assistantCount, userCount, lastAssistant,

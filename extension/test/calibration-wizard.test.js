@@ -167,16 +167,15 @@ describe("calibration wizard", () => {
     assert.equal(t.wizard.state().step, "reply");
   });
 
-  test("a part of the reply with nothing readable in it is flagged in the preview, and 'Looks right' is not the highlighted choice", () => {
+  test("an answer part picked deep inside the prose is grown until it holds the reply's code blocks, so the command is still read", () => {
     const t = setup();
-    t.q("[data-markdown-text-style]").insertAdjacentHTML("afterbegin", '<i class="empty-part" data-part="none"></i>');
+    t.q("[data-markdown-text-style]").insertAdjacentHTML("afterbegin", '<p class="prose">I will check the tools.</p>');
     t.wizard.start();
     t.walkToPreview();
     t.press("pick-answer");
-    t.click(t.q(".empty-part"));
+    t.click(t.q(".prose"));                                  // just the sentence, which leaves the code block out
     assert.equal(t.wizard.state().step, "preview");
-    assert.match(t.errorText(), /Nothing was read/);
-    assert.equal(t.panel().querySelector('[data-action="looks-right"]').className, "", "not the primary button");
+    assert.match(t.panel().querySelector("pre").textContent, /"command"/, "the command block is still read");
   });
 
   test("Back goes to the previous step; Escape and Cancel close everything and give the page its clicks back", () => {

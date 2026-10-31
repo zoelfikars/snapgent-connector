@@ -90,10 +90,18 @@ export function learnTurnSelectors(assistantPick, userPick) {
   return { assistant: a.selector, user: u.selector, assistantTurn: a.el, userTurn: u.el };
 }
 
-/** The part of a reply to read, from a click inside it; null when the turn itself is the body. */
+/**
+ * The part of a reply to read, from a click inside it; null when the turn itself is the body. A part that leaves out one of
+ * the reply's code blocks is grown until it holds them all: the commands the agent must read live in code blocks, and a click
+ * deep inside the prose would otherwise cut them off.
+ */
 export function learnBodySelector(turn, inner) {
   if (!inner || inner === turn || !turn.contains(inner)) return null;
-  for (let el = inner; el && el !== turn; el = el.parentElement) {
+  const blocks = [...turn.querySelectorAll("pre")];
+  let start = inner;
+  while (start !== turn && !blocks.every((block) => start.contains(block))) start = start.parentElement;
+  if (start === turn) return null;
+  for (let el = start; el && el !== turn; el = el.parentElement) {
     const selector = learnSelector(el, { scope: turn });
     if (selector && all(turn, selector)[0] === el) return selector;
   }

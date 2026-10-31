@@ -120,8 +120,12 @@ describe("computeBarView: a site that needs calibrating", () => {
     }
   });
 
-  test("a running session is not interrupted by it, and a site that does not need it is unchanged", () => {
-    assert.notEqual(computeBarView({ ...base, started: true, needsCalibration: true }).kind, "calibrate");
+  test("a session remembered from an earlier visit does not hide it: nothing is readable now", () => {
+    assert.equal(computeBarView({ ...base, started: true, needsCalibration: true }).kind, "calibrate");
+  });
+
+  test("a running loop is not interrupted by it, and a site that does not need it is unchanged", () => {
+    assert.notEqual(computeBarView({ ...base, started: true, running: true, needsCalibration: true }).kind, "calibrate");
     assert.equal(computeBarView({ ...base, needsCalibration: false, modeWarning: null }).kind, "start");
   });
 });

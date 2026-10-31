@@ -63,7 +63,8 @@ export function computeBarView(state) {
   if (state.staleExtension) return view("warn", "<b>Disconnected</b> · reload page", { warn: true });
 
   // Nothing else can happen on a site the extension does not know how to read: the one thing to do is to teach it.
-  if (state.needsCalibration && !state.started && !state.starting) {
+  // (A session remembered from an earlier visit does not count: with nothing readable on the page it cannot be driven.)
+  if (state.needsCalibration && !state.starting && !state.running) {
     return view("warn", state.modeWarning || "Not calibrated for this site yet", { label: "Calibrate", kind: "calibrate", warn: true });
   }
 

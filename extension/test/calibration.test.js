@@ -2,7 +2,8 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as ZSParse from "../src/domain/parser/index.js";
-import { createCalibratedProvider, learnProfile, learnSelector, profileProblems } from "../src/infrastructure/calibration/index.js";
+import { createCalibratedProvider, learnProfile, learnSelector, profileProblems, updateProfile } from "../src/infrastructure/calibration/index.js";
+import { createChipPainter } from "../src/ui/chip-painter.js";
 import { pageWith } from "./support/jsdom-provider.js";
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
@@ -27,7 +28,11 @@ const SITES = {
   },
   meta: {
     hostname: "www.meta.ai", name: "Meta AI", url: "https://www.meta.ai/prompt/x",
-    html: () => fixture("sites/meta-lexical.html"),
+    // the captured composer, with the card around it that the real page has (an attach button next to the box and the send button)
+    html: () => fixture("sites/meta-lexical.html")
+      .replace('<div class="relative"><div data-testid="composer-input" contenteditable', '<div class="composer-card"><button aria-label="Add attachment">+</button><div class="relative"><div data-testid="composer-input" contenteditable')
+      .replace('data-composer-focus=""></div></div>', 'data-composer-focus=""></div></div>')
+      .replace('<button data-testid="composer-send-button" aria-label="Send">Send</button>', '<button data-testid="composer-send-button" aria-label="Send">Send</button></div>'),
     clicks: (d) => ({ composer: d.querySelector("[data-lexical-editor]"), send: d.querySelector('[data-testid="composer-send-button"]'), assistant: d.querySelector("pre"), user: d.querySelector(".user-turn div"), assistantInner: null }),
     editor: "contenteditable", codeBlock: ".ur-code-block",
   },
@@ -127,6 +132,135 @@ describe("what a re-skin must not break", () => {
     const stored = JSON.parse(JSON.stringify(profile));
     const provider = createCalibratedProvider({ document, location: window.location, profile: stored });
     assert.equal(provider.assistantCount(), 1);
+  });
+});
+
+describe("the box around the text field (where the bar is seated)", () => {
+  const PAGE = (extra = "") => `<html><body>
+    <div class="turn-user">hello</div><div class="turn-assistant"><pre>{"command":"x","params":{}}</pre></div>
+    <div id="page-chrome"><button>menu</button><button>settings</button></div>
+    <div id="card" class="card">${extra}<div class="inner"><div id="box" contenteditable="true"></div></div><button aria-label="Attach">+</button><button aria-label="Mic">m</button></div>
+  </body></html>`;
+  function on(html, picks = {}) {
+    const { document, window } = pageWith(html, "https://x.test/");
+    const learned = learnProfile({ hostname: "x.test", name: "X", picks: { composer: document.getElementById("box"), send: null, assistant: document.querySelector("pre"), user: document.querySelector(".turn-user"), ...picks } });
+    assert.equal(learned.error, undefined, learned.error);
+    return { document, window, profile: learned.profile, provider: createCalibratedProvider({ document, location: window.location, profile: learned.profile }) };
+  }
+
+  test("found by looking: the smallest ancestor holding the text field and at least two controls, not the field's own wrapper", () => {
+    const { provider, document } = on(PAGE());
+    assert.equal(provider.composerFrame(), document.getElementById("card"));
+  });
+
+  test("the user can point at it, and the choice wins over looking", () => {
+    const { document } = pageWith(PAGE(), "https://x.test/");
+    const learned = learnProfile({ hostname: "x.test", name: "X", picks: { composer: document.getElementById("box"), send: null, assistant: document.querySelector("pre"), user: document.querySelector(".turn-user"), card: document.querySelector(".inner") } });
+    assert.ok(learned.profile.card.selector);
+    const provider = createCalibratedProvider({ document, location: { pathname: "/" }, profile: learned.profile });
+    assert.equal(provider.composerFrame(), document.querySelector(".inner"));
+  });
+
+  test("our own bar sitting inside the card does not change which box it is", () => {
+    const { provider, document } = on(PAGE());
+    const before = provider.composerFrame();
+    document.querySelector(".inner").insertAdjacentHTML("beforebegin", '<div id="zs-root"><button>Calibrate</button><button>VS Code</button><button>Gemini</button></div>');
+    assert.equal(provider.composerFrame(), before);
+  });
+
+  test("a field with one control or none falls back to the form or its parent", () => {
+    const { provider, document } = on(`<html><body><div class="turn-user">u</div><div class="turn-assistant"><pre>{"command":"x"}</pre></div><form id="f"><div id="box" contenteditable="true"></div></form></body></html>`);
+    assert.equal(provider.composerFrame(), document.getElementById("f"));
+  });
+
+  test("it can be re-learned on its own, keeping the rest of the profile", () => {
+    const { document, profile } = on(PAGE());
+    const updated = updateProfile(profile, "card", { card: document.querySelector(".inner") });
+    assert.ok(updated.profile.card.selector);
+    assert.deepEqual(updated.profile.composer, profile.composer);
+    assert.ok(updateProfile(profile, "card", { card: document.body }).error || updateProfile(profile, "card", { card: document.body }).profile);
+  });
+});
+
+describe("where a chip goes, and what the reply read includes", () => {
+  // The turn element is as wide as the page; the reply's text sits in a centred column inside it (Gemini, Meta).
+  const WIDE = `<html><body>
+    <div class="turn-user">hello</div>
+    <div class="turn-assistant"><div class="avatar"></div><div class="column"><p class="prose">I will check the tools.</p><div class="block"><span>json</span><pre>{"command":"list_commands","params":{}}</pre></div></div></div>
+    <div id="box" contenteditable="true"></div>
+  </body></html>`;
+  function on(picks) {
+    const { document, window } = pageWith(WIDE, "https://x.test/");
+    const learned = learnProfile({ hostname: "x.test", name: "X", picks: { composer: document.getElementById("box"), send: null, assistant: document.querySelector("pre"), user: document.querySelector(".turn-user"), ...picks(document) } });
+    assert.equal(learned.error, undefined, learned.error);
+    const provider = createCalibratedProvider({ document, location: window.location, profile: learned.profile });
+    return { document, provider, profile: learned.profile };
+  }
+
+  test("the chip takes the place of the hidden command block, inside the reply's column, not at the page-wide turn root", () => {
+    const { provider, document } = on(() => ({}));
+    const painter = createChipPainter({ document, provider });
+    const turn = provider.lastAssistant();
+    painter.toolBox(turn, "list_commands", "run", "", false);
+    const chip = turn.querySelector(".zs-chip");
+    assert.equal(chip.parentElement, document.querySelector(".column"));
+    assert.ok(document.querySelector(".block").classList.contains("zs-tool-hide"));
+  });
+
+  test("short prose next to the command is never hidden with it: the answer does not vanish", () => {
+    const { provider, document } = on(() => ({}));
+    provider.findToolBlockSpot(provider.lastAssistant());
+    assert.equal(document.querySelector(".prose").closest(".zs-tool-hide"), null, "the sentence is still visible");
+    assert.ok(document.querySelector("pre").closest(".zs-tool-hide"));
+  });
+
+  test("a longer sentence, a paragraph or a second code block next to it stops the climb too", () => {
+    for (const sibling of ['<div>Here are the tools I will use for the task</div>', "<p>ok</p>", "<pre>other</pre>"]) {
+      const { document: doc, window: win } = pageWith(WIDE.replace('<p class="prose">I will check the tools.</p>', sibling), "https://x.test/");
+      const learned = learnProfile({ hostname: "x.test", name: "X", picks: { composer: doc.getElementById("box"), send: null, assistant: doc.querySelector(".block pre"), user: doc.querySelector(".turn-user") } });
+      const provider = createCalibratedProvider({ document: doc, location: win.location, profile: learned.profile });
+      provider.findToolBlockSpot(provider.lastAssistant());
+      assert.equal(doc.querySelector(".column").classList.contains("zs-tool-hide"), false, sibling);
+    }
+  });
+
+  test("an answer part picked in the prose is grown to include the command block, so the command is still read", () => {
+    const { provider, profile } = on((d) => ({ assistantInner: d.querySelector(".prose") }));
+    assert.equal(profile.assistant.body, ".column");
+    assert.match(provider.readAssistant().reply, /"command":"list_commands"/);
+    assert.match(provider.readAssistant().reply, /I will check the tools/);
+  });
+
+  test("a part that already holds the code blocks is kept as chosen", () => {
+    const { profile } = on((d) => ({ assistantInner: d.querySelector(".column") }));
+    assert.equal(profile.assistant.body, ".column");
+  });
+
+  test("when only the whole turn holds everything, the whole turn is read", () => {
+    const { profile } = on((d) => ({ assistantInner: d.querySelector(".avatar") }));
+    assert.equal(profile.assistant.body, null);
+  });
+
+  test("the review says what is read and how many code blocks it covers", () => {
+    const { provider } = on(() => ({}));
+    const info = provider.review();
+    assert.deepEqual([info.users.length, info.assistants.length, info.codeBlocks, info.codeBlocksRead], [1, 1, 1, 1]);
+    assert.ok(info.card && info.composer);
+  });
+});
+
+describe("conversation identity", () => {
+  test("a chat with no turns has no identity yet, whatever its URL says (Gemini's fresh chat is /app)", () => {
+    const { provider, window } = calibrated(SITES.gemini);
+    window.history.pushState({}, "", "/app");
+    for (const turn of provider.allItems()) turn.remove();
+    assert.equal(provider.conversationKey(), "", "otherwise every new chat looks like the session remembered for /app");
+  });
+
+  test("a chat with turns is identified by its path", () => {
+    const { provider, window } = calibrated(SITES.gemini);
+    window.history.pushState({}, "", "/app/abc123");
+    assert.equal(provider.conversationKey(), "/app/abc123");
   });
 });
 

@@ -24,6 +24,8 @@ async function startOn(html, url = "https://chatgpt.com/c/test", { storage = {} 
   virtualConsole.on("jsdomError", (error) => warnings.push(String(error)));
   const dom = new JSDOM(html, { runScripts: "outside-only", url, pretendToBeVisual: true, virtualConsole });
   const { window } = dom;
+  // jsdom has no layout: say that every element is laid out, or nothing on the page counts as visible.
+  window.Element.prototype.getClientRects = function () { return this.isConnected ? [{ width: 100, height: 20 }] : []; };
   window.__storageListeners = [];
   window.chrome = {
     storage: {
