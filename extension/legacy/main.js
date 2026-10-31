@@ -15,7 +15,7 @@
   "use strict";
   const P = ZSProvider;
   const T = P.timings;
-  const { formatCatalogue, argSummary, outSummary, feedbackIsError, stripOutputPrefix } = ZSDomain;
+  const { argSummary, outSummary, feedbackIsError, stripOutputPrefix } = ZSDomain;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const log = (...a) => console.log("[snapgentV3]", ...a);
 
@@ -104,7 +104,6 @@
       const saved = result && result[TARGET_STORAGE_KEY];
       if (typeof saved === "string" && saved) {
         selectedTargetId = saved;
-        refreshActiveToolNames();
         if (ui.setTarget) {
           ui.setTarget(saved);
           bg({ type: "status" }).then((status) => status && ui.setStatus(status));
@@ -183,8 +182,6 @@
     toolName: "",
     toolItem: null,
     toolArg: "",
-    toolList: [],
-    toolNames: new Set(),
     // Successful tool calls since the last command-list reminder. DeepSeek (and
     // others) can drift away from the exact command names over a long session,
     // so we re-inject the list every REMIND_TOOLS_EVERY calls (see agentLoop).
@@ -210,8 +207,6 @@
     // True while the loop is parked waiting for this tab to come back to the
     // foreground (see waitVisible/parkHidden). Drives the bar's "Paused" state.
     parked: false,
-    // Timestamp of the last successful tool-catalogue refresh (see ensureTools).
-    toolsAt: 0,
   };
 
   async function waitFor(pred, timeout) {
@@ -721,7 +716,7 @@
         // placeholder like "command_name") is NOT misread as a broken command and
         // looped on - only a real tool name means a genuine failed call.
         const nm = ZSParse.toolNameFromText(r);
-        if (nm && nm !== "command" && (A.toolNames.has(nm) || A.toolNames.has(bareToolName(nm)))) {
+        if (nm && nm !== "command" && catalogue.knows(nm)) {
           return { kind: "parse_error", reason: "malformed", raw: r, item: d.item };
         }
       }
@@ -761,11 +756,11 @@
       const wrongKey = /"(?:toolName|tool_name|tool|name|function|action)"\s*:\s*"([A-Za-z0-9_.\/-]+)"/.exec(r);
       if (wrongKey && !/"command"\s*:/.test(r)) {
         const wk = wrongKey[1];
-        const hit = knownTool(wk);
+        const hit = catalogue.knows(wk);
         // Log the miss too: the gate depends on how the bridge ADVERTISES names
         // (they can be prefixed per server on a collision), so a silent no-match
         // is exactly the case that is impossible to diagnose after the fact.
-        diag("cmd.wrongKey", { name: wk, known: hit, catalogue: A.toolNames.size });
+        diag("cmd.wrongKey", { name: wk, known: hit, catalogue: catalogue.names().size });
         if (hit) return { kind: "parse_error", reason: "toolKey", raw: r, item: d.item };
       }
       // NOTE: a site "server busy / something went wrong" notice is deliberately
@@ -829,20 +824,6 @@
   // name never reveals that in advance. Image results are caught generically at
   // the point results are handled (see the `r.images.length` branch) and turned
   // into a plain error on providers whose model cannot see images.
-  const bareToolName = (name) => (name && name.includes("/") ? name.split("/").pop() : name) || "";
-  // Is `name` a tool we actually have? The bridge ADVERTISES names that may carry
-  // a per-server prefix when two MCP servers expose the same tool (see
-  // list_tools in bridge.py), while the model always writes the bare name - so a
-  // plain `A.toolNames.has(bare)` misses, and so does bareToolName(bare), which
-  // cannot re-add a prefix it never had. Compare bare-to-bare in BOTH directions.
-  const bareKey = (n) => String(n || "").split("/").pop().split(".").pop();
-  function knownTool(name) {
-    if (!name || !A.toolNames.size) return false;
-    if (A.toolNames.has(name) || A.toolNames.has(bareToolName(name))) return true;
-    const b = bareKey(name);
-    for (const t of A.toolNames) if (bareKey(t) === b) return true;
-    return false;
-  }
   // ── Learned image tools (reload-proof "screen" chip) ──────────────────────
   // A custom MCP tool's NAME reveals nothing about returning images, so we learn which
   // ones return images and persist that across reloads: with it, a revisited or
@@ -866,201 +847,38 @@
     });
   } catch {}
 
-  // How long a fetched catalogue stays good enough to reuse without a round trip.
-  const TOOLS_TTL_MS = 30000;
+  // ── Tool execution (src/application): wired to this page through ports ────
+  const { ToolCatalogue, ToolRunner } = ZSApp;
+  const { bareToolName } = ZSDomain;
 
-  function activeTools() {
-    if (!isMcpEnabled(selectedTargetId)) return [];
-    return A.toolList.filter((tool) => (tool.server || "vscode") === selectedTargetId);
-  }
-
-  function refreshActiveToolNames() {
-    A.toolNames = new Set(activeTools().map((tool) => tool.name));
-  }
-
-  // Refresh the tool catalogue - but never pay for it twice in a row.
-  //
-  // A list_tools while one MCP server is dead blocks the bridge until it gives
-  // up, and the extension waited the FULL background timeout for it. The boot
-  // sequence calls this three times in a row - startSession(),
-  // then the model's list_commands, then list_mcp_servers - so the user watched
-  // ~a minute of dead air with the model's reply already finished on screen
-  // ("the first commands take forever even though the model clearly stopped
-  // writing"). A short TTL collapses those three calls into one, and the caller
-  // keeps the catalogue it already has instead of stalling for a fresh one.
-  async function ensureTools(force) {
-    if (!force && A.toolList.length && Date.now() - A.toolsAt < TOOLS_TTL_MS) {
-      diag("tools.cached", { age: Date.now() - A.toolsAt, n: A.toolList.length });
-      return A.toolList;
-    }
-    const t0 = Date.now();
-    const r = await bg({ type: "list_tools" });
-    diag("tools.fetched", { ms: Date.now() - t0, n: (r && r.tools && r.tools.length) || 0 });
-    if (r && r.tools && r.tools.length) {
-      A.toolList = r.tools;
-      refreshActiveToolNames();
-      A.toolsAt = Date.now();
-    }
-    return A.toolList;
-  }
-
-  async function runTool(call) {
-    const name = call.tool;
-    const args = call.arguments || {};
-    if (!name) return ZS.FEEDBACK.parseError("malformed");
-    // NEVER execute while the AI tab is backgrounded/minimized. This is the single
-    // choke point for ALL execution (agentLoop's tool dispatch AND the bootstrap's
-    // list_commands), so it closes the hole the loop-entry gate alone left open:
-    // the tab is foreground when a cycle starts, the model then generates for
-    // 30-120s, the user minimizes MID-generation, and waitForResponse returns a
-    // tool call that fired off-screen (observed live: GLM minimized
-    // still ran a command). Parking here (no time cap) means the call runs the
-    // moment the tab is foreground again, instead of being lost or run blind.
-    if (document.hidden && !A.stop) {
-      diag("tool.waitVisible", { name });
-      // Only reachable via a user Stop while parked; agentLoop's post-runTool
-      // A.stop check breaks the loop and discards this, so it just needs to be
-      // a non-crashing, clearly-labelled string.
-      if (!(await waitVisible()) || A.stop) return "ERROR: the command was not run - stopped by the user.";
-    }
-    // Virtual command: list the MCP server(s) snapgentV3 is currently connected
-    // to, with each one's REAL per-server health (from the bridge, never the
-    // merged tool count - a dead server must not borrow another's numbers).
-    if (name === "list_mcp_servers") {
-      await ensureTools();
-      // Isolation: the AI only ever sees the server selected in the dropdown (and only
-      // if its toggle is on). Other servers, enabled or not, are invisible to it.
-      const servers = ((A.bridge && A.bridge.servers) || [])
-        .filter((sv) => sv.id === selectedTargetId && isMcpEnabled(sv.id));
-      const lines = servers.length
-        ? servers.map((sv) => {
-            const label = sv.id === "vscode" ? "VS Code (default target)" : `${sv.id} (addon)`;
-            return `- ${sv.id}: ${label} - ${sv.alive ? `${sv.tools || 0} commands available` : "offline (no tools)"}`;
-          })
-        : ["- vscode: VS Code (default target) - unknown (bridge did not report server health)"];
-      return (
-        `Output of 'list_mcp_servers':\n` +
-        `Connected MCP servers (${lines.length}):\n${lines.join("\n")}\n` +
-        `Use list_commands with a "server" param (one of the ids above) to see that server's exact commands. Without "server", list_commands defaults to "${selectedTargetId}".`
-      );
-    }
-    // Virtual command: list available commands with full details. Defaults to
-    // the selected target - a DIFFERENT server's tools only ever show up
-    // if the model explicitly asks via {"server": "<id>"} (see list_mcp_servers).
-    if (name === "list_commands" || name === "list_tools") {
-      await ensureTools();
-      const target = (selectedTargetId || "vscode").trim();
-      const asked = typeof args.server === "string" ? args.server.trim() : "";
-      // Isolation: only the server selected in the dropdown can be listed. A request
-      // for any other server gets a generic refusal that does not reveal whether that
-      // server exists, is connected, or is toggled on.
-      if (asked && asked !== target) {
-        return `Output of '${name}':\nERROR: server "${asked}" is not available. Only the selected target "${target}" can be used in this session. Do NOT try other servers; ask the user to switch the target in the snapgentV3 selector if needed.`;
-      }
-      const requested = target;
-      if (!isMcpEnabled(requested)) {
-        return `Output of '${name}':\nERROR: MCP server "${requested}" is disabled by the user. Do NOT use it. Tell the user to enable it in the MCP settings if it is needed.`;
-      }
-      const known = new Set(A.toolList.map((t) => t.server).filter(Boolean));
-      // Tools from a bridge that doesn't tag "server" yet (old version) have no
-      // .server field at all - treat those as the primary server rather than
-      // hiding everything.
-      const scoped = A.toolList.filter((t) => (t.server || "vscode") === requested);
-      if (!A.toolList.length) return `Output of '${name}':\nNo commands available - the bridge or selected MCP server may be offline.`;
-      if (!scoped.length) {
-        return `Output of '${name}':\nERROR: the selected server "${requested}" has no commands available (it may be offline). Do NOT try other servers; tell the user to check the target in the snapgentV3 selector.`;
-      }
-      const catalogue = formatCatalogue(scoped);
-      return `Output of '${name}':\n${requested} commands (${scoped.length}):\n\n${catalogue}`;
-    }
-    // Isolation: execution is hard-limited to the server selected in the dropdown.
-    // 1) the selected target must be toggled on,
-    // 2) an explicit "server/tool" prefix may only name the selected target,
-    // 3) the tool must exist in the selected server's own catalogue (never skipped,
-    //    even when that catalogue is empty).
-    // The name sent to the bridge is NOT rewritten: the bridge only knows a "server/"
-    // prefix for tools whose names collide across servers.
-    if (!isMcpEnabled(selectedTargetId)) {
-      return `ERROR: the selected MCP server "${selectedTargetId}" is disabled by the user, so '${name}' was not run. Do NOT retry. Tell the user to enable it in the MCP settings.`;
-    }
-    if (name.includes("/") && name.split("/")[0] !== selectedTargetId) {
-      return `ERROR: '${name}' was not run. Only the selected target "${selectedTargetId}" can be used in this session. Use plain command names from list_commands.`;
-    }
-    if (!A.toolNames.size) await ensureTools();
-    if (!knownTool(name)) {
-      return ZS.FEEDBACK.unknownTool(name, [...A.toolNames]);
-    }
-    const timeout = 120000;
-    // Hard watchdog: even if the background worker never answers, the loop
-    // gets a definitive result and continues.
-    const hardCap = new Promise((res) =>
-      setTimeout(() => res({ ok: false, kind: "timeout", error: "no response from the extension worker" }), timeout + 30000));
-    // Stop watcher: a blocking tool (e.g. wait_job_finished) would otherwise keep
-    // the loop awaiting the bridge for up to minutes, leaving the input locked and
-    // the Stop button stuck. When the user halts (A.stop), abandon the wait within
-    // ~150ms so the loop breaks and its finally unlocks everything. The in-flight
-    // bridge call may still finish in the background; its result is just ignored.
-    let stopTimer;
-    const stopWatch = new Promise((res) => {
-      stopTimer = setInterval(() => { if (A.stop) res({ ok: false, kind: "stopped" }); }, 150);
-    });
-    let r = await Promise.race([bg({ type: "call_tool", name, arguments: args, timeout, server: selectedTargetId }), hardCap, stopWatch]);
-    clearInterval(stopTimer);
-    if (r && r.kind === "stopped") return "(stopped by user)";
-    if (!r) return ZS.FEEDBACK.bridgeOffline;
-    // An MCP server may report missing/invalid required parameters as a SUCCESS
-    // whose text is just the complaint (e.g. "path is required").
-    // Re-shape those into a real ERROR so the model corrects the call instead
-    // of misreading it as tool output.
-    if (r.ok && r.text && /^[\w .'"-]{0,60}\bis (required|not available|invalid)\b[\w .'"-]{0,80}$/i.test(r.text.trim())) {
-      return `ERROR calling '${name}': ${r.text.trim()}.\nA required or invalid parameter - check the command's parameters with list_commands, fix the call and retry.`;
-    }
-    if (r.ok) {
-      if (r.images && r.images.length && !P.supportsVision) {
-        // Any tool from ANY connected server can turn out to return images -
-        // we don't try to predict this from its name in advance. This is the
-        // generic catch: whatever just ran, if it handed back images and this
-        // provider's model can't see them, refuse cleanly instead of silently
-        // attaching a file it will never actually process.
-        return `ERROR: '${bareName}' returned an image, but this assistant cannot see images. Do NOT call it again. Use a different command to get the information as text instead.`;
-      }
-      if (r.images && r.images.length) {
-        // Show the capture in a left-hand snapgentV3 popup (from the in-memory
-        // base64 - simple and reliable on every site; no DOM-embedded preview).
-        ui.showImages(r.images, name);
-        // Do NOT attach the image here: submitAndGetBase/typeAndSend types the
-        // feedback text into the editor LATER, and on providers whose editor is
-        // rebuilt via select-all + insertText (e.g. Gemini's setEditorText),
-        // that wipe severs the site's internal binding between "pending upload"
-        // and "message being composed" - the file then sits in the composer
-        // forever while only the text goes out (validated live: Gemini kept
-        // the file attached+unsent across the whole turn). Stash the images and
-        // let the provider attach them as the LAST step, right before the send
-        // click, so nothing mutates the editor afterward.
-        A.pendingImages = r.images;
-        diag("images.stashed", { count: r.images.length });
-        const caption = r.text && r.text.trim()
-          ? r.text.trim()
-          : `${r.images.length} image(s) captured.`;
-        return `Output of '${name}':\n${caption}\n(The image is attached to THIS message - you can see it directly. Analyse it and continue.)`;
-      }
-      const text = r.text && r.text.length ? r.text : "(tool returned an empty result)";
-      return `Output of '${name}':\n${text}`;
-    }
-    // Orphaned content script - a page reload is the only cure, so say exactly
-    // that instead of blaming the bridge (see bg / isContextInvalidated).
-    if (r.kind === "stale-extension") {
-      ui.banner("warn", "Reload page",
-        "Updated. Press F5.");
-      diag("bridge.staleExtension", { name, error: r.error });
-      return ZS.FEEDBACK.staleExtension;
-    }
-    if (r.kind === "disconnected") return ZS.FEEDBACK.bridgeOffline;
-    if (r.kind === "timeout") {
-      return `ERROR: tool '${name}' timed out after 120s.\n${r.error}\nTry a shorter/simpler call.`;
-    }
-    return `ERROR calling '${name}': ${r.error}\nRead the error carefully, fix the call or try a different approach.`;
-  }
+  const bridgePort = {
+    listTools: () => bg({ type: "list_tools" }),
+    callTool: (request) => bg({ type: "call_tool", ...request }),
+  };
+  const sessionPort = {
+    target: () => selectedTargetId,
+    isEnabled: (id) => isMcpEnabled(id),
+    servers: () => (A.bridge && A.bridge.servers) || [],
+    supportsVision: () => !!P.supportsVision,
+    isStopped: () => A.stop,
+  };
+  const visibilityPort = {
+    isHidden: () => document.hidden,
+    waitUntilVisible: () => waitVisible(),
+  };
+  const sinkPort = {
+    // Stash the images and let the provider attach them as the LAST step before
+    // the send click (typing the text later would sever the composer binding).
+    images: (images, toolName) => { ui.showImages(images, toolName); A.pendingImages = images; },
+    staleExtension: () => ui.banner("warn", "Reload page", "Updated. Press F5."),
+    diag,
+  };
+  const catalogue = new ToolCatalogue({ bridge: bridgePort, session: sessionPort, diag });
+  const toolRunner = new ToolRunner({
+    bridge: bridgePort, catalogue, session: sessionPort, visibility: visibilityPort, sink: sinkPort,
+  });
+  const runTool = (call) => toolRunner.run(call);
+  const activeTools = () => catalogue.active();
 
   // Full args / code, shown in a tool chip's expandable body.
   function callBody(call) {
@@ -1307,7 +1125,7 @@
           // without it looking like a new result to act on. Errors don't count
           // (they already restate what's wrong) and list_commands is redundant.
           let toSend = feedback;
-          if (!isErr && call.tool !== "list_commands" && A.toolList.length) {
+          if (!isErr && call.tool !== "list_commands" && catalogue.hasAny()) {
             A.toolCallsSinceReminder++;
             if (A.toolCallsSinceReminder >= REMIND_TOOLS_EVERY) {
               A.toolCallsSinceReminder = 0;
@@ -1814,7 +1632,7 @@
     P.setInputLock(true); // block user input during bootstrap
     ui.inputCover(true);  // cover the composer ("Working…") for the WHOLE Starting Up
     try {
-      await ensureTools(true); // boot: always take a fresh catalogue (the TTL then
+      await catalogue.ensure(true); // boot: always take a fresh catalogue (the TTL then
                                // covers the list_commands / list_mcp_servers calls
                                // the model makes seconds later)
       if (!alive()) return;
@@ -3235,7 +3053,7 @@
           Date.now() - workspaceProbeAt >= 5000) {
         workspaceProbeAt = Date.now();
         workspaceProbePending = true;
-        ensureTools(false).then(() => {
+        catalogue.ensure(false).then(() => {
           const workspaceTool = activeTools().find((tool) => bareToolName(tool.name) === "list_dir");
           bridgeOk = serverConnected &&
             ((selected.tools || 0) > 0 || activeTools().length > 0);

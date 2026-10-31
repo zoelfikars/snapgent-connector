@@ -48,8 +48,10 @@ extension/
     domain/
       parser/                markers · json-scan · tool-call · salvage · detect
       prompt/                system-prompt · feedback · reminder
-      tools/                 category · catalogue · result-summary
+      tools/                 category · catalogue · result-summary · names · isolation
+                             virtual-commands · result-feedback
       constants.js
+    application/             ToolRunner · ToolCatalogue · call-guard · ports (typedefs)
     infrastructure/chat/     waitFor · StreamSampler · dom-helpers (shared by adapters)
     entry/                   background.js · popup.js · legacy-globals.js
   legacy/                    not yet migrated (see Status): main.js, providers/*
@@ -62,14 +64,18 @@ extension/
 ### Principles and where they are enforced
 
 - **SRP** — one module, one reason to change. `test/architecture.test.js`
-  caps domain modules at 250 lines.
-- **Separation of concerns** — the same test fails if `domain/` touches
-  `document`, `window`, `chrome`, `fetch`, etc., or imports outside `domain/`.
+  caps domain and application modules at 250 lines.
+- **Separation of concerns** — the same test fails if `domain/` or
+  `application/` touch `document`, `window`, `chrome`, `fetch`, etc., or import
+  from a layer above them (`domain` imports only `domain`; `application` only
+  `application` + `domain`).
 - **DRY** — site hosts were repeated in `manifest.json`, `background.js` and
   `popup.js`; they now come from `sites/registry.js`. The 14 content-script
   blocks are generated, not hand-written. Chat-site code that is identical
   across adapters moves into a shared base (see roadmap).
-- **Testable** — pure functions take data and return data. Anything that needs
+- **Testable** — `ToolRunner` runs against fake bridge/session/timer ports with
+  no browser; smoke tests also boot the real `globals.js → adapter → main.js`
+  sequence in a sandbox. Pure functions take data and return data. Anything that needs
   the clock, the DOM or the network is behind a port.
 - **Browser-neutral** — one source tree, two builds. Chrome gets
   `background.service_worker`; Firefox gets `background.scripts` plus
@@ -80,7 +86,8 @@ extension/
 ```bash
 cd extension && npm install
 npm run build            # dist/chrome and dist/firefox
-npm test
+npm test                 # unit + smoke tests (no browser needed)
+npm run lint             # no-undef across legacy code catches dangling references
 ```
 
 Load `extension/dist/chrome` as an unpacked extension in Chrome/Edge, or
@@ -97,7 +104,8 @@ shippable.
 | Parser, prompt, feedback, tool formatting, result summaries | **Migrated** to `domain/`, unit-tested |
 | Manifest, host lists, per-browser build | **Migrated** (`sites/`, `build/`) |
 | Bridge origin check | **Done** (`bridge.py`) |
-| `legacy/main.js` (~4.4k lines: loop + tool runner + session + chips + UI) | Next: split per the layer table |
+| Tool execution (`runTool`, catalogue, isolation, `list_commands`, result shaping) | **Migrated** to `application/` + `domain/tools/`, tested with fake ports |
+| `legacy/main.js` (~4.3k lines: loop + session + chips + UI) | Next: `AgentLoop`, `Session`, then `ui/` |
 | `legacy/providers/*` (12 adapters, ~8.1k lines) | Shared primitives extracted; adapter family factory next |
 | `entry/background.js` | Bridge client + message router still in one file |
 
@@ -114,10 +122,10 @@ shippable.
    (`getEditor`, `writeText`, `snapshot`, `readAssistant`) becomes a
    `createGenericAdapter(selectors)` factory; the other eight keep their quirks
    behind a documented adapter contract (`ChatPort`).
-2. **`application/`**: extract `ToolRunner` (isolation checks, `list_commands`,
-   timeout/stop racing), `AgentLoop` (turn → parse → run → feed back) and
-   `Session` (bootstrap, reminders, re-injection) from `main.js`, against the
-   ports above, with fake-port tests.
+2. **`application/`**: `ToolRunner` *(done: isolation checks, `list_commands`,
+   timeout/stop racing, result shaping)*. Still to extract from `main.js`:
+   `AgentLoop` (turn → parse → run → feed back) and `Session` (bootstrap,
+   reminders, re-injection), against the same ports, with fake-port tests.
 3. **`ui/`**: split the ~1.5k-line `ui` IIFE into `bar`, `target-menu`,
    `mcp-settings`, `banners`; split `decorate` (chips) into `chips` + `camouflage`.
    Rendering takes a state object and returns DOM, so view state is testable.
