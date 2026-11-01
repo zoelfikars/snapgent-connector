@@ -17,6 +17,23 @@ export function targetMenuHtml(options, currentId) {
   return `<section class="zs-menu-sec"><div class="zs-sec-label"><span>MCP target</span></div>${rows}</section>`;
 }
 
+/** What the bar offers for approvals; `id` is what the VS Code server understands (see server/snapgent_vscode/security/modes.py). */
+export const APPROVAL_MODES = [
+  { id: "plan", name: "Plan", note: "Read only: it can look around but changes nothing" },
+  { id: "manual", name: "Manual", note: "Asks before deleting, committing or running commands" },
+  { id: "auto", name: "Auto", note: "Does everything without asking" },
+];
+
+/** The approval-mode pop-over: one row per mode, the active one badged. */
+export function modeMenuHtml(currentId) {
+  const rows = APPROVAL_MODES.map((mode) => {
+    const current = mode.id === currentId;
+    return `<button type="button" class="zs-site-opt zs-mode-opt${current ? " zs-target-cur" : ""}" data-id="${mode.id}">` +
+      `<span class="zs-site-name"><span>${mode.name}</span><span class="zs-site-host">${escapeHtml(mode.note)}</span></span>${current ? `<span class="zs-site-badge">active</span>` : ""}</button>`;
+  }).join("");
+  return `<section class="zs-menu-sec"><div class="zs-sec-label"><span>When it needs approval</span></div>${rows}</section>`;
+}
+
 const CALIBRATION_SECTION = `
          <section class="zs-menu-sec">
            <div class="zs-sec-label"><span>This site</span></div>

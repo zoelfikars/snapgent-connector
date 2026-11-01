@@ -92,7 +92,8 @@ def decide(policy: Policy, name: str, tool_risk: str, arguments: Dict[str, Any],
     if not hard.allowed:
         return hard
     if policy.mode == READONLY and tool_risk != risk.READ:
-        return _deny(f"The server runs in read-only mode, so '{name}' is not allowed.")
+        return _deny(f"Plan mode: the user allows reading only, so '{name}' was not run. Keep to reading the workspace, then describe the plan "
+                     "(what you would change and why) and wait for the user to switch the bar to Manual or Auto.")
     if policy.mode == TRUSTED:
         return _ALLOW
     return _standard(name, tool_risk, arguments, paths, policy, session)

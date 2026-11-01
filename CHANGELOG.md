@@ -22,6 +22,10 @@ All notable changes to snapgentV3 Free are documented here.
 - The bridge's terminal shows only where it listens, the approval question and fatal errors; everything else is in `logs/bridge_debug.log`.
 
 ### Added
+- **Plan / Manual / Auto in the bar**: a dropdown pill chooses how the VS Code server treats risky actions. *Plan* allows reading only
+  and tells the model to describe its plan; *Manual* asks before deleting, committing or running commands (as before); *Auto* never asks
+  (switching to it asks once). The choice is kept for every site and sent with each call in a reserved argument the model cannot set.
+  A mode fixed in `config.json` (`SNAPGENT_POLICY`) stays a ceiling: the bar can tighten it, never loosen it. Hard rules (nothing inside `.git`) apply in every mode.
 - **One program for Linux (beta)**: `snapgent` runs the bridge, and `snapgent --vscode-mcp` runs the VS Code MCP server the bridge
   starts, so a release needs no Python. It writes its own `config.json`, replaces an older Snapgent bridge on the port, and is built by
   CI on Ubuntu 22.04. Releases now also publish the extension on its own (`snapgent-extension-v<version>.zip`) and the Linux program

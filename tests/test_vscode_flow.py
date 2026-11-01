@@ -4,7 +4,7 @@ import json
 import sys
 from itertools import count
 
-from snapgent_vscode.security import READONLY, RESERVED_ARGUMENT, TRUSTED, ConfirmationStore, Policy
+from snapgent_vscode.security import MODE_ARGUMENT, READONLY, RESERVED_ARGUMENT, STANDARD, TRUSTED, ConfirmationStore, Policy
 from snapgent_vscode.server import McpServer
 from snapgent_vscode.tools import commands
 from snapgent_vscode.workspace import Workspace
@@ -115,6 +115,34 @@ class SecretsTests(FlowCase):
         self.assertEqual([h["path"] for h in hits["result"]["structuredContent"]["result"]], [".env"])
 
 
+class BarChoiceTests(FlowCase):
+    """The bar's Plan / Manual / Auto rides along with each call; the model cannot set it and a mode fixed in config.json is a ceiling."""
+
+    def test_plan_refuses_changes_manual_asks_auto_just_does_it(self):
+        self.write("a.txt", "x")
+        server = self.server()
+        plan = self.call(server, "delete_file", {"path": "a.txt", MODE_ARGUMENT: "plan"})
+        self.assertIn("Plan mode", plan["error"]["message"])
+        manual = self.call(server, "delete_file", {"path": "a.txt", MODE_ARGUMENT: "manual"})
+        self.assertEqual(self.confirmation(manual)["tool"], "delete_file")
+        self.assertTrue((self.root / "a.txt").exists())
+        auto = self.call(server, "delete_file", {"path": "a.txt", MODE_ARGUMENT: "auto"})
+        self.assertEqual(auto["result"]["content"][0]["text"], "Deleted a.txt")
+
+    def test_no_choice_or_nonsense_keeps_the_servers_own_policy(self):
+        self.write("a.txt", "x")
+        for choice in (None, "root", 7):
+            arguments = {"path": "a.txt"} if choice is None else {"path": "a.txt", MODE_ARGUMENT: choice}
+            self.assertIn("confirmation", self.call(self.server(), "delete_file", arguments)["result"]["structuredContent"])
+
+    def test_a_mode_set_in_config_can_be_tightened_by_the_bar_but_not_loosened(self):
+        self.write("a.txt", "x")
+        locked = Policy(STANDARD, locked=True)
+        self.assertIn("confirmation", self.call(self.server(locked), "delete_file", {"path": "a.txt", MODE_ARGUMENT: "auto"})["result"]["structuredContent"])
+        self.assertIn("Plan mode", self.call(self.server(locked), "delete_file", {"path": "a.txt", MODE_ARGUMENT: "plan"})["error"]["message"])
+        self.assertTrue((self.root / "a.txt").exists())
+
+
 class HardRuleTests(FlowCase):
     def test_nothing_inside_git_can_be_written_even_in_trusted_mode(self):
         (self.root / ".git" / "hooks").mkdir(parents=True)
@@ -125,7 +153,7 @@ class HardRuleTests(FlowCase):
 
     def test_readonly_mode_refuses_writes_outright(self):
         reply = self.call(self.server(Policy(READONLY)), "write_file", {"path": "a.txt", "content": "x"})
-        self.assertIn("read-only mode", reply["error"]["message"])
+        self.assertIn("Plan mode", reply["error"]["message"])
         self.assertFalse((self.root / "a.txt").exists())
         self.write("b.txt", "visible")
         self.assertEqual(self.call(self.server(Policy(READONLY)), "read_file", {"path": "b.txt"})["result"]["content"][0]["text"], "visible")

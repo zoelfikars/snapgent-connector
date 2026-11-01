@@ -412,8 +412,15 @@
   // Risky actions (delete, commit, arbitrary commands, reading secrets) need the user's approval
   // (src/ui/confirm-dialog.js: a top-layer dialog in a closed shadow root that ignores synthetic clicks).
   const confirmPort = ZSUi.createConfirmDialog();
+  // How the VS Code server treats risky actions, chosen in the bar: plan (read only), manual (asks), auto (never asks).
+  // The same on every site; kept in storage; sent with each call (the model cannot set it).
+  let approvalMode = "manual";
+  try {
+    chrome.storage.local.get("zsApprovalMode", (r) => { if (r && ZSUi.APPROVAL_MODES.some((m) => m.id === r.zsApprovalMode)) { approvalMode = r.zsApprovalMode; scheduleSweep(); } });
+  } catch {}
   const toolRunner = new ToolRunner({
     bridge: bridgePort, catalogue, session: sessionPort, visibility: visibilityPort, sink: sinkPort, confirm: confirmPort,
+    approvalMode: () => approvalMode,
   });
   const runTool = (call) => toolRunner.run(call);
   const activeTools = () => catalogue.active();
@@ -1094,6 +1101,7 @@
   //  UI  (control panel, onboarding, stop button, banners, toast, input cover)
   // ════════════════════════════════════════════════════════════════════════
   const ui = (() => {
+    let renderMode = () => {};
     let toggleEl, root, bar, stateEl, actionBtn, stopBtn, targetSelect, switchBtn, menuEl, unstableEl, notifications;
     let targetBtn, targetMenuEl;
     let barRaf;
@@ -1145,12 +1153,14 @@
           <select id="zs-target" aria-label="MCP target" hidden tabindex="-1">
             <option value="vscode">VS Code</option>
           </select>
+          ${ZSUi.pillHtml({ id: "zs-mode-btn", nameId: "zs-mode-name", label: "Choose how risky actions are approved", title: "Plan: read only. Manual: asks first. Auto: never asks." })}
           ${ZSUi.pillHtml({ id: "zs-target-btn", nameId: "zs-target-name", label: "Choose MCP target", title: "Choose which MCP server receives commands", popup: "listbox" })}
           ${ZSUi.pillHtml({ id: "zs-switch", nameId: "zs-switch-name", label: "Switch AI and options", title: "Switch AI and options" })}
         </div>
         <button id="zs-toggle" type="button" aria-label="Show or hide snapgent"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
         <div id="zs-menu" hidden></div>
         <div id="zs-target-menu" hidden></div>
+        <div id="zs-mode-menu" hidden></div>
         ${P.unstableWarning ? `<button id="zs-unstable" aria-label="Provider may be unstable" hidden>⚠ unstable</button>` : ""}
       `;
       document.documentElement.appendChild(root);
@@ -1202,6 +1212,56 @@
         if (targetMenuEl.hidden) return;
         if (!targetMenuEl.contains(e.target) && !targetBtn.contains(e.target)) targetMenuEl.hidden = true;
       }, true);
+      // The approval-mode pill (Plan / Manual / Auto) and its menu: same look and behaviour as the MCP target pill.
+      const modeBtn = root.querySelector("#zs-mode-btn");
+      const modeMenuEl = root.querySelector("#zs-mode-menu");
+      renderMode = () => {
+        const mode = ZSUi.APPROVAL_MODES.find((m) => m.id === approvalMode) || ZSUi.APPROVAL_MODES[1];
+        root.querySelector("#zs-mode-name").textContent = mode.name;
+        modeBtn.dataset.mode = mode.id;
+      };
+      const positionModeMenu = () => {
+        if (modeMenuEl.hidden) return;
+        ZSUi.applyMenuPlacement(modeMenuEl, ZSUi.computeMenuPlacement({
+          anchor: modeBtn.getBoundingClientRect(), menuWidth: modeMenuEl.offsetWidth, defaultWidth: 280,
+          viewport: ZSUi.viewportOf(document, window), align: "right", roomAbove: 200,
+        }));
+        requestAnimationFrame(positionModeMenu);
+      };
+      async function chooseMode(id) {
+        modeMenuEl.hidden = true;
+        if (id === approvalMode) return;
+        // Auto is the one choice that removes the safety net: ask once, in the page-proof dialog, before it takes effect.
+        if (id === "auto" && !(await confirmPort.ask({
+          description: "Switch to Auto? The agent will then delete files, make git commits and run commands in your project without asking you each time.",
+          tool: "Approval mode", risk: "execute",
+        }))) return;
+        approvalMode = id;
+        try { chrome.storage.local.set({ zsApprovalMode: id }); } catch {}
+        renderMode();
+      }
+      modeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (menuEl) menuEl.hidden = true;
+        targetMenuEl.hidden = true;
+        modeMenuEl.hidden = !modeMenuEl.hidden;
+        if (modeMenuEl.hidden) return;
+        modeMenuEl.innerHTML = ZSUi.modeMenuHtml(approvalMode);
+        modeMenuEl.querySelectorAll(".zs-mode-opt").forEach((b) => b.addEventListener("click", () => chooseMode(b.dataset.id)));
+        requestAnimationFrame(positionModeMenu);
+      });
+      document.addEventListener("click", (e) => {
+        if (!modeMenuEl.hidden && !modeMenuEl.contains(e.target) && !modeBtn.contains(e.target)) modeMenuEl.hidden = true;
+      }, true);
+      try {
+        chrome.storage.onChanged.addListener((changes, area) => {
+          if (area === "local" && changes.zsApprovalMode && ZSUi.APPROVAL_MODES.some((m) => m.id === changes.zsApprovalMode.newValue)) {
+            approvalMode = changes.zsApprovalMode.newValue;
+            renderMode();
+          }
+        });
+      } catch {}
+      renderMode();
       bar.classList.add(`zs-prov-${P.id}`); // lets CSS tune per-site (e.g. font)
       // Provider hook on <html> so overlay.css can tune site-specific CHIP layout
       // (not just the bar). Meta's turn root is full-width with the reply in a
@@ -1469,6 +1529,7 @@
     function renderBar() {
       if (!bar) return;
       setTarget(selectedTargetId);
+      renderMode();
       // The decision (what the bar says, which tone, which action) is a pure function: src/ui/bar-view.js.
       const view = ZSUi.computeBarView({
         staleExtension: A.staleExtension,

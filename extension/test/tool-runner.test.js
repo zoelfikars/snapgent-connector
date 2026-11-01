@@ -21,7 +21,7 @@ describe("ToolRunner.run — real tools", () => {
     const { runner, bridge } = setup({ results: { read_file: { ok: true, text: "file body" } } });
     const text = await runner.run({ tool: "read_file", arguments: { path: "a.js" } });
     assert.equal(text, "Output of 'read_file':\nfile body");
-    assert.deepEqual(bridge.calls, [{ name: "read_file", arguments: { path: "a.js" }, timeout: 120000, server: "vscode" }]);
+    assert.deepEqual(bridge.calls, [{ name: "read_file", arguments: { path: "a.js", __snapgent_mode: "manual" }, timeout: 120000, server: "vscode" }]);
   });
 
   test("loads the catalogue lazily on the first call", async () => {

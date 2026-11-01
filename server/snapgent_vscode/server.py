@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, Optional, TextIO
 
 from . import SERVER_NAME, SERVER_VERSION, protocol
 from .context import Context
-from .security import CONFIRM, DENY, RESERVED_ARGUMENT, ConfirmationStore, Policy, SessionState, decide, policy_from_env
+from .security import CONFIRM, DENY, MODE_ARGUMENT, RESERVED_ARGUMENT, ConfirmationStore, Policy, SessionState, decide, policy_for_call, policy_from_env
 from .tools import registry
 from .workspace import Workspace
 
@@ -44,11 +44,13 @@ class McpServer:
 
     def _tools_call(self, request_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
         name = params.get("name", "")
-        arguments = params.get("arguments") or {}
+        arguments = dict(params.get("arguments") or {})
+        # The bar's choice (plan / manual / auto) rides along in a reserved argument; it never reaches a tool or a fingerprint.
+        policy = policy_for_call(self._policy, arguments.pop(MODE_ARGUMENT, None))
         try:
-            ctx = Context(root=self._workspace.root(), policy=self._policy, session=self._session)
+            ctx = Context(root=self._workspace.root(), policy=policy, session=self._session)
             definition = registry.get(name)
-            decision = decide(self._policy, name, definition.risk, arguments, self._session)
+            decision = decide(policy, name, definition.risk, arguments, self._session)
             if decision.verdict == DENY:
                 return protocol.error(request_id, protocol.INTERNAL_ERROR, decision.reason)
             if decision.verdict == CONFIRM and not self._confirmations.redeem(arguments.get(RESERVED_ARGUMENT), name, arguments):

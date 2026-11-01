@@ -4,10 +4,12 @@
 // reserved argument. The model must never be able to set it, so it is stripped from model arguments.
 
 export const RESERVED_ARGUMENT = "__snapgent_confirm";
+// The bar's choice (plan / manual / auto) travels in its own reserved argument; the model must not be able to pick its own mode.
+export const MODE_ARGUMENT = "__snapgent_mode";
 
-/** Model-supplied arguments, minus anything that could pose as an approval. */
+/** Model-supplied arguments, minus anything that could pose as an approval or a mode. */
 export function withoutReserved(args) {
-  const { [RESERVED_ARGUMENT]: _ignored, ...rest } = args || {};
+  const { [RESERVED_ARGUMENT]: _approval, [MODE_ARGUMENT]: _mode, ...rest } = args || {};
   return rest;
 }
 

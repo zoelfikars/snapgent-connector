@@ -11,7 +11,7 @@
 //   5. shape the result for the model          -> domain/tools/result-feedback
 
 import { FEEDBACK } from "../domain/prompt/feedback.js";
-import { RESERVED_ARGUMENT, declinedFeedback, needsApproval, unavailableFeedback, withoutReserved } from "../domain/tools/confirmation.js";
+import { MODE_ARGUMENT, RESERVED_ARGUMENT, declinedFeedback, needsApproval, unavailableFeedback, withoutReserved } from "../domain/tools/confirmation.js";
 import { isolationError } from "../domain/tools/isolation.js";
 import { toFeedback } from "../domain/tools/result-feedback.js";
 import { LIST_SERVERS, isListCommands, renderCommandList, renderServerList } from "../domain/tools/virtual-commands.js";
@@ -28,16 +28,18 @@ export class ToolRunner {
    *           visibility: import("./ports.js").VisibilityPort,
    *           sink: import("./ports.js").SinkPort,
    *           confirm?: import("./ports.js").ConfirmPort,
+   *           approvalMode?: () => string,
    *           timers?: import("./ports.js").Timers,
    *           timeoutMs?: number }} deps
    */
-  constructor({ bridge, catalogue, session, visibility, sink, confirm = null, timers = globalThis, timeoutMs = DEFAULT_TIMEOUT_MS }) {
+  constructor({ bridge, catalogue, session, visibility, sink, confirm = null, approvalMode = () => "manual", timers = globalThis, timeoutMs = DEFAULT_TIMEOUT_MS }) {
     this._bridge = bridge;
     this._catalogue = catalogue;
     this._session = session;
     this._visibility = visibility;
     this._sink = sink;
     this._confirm = confirm;
+    this._approvalMode = approvalMode;
     this._timers = timers;
     this._timeoutMs = timeoutMs;
   }
@@ -86,8 +88,10 @@ export class ToolRunner {
   }
 
   _callBridge(name, args, target) {
+    // The VS Code server applies the bar's choice (plan / manual / auto); other servers know nothing of it.
+    const sent = target === "vscode" ? { ...args, [MODE_ARGUMENT]: this._approvalMode() } : args;
     return callWithGuards(
-      () => this._bridge.callTool({ name, arguments: args, timeout: this._timeoutMs, server: target }),
+      () => this._bridge.callTool({ name, arguments: sent, timeout: this._timeoutMs, server: target }),
       { timeoutMs: this._timeoutMs, isStopped: () => this._session.isStopped(), timers: this._timers },
     );
   }
