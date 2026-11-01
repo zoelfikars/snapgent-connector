@@ -1102,6 +1102,7 @@
   // ════════════════════════════════════════════════════════════════════════
   const ui = (() => {
     let renderMode = () => {};
+    let pinnedWorkspace = null;
     let toggleEl, root, bar, stateEl, actionBtn, stopBtn, targetSelect, switchBtn, menuEl, unstableEl, notifications;
     let targetBtn, targetMenuEl;
     let barRaf;
@@ -1154,6 +1155,7 @@
             <option value="vscode">VS Code</option>
           </select>
           ${ZSUi.pillHtml({ id: "zs-mode-btn", nameId: "zs-mode-name", label: "Choose how risky actions are approved", title: "Plan: read only. Manual: asks first. Auto: never asks." })}
+          ${ZSUi.pillHtml({ id: "zs-ws-btn", nameId: "zs-ws-name", label: "Choose the workspace folder", title: "Which folder the agent works in" })}
           ${ZSUi.pillHtml({ id: "zs-target-btn", nameId: "zs-target-name", label: "Choose MCP target", title: "Choose which MCP server receives commands", popup: "listbox" })}
           ${ZSUi.pillHtml({ id: "zs-switch", nameId: "zs-switch-name", label: "Switch AI and options", title: "Switch AI and options" })}
         </div>
@@ -1161,6 +1163,7 @@
         <div id="zs-menu" hidden></div>
         <div id="zs-target-menu" hidden></div>
         <div id="zs-mode-menu" hidden></div>
+        <div id="zs-ws-menu" hidden></div>
         ${P.unstableWarning ? `<button id="zs-unstable" aria-label="Provider may be unstable" hidden>⚠ unstable</button>` : ""}
       `;
       document.documentElement.appendChild(root);
@@ -1219,6 +1222,10 @@
         const mode = ZSUi.APPROVAL_MODES.find((m) => m.id === approvalMode) || ZSUi.APPROVAL_MODES[1];
         root.querySelector("#zs-mode-name").textContent = mode.name;
         modeBtn.dataset.mode = mode.id;
+        // Both pills only mean something for the VS Code server (other servers know nothing of modes or folders).
+        const forVscode = selectedTargetId === "vscode";
+        modeBtn.hidden = !forVscode;
+        root.querySelector("#zs-ws-btn").hidden = !forVscode;
       };
       const positionModeMenu = () => {
         if (modeMenuEl.hidden) return;
@@ -1244,6 +1251,7 @@
         e.stopPropagation();
         if (menuEl) menuEl.hidden = true;
         targetMenuEl.hidden = true;
+        root.querySelector("#zs-ws-menu").hidden = true;
         modeMenuEl.hidden = !modeMenuEl.hidden;
         if (modeMenuEl.hidden) return;
         modeMenuEl.innerHTML = ZSUi.modeMenuHtml(approvalMode);
@@ -1262,6 +1270,76 @@
         });
       } catch {}
       renderMode();
+
+      // The workspace pill: Auto follows VS Code's active window; or pin one of its open folders, or any folder typed in.
+      const wsBtn = root.querySelector("#zs-ws-btn");
+      const wsMenuEl = root.querySelector("#zs-ws-menu");
+      const renderWorkspace = () => { root.querySelector("#zs-ws-name").textContent = ZSUi.workspaceLabel(pinnedWorkspace); wsBtn.title = pinnedWorkspace || "Auto: follows the active VS Code window"; };
+      const positionWsMenu = () => {
+        if (wsMenuEl.hidden) return;
+        ZSUi.applyMenuPlacement(wsMenuEl, ZSUi.computeMenuPlacement({
+          anchor: wsBtn.getBoundingClientRect(), menuWidth: wsMenuEl.offsetWidth, defaultWidth: 300,
+          viewport: ZSUi.viewportOf(document, window), align: "right", roomAbove: 240,
+        }));
+        requestAnimationFrame(positionWsMenu);
+      };
+      const wsError = (text) => { const el = wsMenuEl.querySelector(".zs-ws-error"); if (el) { el.textContent = text; el.hidden = !text; } };
+      async function useWorkspace(path, { typed = false } = {}) {
+        // A folder typed in may be anywhere on the machine: ask once, in the page-proof dialog, before the agent may work in it.
+        if (typed && !(await confirmPort.ask({
+          description: `Let the agent read and change files in this folder?\n${path}`,
+          tool: "Workspace", risk: "write",
+        }))) return;
+        const reply = await bg({ type: "set_workspace", path });
+        if (!reply.ok) { wsError(reply.error || "Could not use that folder."); return; }
+        pinnedWorkspace = reply.pinned;
+        wsMenuEl.hidden = true;
+        renderWorkspace();
+        catalogue.ensure(true);
+        notifications.toast(pinnedWorkspace ? `Working in ${ZSUi.workspaceLabel(pinnedWorkspace)}` : "Following the active VS Code window");
+      }
+      wsBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (menuEl) menuEl.hidden = true;
+        targetMenuEl.hidden = true;
+        modeMenuEl.hidden = true;
+        wsMenuEl.hidden = !wsMenuEl.hidden;
+        if (wsMenuEl.hidden) return;
+        const listing = await bg({ type: "workspaces" });
+        if (!listing.ok) { wsMenuEl.hidden = true; notifications.toast(listing.error || "The bridge is not reachable."); return; }
+        pinnedWorkspace = listing.pinned;
+        renderWorkspace();
+        wsMenuEl.innerHTML = ZSUi.workspaceMenuHtml(listing);
+        wsMenuEl.querySelectorAll(".zs-ws-opt").forEach((b) => b.addEventListener("click", () => useWorkspace(b.dataset.path)));
+        // Typing here must not trigger the site's own keyboard shortcuts.
+        const folderInput = wsMenuEl.querySelector(".zs-ws-input");
+        for (const type of ["keydown", "keyup", "keypress", "input"]) folderInput.addEventListener(type, (event) => event.stopPropagation());
+        const pickBtn = wsMenuEl.querySelector(".zs-ws-pick");
+        pickBtn.addEventListener("click", async () => {
+          wsError("");
+          pickBtn.disabled = true;
+          pickBtn.querySelector(".zs-site-host").textContent = "waiting for the folder window…";
+          const picked = await bg({ type: "pick_folder" });
+          pickBtn.disabled = false;
+          pickBtn.querySelector(".zs-site-host").textContent = "opens your system's folder window";
+          if (!picked.ok) { wsError(picked.error || "The folder window could not be opened."); wsMenuEl.querySelector(".zs-ws-form").hidden = false; return; }
+          // The user chose it themselves in the system's own window: no second question.
+          if (picked.picked) useWorkspace(picked.picked);
+        });
+        wsMenuEl.querySelector(".zs-ws-form").addEventListener("submit", (event) => {
+          event.preventDefault();
+          const typedPath = wsMenuEl.querySelector(".zs-ws-input").value.trim();
+          if (typedPath) useWorkspace(typedPath, { typed: true });
+        });
+        requestAnimationFrame(positionWsMenu);
+      });
+      document.addEventListener("click", (e) => {
+        if (!wsMenuEl.hidden && !wsMenuEl.contains(e.target) && !wsBtn.contains(e.target)) wsMenuEl.hidden = true;
+      }, true);
+      // The pill shows what is pinned right now (the bridge may have been restarted, which forgets it).
+      const syncWorkspace = async () => { const listing = await bg({ type: "workspaces" }); if (listing.ok) { pinnedWorkspace = listing.pinned; renderWorkspace(); } };
+      syncWorkspace();
+      renderWorkspace();
       bar.classList.add(`zs-prov-${P.id}`); // lets CSS tune per-site (e.g. font)
       // Provider hook on <html> so overlay.css can tune site-specific CHIP layout
       // (not just the bar). Meta's turn root is full-width with the reply in a

@@ -40,7 +40,23 @@ class McpServer:
             return self._tools_call(request_id, params)
         if method == "notifications/initialized":
             return None
+        # Not tools (the model never sees them): the bar asks which folders exist and pins one.
+        if method == "snapgent/workspaces":
+            return self._workspace_reply(request_id, lambda: self._workspace.listing())
+        if method == "snapgent/set_workspace":
+            return self._workspace_reply(request_id, lambda: {"pinned": self._pin(params.get("path"))})
         return protocol.error(request_id, protocol.METHOD_NOT_FOUND, f"Method not found: {method}")
+
+    def _pin(self, path: Any) -> Optional[str]:
+        folder = self._workspace.pin(path)
+        return str(folder) if folder else None
+
+    @staticmethod
+    def _workspace_reply(request_id: Any, make: Callable[[], Any]) -> Dict[str, Any]:
+        try:
+            return protocol.result(request_id, make())
+        except Exception as error:  # a bad path is an answer for the user, not a crash
+            return protocol.error(request_id, protocol.INTERNAL_ERROR, str(error))
 
     def _tools_call(self, request_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
         name = params.get("name", "")

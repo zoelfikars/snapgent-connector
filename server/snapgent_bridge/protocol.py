@@ -53,6 +53,15 @@ def server_changed_message(request_id: Any, ok: bool, error: Optional[str] = Non
     return message
 
 
+def workspace_message(request_id: Any, ok: bool, data: Optional[Dict[str, Any]] = None, error: Optional[str] = None) -> Dict[str, Any]:
+    message: Dict[str, Any] = {"type": "workspace", "id": request_id, "ok": ok}
+    if ok:
+        message.update(data or {})
+    else:
+        message["error"] = error
+    return message
+
+
 # ── tool calls ─────────────────────────────────────────────────────────────
 
 class ToolCall(NamedTuple):

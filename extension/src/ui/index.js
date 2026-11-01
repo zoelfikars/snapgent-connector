@@ -14,7 +14,7 @@ export { computeCoverRect, measureClippingAncestors, boxOf } from "./cover-geome
 export { barGeometry, cornerOf, pillPosition, toggleGeometry } from "./bar-placement.js";
 export { describeResultTurn, describeSystemTurn } from "./turn-chips.js";
 export { commandPhase, haltState, holdsRegenerateLook, shouldReown } from "./command-phase.js";
-export { APPROVAL_MODES, modeMenuHtml, switchMenuHtml, targetMenuHtml, targetOptionsHtml } from "./menu-html.js";
+export { APPROVAL_MODES, modeMenuHtml, switchMenuHtml, targetMenuHtml, targetOptionsHtml, workspaceLabel, workspaceMenuHtml } from "./menu-html.js";
 export { createChipPainter } from "./chip-painter.js";
 export { createBarPlacer } from "./bar-placer.js";
 export { createInputCover } from "./input-cover.js";

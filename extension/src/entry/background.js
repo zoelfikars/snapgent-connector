@@ -216,6 +216,12 @@ function handleBridgeMessage(msg) {
     resolvePending(msg.id, { ok: !!msg.ok, error: msg.error, restarting: !!msg.restarting });
     return;
   }
+  if (msg.type === "workspace") {
+    resolvePending(msg.id, msg.ok
+      ? { ok: true, active: msg.active || null, open: Array.isArray(msg.open) ? msg.open : [], pinned: msg.pinned || null, picked: msg.picked || null }
+      : { ok: false, error: msg.error });
+    return;
+  }
   if (msg.type === "error") {
     resolvePending(msg.id, { ok: false, error: msg.error });
     return;
@@ -277,6 +283,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse(r);
         break;
       }
+      case "workspaces":
+        sendResponse(await send({ type: "workspaces" }, 15000));
+        break;
+      case "pick_folder": // waits for the user to choose in the system's folder window
+        sendResponse(await send({ type: "pick_folder" }, 11 * 60 * 1000));
+        break;
+      case "set_workspace":
+        sendResponse(await send({ type: "set_workspace", path: msg.path }, 15000));
+        break;
       case "restart_mcp": {
         const r = await send({ type: "restart_mcp" }, 30000);
         sendResponse(r);

@@ -64,17 +64,18 @@ def _vscode_running_on_windows(run: Callable) -> bool:
     return "Code.exe" in result.stdout
 
 
-def active_folder(
+def open_folders(
     platform: str = sys.platform,
     env: Optional[Mapping[str, str]] = None,
     home: Optional[Path] = None,
     run: Callable = subprocess.run,
-) -> Optional[Path]:
-    """The folder of the active VS Code window, or None when VS Code is not showing one."""
+) -> List[Path]:
+    """The folders VS Code has open, the last active window first (folders that no longer exist are left out)."""
     env = os.environ if env is None else env
     home = Path.home() if home is None else home
     if platform == "win32" and not _vscode_running_on_windows(run):
-        return None
+        return []
+    found: List[Path] = []
     for storage_path in storage_paths(platform, env, home):
         if not storage_path.is_file():
             continue
@@ -87,21 +88,77 @@ def active_folder(
                 candidate = uri_to_path(uri, platform).resolve()
             except (OSError, ValueError):
                 continue
-            if candidate.is_dir():
-                return candidate
-    return None
+            if candidate.is_dir() and candidate not in found:
+                found.append(candidate)
+    return found
+
+
+def active_folder(
+    platform: str = sys.platform,
+    env: Optional[Mapping[str, str]] = None,
+    home: Optional[Path] = None,
+    run: Callable = subprocess.run,
+) -> Optional[Path]:
+    """The folder of the active VS Code window, or None when VS Code is not showing one."""
+    folders = open_folders(platform, env, home, run)
+    return folders[0] if folders else None
+
+
+def checked_folder(text: object) -> Path:
+    """A folder the user typed or picked, or WorkspaceError saying what is wrong with it."""
+    if not isinstance(text, str) or not text.strip():
+        raise WorkspaceError("Give the full path of a folder.")
+    path = Path(text.strip()).expanduser()
+    if not path.is_absolute():
+        raise WorkspaceError("Give the full path of a folder (it must start from the root, for example /home/me/project).")
+    try:
+        resolved = path.resolve()
+    except (OSError, RuntimeError) as error:
+        raise WorkspaceError(f"That path cannot be used: {error}") from error
+    if not resolved.is_dir():
+        raise WorkspaceError(f"That folder does not exist: {resolved}")
+    if resolved == Path(resolved.anchor):
+        raise WorkspaceError("A whole drive or the root folder cannot be the workspace. Choose a project folder.")
+    return resolved
 
 
 class Workspace:
-    """The workspace as the tools see it. Replaceable in tests with a fixed folder."""
+    """The workspace as the tools see it: the folder the user pinned, else the active VS Code window.
 
-    def __init__(self, finder: Callable[[], Optional[Path]] = active_folder) -> None:
+    Replaceable in tests with a fixed folder."""
+
+    def __init__(self, finder: Callable[[], Optional[Path]] = active_folder,
+                 lister: Callable[[], List[Path]] = open_folders) -> None:
         self._finder = finder
+        self._lister = lister
+        self._pinned: Optional[Path] = None
+
+    @property
+    def pinned(self) -> Optional[Path]:
+        return self._pinned if self._pinned is not None and self._pinned.is_dir() else None
+
+    def pin(self, text: object) -> Optional[Path]:
+        """Use this folder from now on (until unpinned or the server restarts); None or empty goes back to following VS Code."""
+        self._pinned = None if text is None or text == "" else checked_folder(text)
+        return self._pinned
+
+    def listing(self) -> Dict[str, object]:
+        """What the bar's workspace menu shows."""
+        active = self._finder()
+        return {
+            "active": str(active) if active else None,
+            "open": [str(folder) for folder in self._lister()],
+            "pinned": str(self.pinned) if self.pinned else None,
+        }
 
     def is_open(self) -> bool:
-        return self._finder() is not None
+        return self.pinned is not None or self._finder() is not None
 
     def root(self) -> Path:
+        if self._pinned is not None:
+            if self.pinned is None:
+                raise WorkspaceError(f"The chosen folder is gone: {self._pinned}. Choose another one, or go back to Auto.")
+            return self.pinned.resolve()
         folder = self._finder()
         if folder is None:
             raise WorkspaceError("Open a project folder in VS Code before using the VS Code MCP server.")

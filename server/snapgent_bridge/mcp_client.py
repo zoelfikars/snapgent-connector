@@ -185,6 +185,12 @@ class MCPServer:
     async def _notify(self, method: str, params: Optional[Dict[str, Any]] = None) -> None:
         await self._send({"jsonrpc": "2.0", "method": method, "params": params or {}})
 
+    async def request(self, method: str, params: Dict[str, Any], timeout: float = 10) -> Any:
+        """A request that is not a tool call (the bar's own questions to the server)."""
+        if not self.alive:
+            raise RuntimeError(self.error or f"{self.server_id} MCP server is offline.")
+        return await self._request(method, params, timeout=timeout)
+
     async def call_tool(self, tool_name: str, arguments: Dict[str, Any], timeout: float) -> Dict[str, Any]:
         if not self.alive:
             raise RuntimeError(self.error or f"{self.server_id} MCP server is offline.")

@@ -22,6 +22,9 @@ All notable changes to snapgentV3 Free are documented here.
 - The bridge's terminal shows only where it listens, the approval question and fatal errors; everything else is in `logs/bridge_debug.log`.
 
 ### Added
+- **Choose the workspace in the bar**: a pill beside the mode pill. *Auto* (default) follows VS Code's active window as before; the menu
+  also lists every folder VS Code has open, and **Choose a folder…** opens the system's own folder window (through the desktop portal, zenity, kdialog, PowerShell or osascript), so no path is copied by hand; a box for typing a path only appears when the machine has no folder window. The bridge keeps
+  the chosen folder until it is changed or the bridge restarts. The root folder or a whole drive is refused.
 - **Plan / Manual / Auto in the bar**: a dropdown pill chooses how the VS Code server treats risky actions. *Plan* allows reading only
   and tells the model to describe its plan; *Manual* asks before deleting, committing or running commands (as before); *Auto* never asks
   (switching to it asks once). The choice is kept for every site and sent with each call in a reserved argument the model cannot set.

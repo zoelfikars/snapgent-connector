@@ -3,7 +3,7 @@
 import asyncio
 from typing import Any, Awaitable, Callable, Dict
 
-from . import protocol
+from . import folder_picker, protocol
 from .config import ConfigStore
 from .registry import ServerRegistry
 from .settings import MAX_LOG_CHARS
@@ -26,6 +26,9 @@ class RequestRouter:
             "restart_mcp": self._restart_mcp,
             "add_server": self._add_server,
             "remove_server": self._remove_server,
+            "workspaces": self._workspaces,
+            "set_workspace": self._set_workspace,
+            "pick_folder": self._pick_folder,
         }
 
     def connected_message(self) -> Dict[str, Any]:
@@ -80,6 +83,34 @@ class RequestRouter:
             return
         await reply(protocol.server_changed_message(request_id, True))
         await self._broadcast(self.connected_message())
+
+    async def _workspaces(self, request, reply):
+        await self._ask_vscode("snapgent/workspaces", {}, request, reply)
+
+    async def _set_workspace(self, request, reply):
+        await self._ask_vscode("snapgent/set_workspace", {"path": request.get("path")}, request, reply)
+
+    async def _pick_folder(self, request, reply):
+        """Open the system's folder window on this machine; the answer is the chosen path (or none when it was closed)."""
+        try:
+            chosen = await folder_picker.pick_folder()
+        except folder_picker.PickerUnavailable as error:
+            await reply(protocol.workspace_message(request.get("id"), False, error=str(error)))
+            return
+        await reply(protocol.workspace_message(request.get("id"), True, {"picked": chosen}))
+
+    async def _ask_vscode(self, method, params, request, reply):
+        """The bar's questions about the VS Code server's workspace (which folders, which one is pinned)."""
+        server = self._registry.servers.get("vscode")
+        if server is None:
+            await reply(protocol.workspace_message(request.get("id"), False, error="The VS Code server is not configured."))
+            return
+        try:
+            data = await server.request(method, params)
+        except (asyncio.TimeoutError, RuntimeError, OSError) as error:
+            await reply(protocol.workspace_message(request.get("id"), False, error=str(error) or "The VS Code server did not answer."))
+            return
+        await reply(protocol.workspace_message(request.get("id"), True, data if isinstance(data, dict) else {}))
 
     async def _call_tool(self, request, reply):
         call = protocol.parse_tool_call(request)
