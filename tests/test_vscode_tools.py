@@ -110,8 +110,11 @@ class ReadingTests(WorkspaceCase):
     def test_read_file_truncates_large_files(self):
         self.write("huge.txt", "a" * (limits.MAX_FILE_CHARS + 10))
         text = reading.read_file(self.ctx, "huge.txt")
-        self.assertTrue(text.endswith("[truncated]"))
-        self.assertEqual(len(text), limits.MAX_FILE_CHARS + len("\n[truncated]"))
+        self.assertIn("[truncated", text)
+        # Truncation keeps both ends, so the result never exceeds the cap by much.
+        self.assertLessEqual(len(text), limits.MAX_FILE_CHARS + 100)
+        self.assertTrue(text.startswith("a" * (limits.MAX_FILE_CHARS // 2)))
+        self.assertTrue(text.endswith("a" * (limits.MAX_FILE_CHARS - limits.MAX_FILE_CHARS // 2)))
 
     def test_read_files_limit_and_escape(self):
         self.assertEqual(len(reading.read_files(self.ctx, ["src/app.js"])), 1)

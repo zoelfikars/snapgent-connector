@@ -111,24 +111,35 @@ def search_files(ctx: Context, path: str, query: str, file_pattern: str = "*", c
     return matches
 
 
-def _read(ctx: Context, path: str) -> str:
+def _read(ctx: Context, path: str, max_chars: int = None) -> str:
     target = resolve_inside(path, ctx.root)
     if not target.is_file():
         raise FileNotFoundError(f"File not found: {path}")
     content = target.read_text(encoding="utf-8", errors="replace")
-    return content[:MAX_FILE_CHARS] + "\n[truncated]" if len(content) > MAX_FILE_CHARS else content
+    limit = MAX_FILE_CHARS if max_chars is None else max(1, min(int(max_chars), MAX_FILE_CHARS))
+    if len(content) <= limit:
+        return content
+    # Keep both ends: a hard head-only cut hides the tail, which is exactly
+    # where the part that needs editing often lives. The marker names how much
+    # was dropped so the model knows the file is incomplete.
+    head = limit // 2
+    tail = limit - head
+    omitted = len(content) - head - tail
+    return f"{content[:head]}\n... [truncated {omitted} characters] ...\n{content[-tail:]}"
 
 
-@tool("read_file", "Read a UTF-8 text file in the workspace.", {"path": STR}, ["path"], risk=READ)
-def read_file(ctx: Context, path: str) -> str:
-    return _read(ctx, path)
+@tool("read_file", "Read a UTF-8 text file in the workspace. Large files are truncated, keeping both ends.",
+      {"path": STR, "max_chars": integer(1, MAX_FILE_CHARS)}, ["path"], risk=READ)
+def read_file(ctx: Context, path: str, max_chars: int = None) -> str:
+    return _read(ctx, path, max_chars)
 
 
-@tool("read_files", f"Read up to {MAX_FILES_PER_READ} workspace files.", {"paths": STR_LIST}, ["paths"], risk=READ)
-def read_files(ctx: Context, paths: List[str]) -> List[Dict[str, str]]:
+@tool("read_files", f"Read up to {MAX_FILES_PER_READ} workspace files. Large files are truncated, keeping both ends.",
+      {"paths": STR_LIST, "max_chars": integer(1, MAX_FILE_CHARS)}, ["paths"], risk=READ)
+def read_files(ctx: Context, paths: List[str], max_chars: int = None) -> List[Dict[str, str]]:
     if len(paths) > MAX_FILES_PER_READ:
         raise ValueError(f"Read at most {MAX_FILES_PER_READ} files per request.")
-    return [{"path": path, "content": _read(ctx, path)} for path in paths]
+    return [{"path": path, "content": _read(ctx, path, max_chars)} for path in paths]
 
 
 @tool("read_file_lines", "Read a bounded line range from a workspace file.",
