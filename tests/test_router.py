@@ -73,13 +73,13 @@ class CallToolTests(unittest.IsolatedAsyncioTestCase):
         registry.servers["vscode"].call_tool = call_tool
         return calls
 
-    async def test_success_returns_text_and_logs_it(self):
+    async def test_success_returns_text(self):
         router, registry, _, logs, _ = make()
         calls = self.stub(registry, {"content": [{"type": "text", "text": "file body"}]})
         [reply] = await ask(router, {"type": "call_tool", "id": 1, "name": "read_file", "arguments": {"path": "a"}, "timeout": 5000})
         self.assertEqual(reply, {"type": "tool_result", "id": 1, "ok": True, "text": "file body", "images": []})
         self.assertEqual(calls, [("read_file", {"path": "a"}, 5.0)])
-        self.assertTrue(any(line.startswith("<- read_file (file body") for line in logs))
+        # Successful calls are no longer logged with their result preview (log spam).
 
     async def test_tool_reported_errors_become_failed_results(self):
         router, registry, *_ = make()

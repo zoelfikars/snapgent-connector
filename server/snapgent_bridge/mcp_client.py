@@ -234,10 +234,23 @@ class MCPServer:
         process = self.process
         if not process or not process.stderr:
             return
+        # A chatty MCP server (or one stuck in a retry loop) used to flood the
+        # log with one line per stderr frame. Cap the echoed lines per process and
+        # summarise the rest; the full output is still in the server's own stream.
+        logged = 0
+        suppressed = 0
+        max_lines = 50
         while True:
             line = await process.stderr.readline()
             if not line:
                 break
             text = line.decode("utf-8", errors="replace").strip()
-            if text:
-                self._log(f"[{self.server_id}] stderr: {text[:MAX_LOG_CHARS]}")
+            if not text:
+                continue
+            if logged < max_lines:
+                self._log(f"[{self.server_id}] stderr: {text[:200]}")
+                logged += 1
+            else:
+                suppressed += 1
+        if suppressed:
+            self._log(f"[{self.server_id}] stderr: suppressed {suppressed} further line(s) (cap {max_lines}).")

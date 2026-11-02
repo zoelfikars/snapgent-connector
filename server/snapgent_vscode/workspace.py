@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 from urllib.parse import unquote, urlparse
@@ -125,13 +126,29 @@ def checked_folder(text: object) -> Path:
 class Workspace:
     """The workspace as the tools see it: the folder the user pinned, else the active VS Code window.
 
-    Replaceable in tests with a fixed folder."""
+    Replaceable in tests with a fixed folder.
+
+    The auto-detected folder is cached briefly: VS Code's storage.json (and, on
+    Windows, the process list) does not change between two tool calls that land
+    within a couple of seconds, and re-reading it for every call was the main
+    avoidable cost behind a slow ``read_file``. Pinning always invalidates it.
+    """
+
+    # How long a cached auto-detected folder stays valid. Short enough that a
+    # folder change in VS Code is picked up quickly, long enough to cover a
+    # burst of tool calls.
+    DEFAULT_CACHE_TTL_SECONDS = 2.0
 
     def __init__(self, finder: Callable[[], Optional[Path]] = active_folder,
-                 lister: Callable[[], List[Path]] = open_folders) -> None:
+                 lister: Callable[[], List[Path]] = open_folders,
+                 cache_ttl: float = DEFAULT_CACHE_TTL_SECONDS) -> None:
         self._finder = finder
         self._lister = lister
         self._pinned: Optional[Path] = None
+        self._cache_ttl = max(0.0, float(cache_ttl))
+        self._cached_auto: Optional[Path] = None
+        self._cached_auto_expires: float = 0.0
+        self._cached_auto_valid: bool = False
 
     @property
     def pinned(self) -> Optional[Path]:
@@ -140,6 +157,7 @@ class Workspace:
     def pin(self, text: object) -> Optional[Path]:
         """Use this folder from now on (until unpinned or the server restarts); None or empty goes back to following VS Code."""
         self._pinned = None if text is None or text == "" else checked_folder(text)
+        self._invalidate_auto_cache()
         return self._pinned
 
     def listing(self) -> Dict[str, object]:
@@ -151,15 +169,37 @@ class Workspace:
             "pinned": str(self.pinned) if self.pinned else None,
         }
 
+    def _invalidate_auto_cache(self) -> None:
+        self._cached_auto_valid = False
+        self._cached_auto = None
+        self._cached_auto_expires = 0.0
+
+    def _auto_folder(self) -> Optional[Path]:
+        """The resolved VS Code folder, cached for a short while."""
+        if self._cache_ttl <= 0:
+            folder = self._finder()
+            return folder.resolve() if folder is not None else None
+        now = time.monotonic()
+        if self._cached_auto_valid and now < self._cached_auto_expires:
+            return self._cached_auto
+        folder = self._finder()
+        resolved = folder.resolve() if folder is not None else None
+        self._cached_auto = resolved
+        self._cached_auto_valid = True
+        self._cached_auto_expires = now + self._cache_ttl
+        return resolved
+
     def is_open(self) -> bool:
-        return self.pinned is not None or self._finder() is not None
+        if self._pinned is not None:
+            return self.pinned is not None
+        return self._auto_folder() is not None
 
     def root(self) -> Path:
         if self._pinned is not None:
             if self.pinned is None:
                 raise WorkspaceError(f"The chosen folder is gone: {self._pinned}. Choose another one, or go back to Auto.")
             return self.pinned.resolve()
-        folder = self._finder()
+        folder = self._auto_folder()
         if folder is None:
             raise WorkspaceError("Open a project folder in VS Code before using the VS Code MCP server.")
-        return folder.resolve()
+        return folder

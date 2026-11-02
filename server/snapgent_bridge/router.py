@@ -130,4 +130,6 @@ class RequestRouter:
             return
         message, text = protocol.tool_result_message(call.request_id, result)
         await reply(message)
-        self._log(f"<- {call.name} ({text[:120].replace(chr(10), ' ')})")
+        # Keep the result out of the log: previews of every call (especially large
+        # list_dir/read_file results) were the main source of log spam. Failures
+        # are still logged above.
