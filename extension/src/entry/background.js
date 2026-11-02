@@ -16,15 +16,20 @@ const PROVIDER_URLS = allMatches();
 
 const RECONNECT_MIN = 1000;
 const RECONNECT_MAX = 5000;
-const HEARTBEAT_MS = 10000;
+// Ping a little more often so a half-open socket is noticed sooner and the
+// MV3 service worker is kept awake more reliably between tool calls.
+const HEARTBEAT_MS = 5000;
 // If no message (incl. pong) arrives within this window while we believe we're
 // connected, the socket is half-open: force a reconnect instead of letting
 // pending requests slowly time out.
-const STALE_SOCKET_MS = 25000;
+const STALE_SOCKET_MS = 15000;
 const REQUEST_TIMEOUT_DEFAULT = 130000; // a bit above the 120s tool timeout
 
 let ws = null;
 let connected = false;
+// Resolvers waiting for the socket to (re)open; resolved by onopen/onclose instead
+// of the old 100 ms polling loop, so a wake-up no longer pays up to 100 ms per tick.
+let connectionWaiters = [];
 let reconnectDelay = RECONNECT_MIN;
 let reconnectTimer = null;
 let heartbeatTimer = null;
@@ -64,6 +69,8 @@ function connect() {
     log("connected to bridge");
     startHeartbeat();
     broadcastStatus();
+    const waiters = connectionWaiters.splice(0);
+    for (const resolve of waiters) resolve(true);
   };
 
   ws.onmessage = (ev) => {
@@ -80,6 +87,8 @@ function connect() {
   ws.onclose = (event) => {
     needsApproval = !!(event && event.code === 1008 && /not approved/i.test(event.reason || ""));
     connected = false;
+    const waiters = connectionWaiters.splice(0);
+    for (const resolve of waiters) resolve(false);
     mcpAlive = false;
     serversCache = [];
     bridgeVersion = null;
@@ -126,19 +135,22 @@ function stopHeartbeat() {
 
 // Resolve once the socket is OPEN, or false after `timeout` ms.
 function waitForConnection(timeout = 8000) {
+  if (connected && ws && ws.readyState === WebSocket.OPEN) return Promise.resolve(true);
+  connect(); // nudge a (re)connection - important after a worker wake-up
   return new Promise((resolve) => {
-    if (connected && ws && ws.readyState === WebSocket.OPEN) return resolve(true);
-    connect(); // nudge a (re)connection - important after a worker wake-up
-    const t0 = Date.now();
-    const iv = setInterval(() => {
-      if (connected && ws && ws.readyState === WebSocket.OPEN) {
-        clearInterval(iv);
-        resolve(true);
-      } else if (Date.now() - t0 > timeout) {
-        clearInterval(iv);
-        resolve(false);
-      }
-    }, 100);
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const waiter = (value) => finish(!!value);
+    connectionWaiters.push(waiter);
+    setTimeout(() => {
+      const index = connectionWaiters.indexOf(waiter);
+      if (index >= 0) connectionWaiters.splice(index, 1);
+      finish(connected && ws && ws.readyState === WebSocket.OPEN);
+    }, timeout);
   });
 }
 
