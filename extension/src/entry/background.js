@@ -156,6 +156,7 @@ function waitForConnection(timeout = 8000) {
 
 // ── request/response over the socket ────────────────────────────────────
 async function send(obj, timeout = REQUEST_TIMEOUT_DEFAULT) {
+  const startedAt = Date.now();
   // The MV3 service worker can be suspended; the first message after a wake-up
   // arrives before the socket has re-opened. Wait for it instead of failing -
   // otherwise Kimi wrongly hears "bridge offline".
@@ -163,8 +164,13 @@ async function send(obj, timeout = REQUEST_TIMEOUT_DEFAULT) {
     await waitForConnection(8000);
   }
   return new Promise((resolve) => {
+    const finish = (value) => {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed >= 2000) log("send slow:", (obj && obj.type) || obj, elapsed + "ms");
+      resolve(value);
+    };
     if (!connected || !ws || ws.readyState !== WebSocket.OPEN) {
-      resolve({ ok: false, kind: "disconnected", error: "bridge not connected" });
+      finish({ ok: false, kind: "disconnected", error: "bridge not connected" });
       return;
     }
     const id = nextId++;
@@ -172,16 +178,16 @@ async function send(obj, timeout = REQUEST_TIMEOUT_DEFAULT) {
     const timer = setTimeout(() => {
       if (pending.has(id)) {
         pending.delete(id);
-        resolve({ ok: false, kind: "timeout", error: "bridge did not respond in time" });
+        finish({ ok: false, kind: "timeout", error: "bridge did not respond in time" });
       }
     }, timeout);
-    pending.set(id, { resolve, timer });
+    pending.set(id, { resolve: finish, timer });
     try {
       ws.send(JSON.stringify(payload));
     } catch (e) {
       clearTimeout(timer);
       pending.delete(id);
-      resolve({ ok: false, kind: "disconnected", error: String(e) });
+      finish({ ok: false, kind: "disconnected", error: String(e) });
     }
   });
 }

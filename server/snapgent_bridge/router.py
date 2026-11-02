@@ -1,6 +1,7 @@
 """Turns one request from the extension into replies. No sockets: it talks through `reply` and `broadcast`."""
 
 import asyncio
+import time
 from typing import Any, Awaitable, Callable, Dict
 
 from . import folder_picker, protocol
@@ -121,13 +122,19 @@ class RequestRouter:
         if target.error:
             await reply(protocol.tool_error(call.request_id, target.error, target.kind))
             return
+        started = time.monotonic()
         try:
             result = await target.server.call_tool(target.tool_name, call.arguments, call.timeout_seconds)
         except (asyncio.TimeoutError, RuntimeError, OSError, ValueError) as error:
+            elapsed_ms = int((time.monotonic() - started) * 1000)
             kind = "timeout" if isinstance(error, asyncio.TimeoutError) else "tool_error"
             await reply(protocol.tool_error(call.request_id, str(error), kind))
-            self._log(f"<- {call.name} ERROR: {str(error)[:MAX_LOG_CHARS]}")
+            self._log(f"<- {call.name} ERROR: {str(error)[:MAX_LOG_CHARS]} ({elapsed_ms} ms)")
             return
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        # Only slow calls are logged, so timing data is available without spamming.
+        if elapsed_ms >= 250:
+            self._log(f"<- {call.name} took {elapsed_ms} ms")
         message, text = protocol.tool_result_message(call.request_id, result)
         await reply(message)
         # Keep the result out of the log: previews of every call (especially large
