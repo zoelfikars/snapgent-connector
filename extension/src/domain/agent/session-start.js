@@ -9,7 +9,7 @@ const WORKSPACE_REQUIRED = Object.freeze({ title: "VS Code workspace required", 
 export const workspaceRequiredBanner = () => ({ ...WORKSPACE_REQUIRED });
 
 /** The cheap tool we call to prove a workspace is really open. */
-export const WORKSPACE_PROBE_TOOL = "list_dir";
+export const WORKSPACE_PROBE_TOOL = "tree";
 
 /**
  * Checks that need no I/O, in the order they are reported.

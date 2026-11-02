@@ -45,13 +45,19 @@ describe("skill text", () => {
   test("skill path", () => assert.equal(skillPath("a"), ".snapgent/skills/a/SKILL.md"));
 });
 
-function setup({ files = {}, stored = {}, tools = ["find_files", "read_file", "create_file"] } = {}) {
+function setup({ files = {}, stored = {}, tools = ["find_files", "read_files", "create_file"] } = {}) {
   const store = { data: { ...stored }, get: async (k) => store.data[k], set: (k, v) => { store.data[k] = v; } };
   const calls = [];
   const callTool = async (name, args) => {
     calls.push([name, args]);
     if (name === "find_files") return { ok: true, text: JSON.stringify(Object.keys(files)) };
-    if (name === "read_file") return files[args.path] === undefined ? { ok: false } : { ok: true, text: files[args.path] };
+    if (name === "read_files") {
+      const path = args.paths && args.paths[0];
+      if (files[path] === undefined) return { ok: false };
+      const text = files[path];
+      const numbered = text.split("\n").map((line, i) => `${i + 1}: ${line}`).join("\n");
+      return { ok: true, text: `===== ${path} =====\n${numbered}\n` };
+    }
     if (name === "create_file") { files[args.path] = args.content; return { ok: true }; }
     return { ok: false, error: "nope" };
   };

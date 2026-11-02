@@ -2,101 +2,122 @@
 
 import fnmatch
 import os
-import re
 from pathlib import Path
 from typing import Any, Dict, List
 
 from ..context import Context
-from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, MAX_LINES_PER_READ, MAX_RESULTS, MAX_TREE_DEPTH
+from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, MAX_RESULTS, MAX_TREE_DEPTH
 from ..paths import iter_files, relative, resolve_inside
 from ..security import TRUSTED
 from ..security.files import is_sensitive
 from .registry import READ, tool
 from .schema import BOOL, STR, STR_LIST, integer
 
-OUTLINE_PATTERNS = (
-    r"^\s*(?:async\s+)?def\s+([A-Za-z_]\w*)",
-    r"^\s*class\s+([A-Za-z_]\w*)",
-    r"^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)",
-    r"^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:function|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)",
-)
+# Junk that is almost never useful as source context, on top of IGNORED_DIRECTORIES.
+# Kept as names so it works regardless of where in the tree they appear.
+DEFAULT_EXCLUDED = frozenset({
+    "vendor", "node_modules", ".git", "dist", "build", "target", ".next", ".nuxt",
+    "__pycache__", ".venv", "venv", ".pytest_cache", ".mypy_cache", ".tox",
+    ".idea", ".vscode", ".cache", "coverage", ".turbo", ".svelte-kit",
+})
 
 
-def _visible_files(ctx: Context, base: Path):
-    """Files under `base`, minus those that may hold secrets: search results and listings are sent to a
-    third-party website, so they must not surface them. (Reading one is a separate, confirmed action.)"""
+def _excluded_names(exclude) -> set:
+    names = set(IGNORED_DIRECTORIES) | set(DEFAULT_EXCLUDED)
+    if exclude:
+        for item in exclude:
+            if isinstance(item, str) and item.strip():
+                names.add(item.strip())
+    return names
+
+
+def _visible_files(ctx: Context, base: Path, excluded: set):
     hide = ctx.policy.mode != TRUSTED
     for file_path in iter_files(base):
-        if hide and is_sensitive(relative(file_path, ctx.root)):
+        rel = relative(file_path, ctx.root)
+        if any(part in excluded for part in Path(rel).parts):
+            continue
+        if hide and is_sensitive(rel):
             continue
         yield file_path
 
 
-def _kind(path: Path) -> str:
-    return "directory" if path.is_dir() else "file"
+def _tree(ctx: Context, base: Path, max_depth, excluded: set) -> str:
+    lines: List[str] = [str(base.name or ".")]
+    count = [0]
+
+    def walk(current: Path, depth: int, prefix: str):
+        if (max_depth is not None and depth > max_depth) or count[0] >= MAX_RESULTS:
+            return
+        try:
+            children = sorted(current.iterdir(), key=lambda p: (p.is_file(), p.name.lower()))
+        except OSError:
+            return
+        # Skip excluded directories and hidden secret files (non-trusted mode).
+        filtered = []
+        for child in children:
+            if child.name in excluded:
+                continue
+            if child.is_file() and ctx.policy.mode != TRUSTED and is_sensitive(relative(child, ctx.root)):
+                continue
+            filtered.append(child)
+        for index, child in enumerate(filtered):
+            if count[0] >= MAX_RESULTS:
+                return
+            last = index == len(filtered) - 1
+            branch = "└── " if last else "├── "
+            lines.append(f"{prefix}{branch}{child.name}")
+            count[0] += 1
+            if child.is_dir():
+                extension = "    " if last else "│   "
+                walk(child, depth + 1, prefix + extension)
+
+    walk(base, 0, "")
+    if count[0] >= MAX_RESULTS:
+        lines.append("... [truncated]")
+    return "\n".join(lines)
 
 
-@tool("list_dir", "List files and folders in the workspace.", {"path": STR}, risk=READ)
-def list_dir(ctx: Context, path: str = ".") -> List[Dict[str, str]]:
+@tool("tree", "Show a filtered tree of workspace files and folders. Junk folders are excluded by default. No depth limit by default.",
+      {"path": STR, "max_depth": integer(0, MAX_TREE_DEPTH), "exclude": STR_LIST}, risk=READ)
+def tree(ctx: Context, path: str = ".", max_depth: int = None, exclude: List[str] = None) -> str:
     target = resolve_inside(path, ctx.root)
-    if not target.exists():
-        raise FileNotFoundError(f"Directory not found: {path}")
     if not target.is_dir():
         raise NotADirectoryError(f"Not a directory: {path}")
-    return [
-        {"name": child.name, "path": relative(child, ctx.root), "type": _kind(child)}
-        for child in sorted(target.iterdir(), key=lambda item: (item.is_file(), item.name.lower()))
-    ]
+    if max_depth is not None:
+        max_depth = max(0, min(int(max_depth), MAX_TREE_DEPTH))
+    return _tree(ctx, target, max_depth, _excluded_names(exclude))
 
 
-@tool("list_tree", "List a bounded tree of workspace files and folders.",
-      {"path": STR, "max_depth": integer(0, MAX_TREE_DEPTH)}, risk=READ)
-def list_tree(ctx: Context, path: str = ".", max_depth: int = 3) -> List[Dict[str, Any]]:
-    target = resolve_inside(path, ctx.root)
-    if not target.is_dir():
-        raise NotADirectoryError(f"Not a directory: {path}")
-    depth_limit = max(0, min(int(max_depth), MAX_TREE_DEPTH))
-    result: List[Dict[str, Any]] = []
-    for current, dirs, files in os.walk(target):
-        current_path = Path(current)
-        depth = len(current_path.relative_to(target).parts)
-        dirs[:] = sorted(name for name in dirs if name not in IGNORED_DIRECTORIES)
-        for name in sorted(dirs) + sorted(files):
-            entry = current_path / name
-            result.append({"path": relative(entry, ctx.root), "type": _kind(entry)})
-            if len(result) >= MAX_RESULTS:
-                return result
-        if depth >= depth_limit:
-            dirs[:] = []
-    return result
-
-
-@tool("find_files", "Find workspace files by glob pattern.", {"path": STR, "pattern": STR}, risk=READ)
-def find_files(ctx: Context, path: str = ".", pattern: str = "*") -> List[str]:
+@tool("find_files", "Find workspace files by glob pattern.", {"path": STR, "pattern": STR, "exclude": STR_LIST}, risk=READ)
+def find_files(ctx: Context, path: str = ".", pattern: str = "*", exclude: List[str] = None) -> List[str]:
     base = resolve_inside(path, ctx.root)
     if not base.exists():
         raise FileNotFoundError(f"Path not found: {path}")
     if not base.is_dir():
         raise NotADirectoryError(f"Not a directory: {path}")
+    excluded = _excluded_names(exclude)
     matches = [
         relative(file_path, ctx.root)
-        for file_path in _visible_files(ctx, base)
+        for file_path in _visible_files(ctx, base, excluded)
         if fnmatch.fnmatch(file_path.name, pattern) or fnmatch.fnmatch(relative(file_path, base), pattern)
     ]
     return matches[:MAX_RESULTS]
 
 
-@tool("search_files", "Search text in workspace files.",
-      {"path": STR, "query": STR, "file_pattern": STR, "case_sensitive": BOOL}, ["path", "query"], risk=READ)
-def search_files(ctx: Context, path: str, query: str, file_pattern: str = "*", case_sensitive: bool = False) -> List[Dict[str, Any]]:
+@tool("search_files", "Search text in workspace files. Returns compact 'path:line: text' lines.",
+      {"path": STR, "query": STR, "file_pattern": STR, "case_sensitive": BOOL, "exclude": STR_LIST}, ["path", "query"], risk=READ)
+def search_files(ctx: Context, path: str, query: str, file_pattern: str = "*", case_sensitive: bool = False,
+                exclude: List[str] = None) -> List[str]:
     target = resolve_inside(path, ctx.root)
     if not target.exists():
         raise FileNotFoundError(f"Path not found: {path}")
     if not query.strip():
         raise ValueError("Search query cannot be empty.")
     needle = query if case_sensitive else query.lower()
-    matches: List[Dict[str, Any]] = []
-    for file_path in ([target] if target.is_file() else _visible_files(ctx, target)):
+    excluded = _excluded_names(exclude)
+    matches: List[str] = []
+    for file_path in ([target] if target.is_file() else _visible_files(ctx, target, excluded)):
         if not fnmatch.fnmatch(file_path.name, file_pattern):
             continue
         try:
@@ -105,71 +126,44 @@ def search_files(ctx: Context, path: str, query: str, file_pattern: str = "*", c
             continue
         for line_number, line in enumerate(text.splitlines(), start=1):
             if needle in (line if case_sensitive else line.lower()):
-                matches.append({"path": relative(file_path, ctx.root), "line": line_number, "text": line[:500]})
+                matches.append(f"{relative(file_path, ctx.root)}:{line_number}: {line[:500]}")
                 if len(matches) >= MAX_RESULTS:
                     return matches
     return matches
 
 
-def _read(ctx: Context, path: str, max_chars: int = None) -> str:
+def _read(ctx: Context, path: str) -> str:
     target = resolve_inside(path, ctx.root)
     if not target.is_file():
         raise FileNotFoundError(f"File not found: {path}")
     content = target.read_text(encoding="utf-8", errors="replace")
-    limit = MAX_FILE_CHARS if max_chars is None else max(1, min(int(max_chars), MAX_FILE_CHARS))
-    if len(content) <= limit:
-        return content
-    # Keep both ends: a hard head-only cut hides the tail, which is exactly
-    # where the part that needs editing often lives. The marker names how much
-    # was dropped so the model knows the file is incomplete.
-    head = limit // 2
-    tail = limit - head
-    omitted = len(content) - head - tail
-    return f"{content[:head]}\n... [truncated {omitted} characters] ...\n{content[-tail:]}"
+    return content[:MAX_FILE_CHARS] + "\n[truncated]" if len(content) > MAX_FILE_CHARS else content
 
 
-@tool("read_file", "Read a UTF-8 text file in the workspace. Large files are truncated, keeping both ends.",
-      {"path": STR, "max_chars": integer(1, MAX_FILE_CHARS)}, ["path"], risk=READ)
-def read_file(ctx: Context, path: str, max_chars: int = None) -> str:
-    return _read(ctx, path, max_chars)
-
-
-@tool("read_files", f"Read up to {MAX_FILES_PER_READ} workspace files. Large files are truncated, keeping both ends.",
-      {"paths": STR_LIST, "max_chars": integer(1, MAX_FILE_CHARS)}, ["paths"], risk=READ)
-def read_files(ctx: Context, paths: List[str], max_chars: int = None) -> List[Dict[str, str]]:
+@tool("read_files", f"Read up to {MAX_FILES_PER_READ} workspace files as bulk text with line numbers. "
+                   f"Total output is capped; files that do not fit are listed as remaining instead of being truncated.",
+      {"paths": STR_LIST, "max_total_chars": integer(1)}, ["paths"], risk=READ)
+def read_files(ctx: Context, paths: List[str], max_total_chars: int = None) -> str:
     if len(paths) > MAX_FILES_PER_READ:
         raise ValueError(f"Read at most {MAX_FILES_PER_READ} files per request.")
-    return [{"path": path, "content": _read(ctx, path, max_chars)} for path in paths]
-
-
-@tool("read_file_lines", "Read a bounded line range from a workspace file.",
-      {"path": STR, "start_line": integer(1), "end_line": integer(1)}, ["path"], risk=READ)
-def read_file_lines(ctx: Context, path: str, start_line: int = 1, end_line: int = 200) -> str:
-    if start_line < 1 or end_line < start_line:
-        raise ValueError("Line numbers must be positive, and end_line must be >= start_line.")
-    if end_line - start_line > MAX_LINES_PER_READ - 1:
-        raise ValueError(f"Read at most {MAX_LINES_PER_READ} lines per request.")
-    lines = _read(ctx, path).splitlines()
-    return "\n".join(f"{number}: {lines[number - 1]}" for number in range(start_line, min(end_line, len(lines)) + 1))
-
-
-@tool("get_file_info", "Get size, type, extension, and modification time for a workspace path.", {"path": STR}, ["path"], risk=READ)
-def get_file_info(ctx: Context, path: str) -> Dict[str, Any]:
-    target = resolve_inside(path, ctx.root)
-    if not target.exists():
-        raise FileNotFoundError(f"Path not found: {path}")
-    stat = target.stat()
-    return {"path": relative(target, ctx.root), "type": _kind(target), "size_bytes": stat.st_size,
-            "modified": stat.st_mtime, "suffix": target.suffix}
-
-
-@tool("get_file_outline", "List class and function declarations from a source file.", {"path": STR}, ["path"], risk=READ)
-def get_file_outline(ctx: Context, path: str) -> List[Dict[str, Any]]:
-    result = []
-    for line_number, line in enumerate(_read(ctx, path).splitlines(), start=1):
-        for pattern in OUTLINE_PATTERNS:
-            match = re.search(pattern, line)
-            if match:
-                result.append({"name": match.group(1), "line": line_number})
-                break
-    return result[:MAX_RESULTS]
+    budget = MAX_FILE_CHARS if max_total_chars is None else max(1, int(max_total_chars))
+    chunks: List[str] = []
+    remaining: List[str] = []
+    used = 0
+    for path in paths:
+        try:
+            content = _read(ctx, path)
+        except (FileNotFoundError, ValueError, OSError) as error:
+            chunks.append(f"===== {path} =====\nERROR: {error}\n")
+            continue
+        numbered = "\n".join(f"{number}: {line}" for number, line in enumerate(content.splitlines(), start=1))
+        block = f"===== {path} =====\n{numbered}\n"
+        if not chunks or used + len(block) <= budget:
+            chunks.append(block)
+            used += len(block)
+        else:
+            remaining.append(path)
+    result = "".join(chunks)
+    if remaining:
+        result += f"\n... [{len(remaining)} more files remaining: {', '.join(remaining)}]\n"
+    return result if result.strip() else "(no files read)"

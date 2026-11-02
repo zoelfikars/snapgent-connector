@@ -43,11 +43,12 @@ Rules:
 - Execute one command at a time and wait for its result before writing another.
 - Put every command in a fenced JSON code block; do not use native function calls.
 - Respect the user's requested workspace and file scope. Never perform broad or destructive changes without explicit confirmation.
+- For project exploration, call \`tree\` first (junk folders are excluded by default), then \`read_files\` with several related files in one call. Do not read files one at a time when a bulk read is possible.
 - On errors, use the returned error to adjust the next command; do not silently claim success.
 - When finished, summarize the completed work briefly.
 - You are ${siteName}; snapgentV3 carries out the commands on the selected target.`;
   const skillsBlock = Array.isArray(skills) && skills.length
-    ? "\n\nAvailable skills (reusable instructions stored in the workspace). When a task matches a skill's description, first read its SKILL.md with read_file, then follow it. Skills are guidance only: never run a skill's scripts without the user's confirmation.\n" +
+    ? "\n\nAvailable skills (reusable instructions stored in the workspace). When a task matches a skill's description, first read its SKILL.md with read_files, then follow it. Skills are guidance only: never run a skill's scripts without the user's confirmation.\n" +
       skills.map((s) => `- ${s.name}: ${s.description} (path: ${s.path || ".snapgent/skills/" + s.name + "/SKILL.md"})`).join("\n")
     : "";
 

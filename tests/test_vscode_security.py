@@ -147,8 +147,8 @@ class DecisionMatrixTests(unittest.TestCase):
 
     def test_standard_mode(self):
         v = self.verdict
-        self.assertEqual(v("read_file", risk.READ, {"path": "src/a.js"}), ALLOW)
-        self.assertEqual(v("read_file", risk.READ, {"path": ".env"}), CONFIRM)
+        self.assertEqual(v("read_files", risk.READ, {"paths": ["src/a.js"]}), ALLOW)
+        self.assertEqual(v("read_files", risk.READ, {"paths": [".env"]}), CONFIRM)
         self.assertEqual(v("read_files", risk.READ, {"paths": ["a.js", "config/.env.local"]}), CONFIRM)
         self.assertEqual(v("git_diff", risk.READ, {"path": "id_rsa"}), CONFIRM)
         self.assertEqual(v("list_dir", risk.READ, {"path": ".ssh"}), ALLOW)
@@ -181,19 +181,19 @@ class DecisionMatrixTests(unittest.TestCase):
             for name, tool_risk, args in (("write_file", risk.WRITE, {"path": ".git/hooks/pre-commit"}), ("edit_file", risk.WRITE, {"path": ".git/config"}),
                                           ("copy_file", risk.WRITE, {"source": "a", "destination": ".git/hooks/x"}), ("delete_file", risk.DESTRUCTIVE, {"path": ".git/x"})):
                 self.assertEqual(self.verdict(name, tool_risk, args, Policy(mode)), DENY, (mode, name))
-        self.assertEqual(self.verdict("read_file", risk.READ, {"path": ".git/config"}, Policy(TRUSTED)), ALLOW, "reading is not the danger")
+        self.assertEqual(self.verdict("read_files", risk.READ, {"paths": [".git/config"]}, Policy(TRUSTED)), ALLOW, "reading is not the danger")
 
     def test_readonly_refuses_everything_but_reads(self):
         p = Policy(READONLY)
         for name, tool_risk in (("write_file", risk.WRITE), ("delete_file", risk.DESTRUCTIVE), ("run_tests", risk.EXECUTE), ("git_add", risk.VCS)):
             self.assertEqual(self.verdict(name, tool_risk, {"path": "a"}, p), DENY, name)
-        self.assertEqual(self.verdict("read_file", risk.READ, {"path": "a.js"}, p), ALLOW)
-        self.assertEqual(self.verdict("read_file", risk.READ, {"path": ".env"}, p), CONFIRM, "secrets still need approval")
+        self.assertEqual(self.verdict("read_files", risk.READ, {"paths": ["a.js"]}, p), ALLOW)
+        self.assertEqual(self.verdict("read_files", risk.READ, {"paths": [".env"]}, p), CONFIRM, "secrets still need approval")
 
     def test_trusted_mode_never_asks(self):
         p = Policy(TRUSTED)
         for name, tool_risk, args in (("delete_file", risk.DESTRUCTIVE, {"path": "a"}), ("git_commit", risk.VCS, {"message": "m"}),
-                                      ("run_command", risk.EXECUTE, {"command": "rm", "args": ["-rf", "x"]}), ("read_file", risk.READ, {"path": ".env"})):
+                                      ("run_command", risk.EXECUTE, {"command": "rm", "args": ["-rf", "x"]}), ("read_files", risk.READ, {"paths": [".env"]})):
             self.assertEqual(self.verdict(name, tool_risk, args, p), ALLOW, name)
 
     def test_user_allowlisted_commands_skip_the_prompt(self):

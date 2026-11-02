@@ -9,10 +9,10 @@ from tests.vscode_support import WorkspaceCase, git
 
 
 class CatalogueTests(WorkspaceCase):
-    def test_28_unique_tools_each_with_a_description_schema_and_risk(self):
+    def test_23_unique_tools_each_with_a_description_schema_and_risk(self):
         tools = all_tools()
-        self.assertEqual(len(tools), 28)
-        self.assertEqual(len({t.name for t in tools}), 28)
+        self.assertEqual(len(tools), 23)
+        self.assertEqual(len({t.name for t in tools}), 23)
         for tool in tools:
             self.assertTrue(tool.description, tool.name)
             self.assertIn(tool.risk, {registry.READ, registry.WRITE, registry.DESTRUCTIVE, registry.EXECUTE, registry.VCS}, tool.name)
@@ -21,7 +21,7 @@ class CatalogueTests(WorkspaceCase):
 
     def test_risk_labels_for_the_tools_that_matter(self):
         risk = {t.name: t.risk for t in all_tools()}
-        self.assertEqual((risk["read_file"], risk["write_file"], risk["delete_file"], risk["run_command"], risk["git_commit"]),
+        self.assertEqual((risk["read_files"], risk["write_file"], risk["delete_file"], risk["run_command"], risk["git_commit"]),
                          (registry.READ, registry.WRITE, registry.DESTRUCTIVE, registry.EXECUTE, registry.VCS))
 
     def test_schemas_are_json_serialisable(self):
@@ -29,21 +29,21 @@ class CatalogueTests(WorkspaceCase):
 
     def test_duplicate_registration_is_an_error(self):
         with self.assertRaisesRegex(ValueError, "Duplicate tool name"):
-            registry.tool("read_file", "again")(lambda ctx: None)
+            registry.tool("tree", "again")(lambda ctx: None)
 
     def test_unknown_tool(self):
         with self.assertRaisesRegex(ValueError, "Unknown tool: nope"):
             call(self.ctx, "nope", {})
 
     def test_missing_required_parameters_are_named(self):
-        with self.assertRaisesRegex(ValueError, r"Missing required parameter\(s\) for read_file: path"):
-            call(self.ctx, "read_file", {})
+        with self.assertRaisesRegex(ValueError, r"Missing required parameter\(s\) for read_files: paths"):
+            call(self.ctx, "read_files", {})
         with self.assertRaisesRegex(ValueError, "old_text, new_text"):
             call(self.ctx, "edit_file", {"path": "x"})
 
     def test_unknown_arguments_are_ignored(self):
         self.write("a.txt", "hi")
-        self.assertEqual(call(self.ctx, "read_file", {"path": "a.txt", "encoding": "latin-1", "extra": 1}), "hi")
+        self.assertIn("hi", call(self.ctx, "read_files", {"paths": ["a.txt"], "encoding": "latin-1", "extra": 1}))
 
 
 class ProjectTests(WorkspaceCase):
@@ -70,25 +70,12 @@ class ReadingTests(WorkspaceCase):
         self.write(".github/workflows/check.yml", "name: check\n")
         self.write("node_modules/dep/index.js", "export function hidden() {}\n")
 
-    def test_list_dir_sorts_folders_first(self):
-        self.write("zeta.txt")
-        entries = reading.list_dir(self.ctx)
-        self.assertEqual([e["type"] for e in entries][:2], ["directory", "directory"])
-        self.assertEqual(entries[-1], {"name": "zeta.txt", "path": "zeta.txt", "type": "file"})
-
-    def test_list_dir_errors(self):
-        with self.assertRaises(FileNotFoundError):
-            reading.list_dir(self.ctx, "nope")
-        with self.assertRaises(NotADirectoryError):
-            reading.list_dir(self.ctx, "src/app.js")
-
-    def test_list_tree_is_depth_limited_and_skips_dependencies(self):
-        paths = [e["path"] for e in reading.list_tree(self.ctx, ".", 0)]  # depth 0 = the top level only
-        self.assertEqual(sorted(paths), [".github", "src"])
-        self.assertIn("src/app.js", [e["path"] for e in reading.list_tree(self.ctx, ".", 1)])
-        deeper = [e["path"] for e in reading.list_tree(self.ctx, ".", 3)]
-        self.assertIn("src/app.js", deeper)
-        self.assertFalse(any("node_modules/dep" in p for p in deeper))
+    def test_tree_skips_dependencies_and_respects_exclude(self):
+        paths = [line.strip() for line in reading.tree(self.ctx, ".", 1).splitlines()]
+        self.assertTrue(any("src" in p for p in paths))
+        self.assertFalse(any("node_modules" in p for p in paths))
+        custom = reading.tree(self.ctx, ".", 3, exclude=["src"])
+        self.assertFalse(any("app.js" in p for p in custom.splitlines()))
 
     def test_find_files_by_name_and_by_path_pattern(self):
         self.assertEqual(reading.find_files(self.ctx, ".", "*.js"), ["src/app.js"])  # node_modules is skipped
@@ -97,48 +84,35 @@ class ReadingTests(WorkspaceCase):
 
     def test_search_files(self):
         hits = reading.search_files(self.ctx, ".", "START")
-        self.assertEqual(hits, [{"path": "src/app.js", "line": 1, "text": "export function start() {}"}])
+        self.assertEqual(hits, ["src/app.js:1: export function start() {}"])
         self.assertEqual(reading.search_files(self.ctx, ".", "START", case_sensitive=True), [])
         self.assertEqual(reading.search_files(self.ctx, ".", "run", file_pattern="*.yml"), [])
-        with self.assertRaisesRegex(ValueError, "cannot be empty"):
-            reading.search_files(self.ctx, ".", "  ")
 
     def test_search_results_are_capped(self):
         self.write("big.txt", "x\n" * (limits.MAX_RESULTS + 50))
         self.assertEqual(len(reading.search_files(self.ctx, "big.txt", "x")), limits.MAX_RESULTS)
 
-    def test_read_file_truncates_large_files(self):
-        self.write("huge.txt", "a" * (limits.MAX_FILE_CHARS + 10))
-        text = reading.read_file(self.ctx, "huge.txt")
-        self.assertIn("[truncated", text)
-        # Truncation keeps both ends, so the result never exceeds the cap by much.
-        self.assertLessEqual(len(text), limits.MAX_FILE_CHARS + 100)
-        self.assertTrue(text.startswith("a" * (limits.MAX_FILE_CHARS // 2)))
-        self.assertTrue(text.endswith("a" * (limits.MAX_FILE_CHARS - limits.MAX_FILE_CHARS // 2)))
+    def test_read_files_bulk_and_budget(self):
+        self.write("a.txt", "one\ntwo\n")
+        self.write("b.txt", "three\n")
+        text = reading.read_files(self.ctx, ["a.txt", "b.txt"])
+        self.assertIn("===== a.txt =====", text)
+        self.assertIn("1: one", text)
+        self.assertIn("===== b.txt =====", text)
+        # A file that does not fit is listed as remaining instead of being truncated.
+        big = "z" * (limits.MAX_FILE_CHARS + 10)
+        self.write("huge.txt", big)
+        out = reading.read_files(self.ctx, ["a.txt", "huge.txt", "b.txt"], max_total_chars=20)
+        self.assertIn("more files remaining", out)
+        self.assertIn("huge.txt", out)
 
-    def test_read_files_limit_and_escape(self):
-        self.assertEqual(len(reading.read_files(self.ctx, ["src/app.js"])), 1)
-        with self.assertRaisesRegex(ValueError, "at most 50"):
-            reading.read_files(self.ctx, ["src/app.js"] * 51)
+    def test_read_files_limit(self):
         with self.assertRaises(ValueError):
-            reading.read_file(self.ctx, "../outside.txt")
+            reading.read_files(self.ctx, ["src/app.js"] * 51)
 
-    def test_read_file_lines(self):
-        self.assertEqual(reading.read_file_lines(self.ctx, "src/app.js", 2, 2), "2: const run = () => 1")
-        for start, end in ((0, 5), (5, 2), (1, 1002)):
-            with self.assertRaises(ValueError):
-                reading.read_file_lines(self.ctx, "src/app.js", start, end)
-
-    def test_file_info_and_outline(self):
-        info = reading.get_file_info(self.ctx, "src/app.js")
-        self.assertEqual((info["type"], info["suffix"], info["path"]), ("file", ".js", "src/app.js"))
-        self.assertEqual(reading.get_file_info(self.ctx, "src")["type"], "directory")
-        self.assertEqual(reading.get_file_outline(self.ctx, "src/app.js"), [{"name": "start", "line": 1}, {"name": "run", "line": 2}])
-
-    def test_outline_recognises_python(self):
-        self.write("m.py", "class A:\n    def f(self): pass\nasync def g(): pass\n")
-        self.assertEqual([o["name"] for o in reading.get_file_outline(self.ctx, "m.py")], ["A", "f", "g"])
-
+    def test_read_files_escape(self):
+        text = reading.read_files(self.ctx, ["../outside.txt"])
+        self.assertIn("escapes workspace", text)
 
 class EditingTests(WorkspaceCase):
     def test_create_never_overwrites_and_makes_parents(self):

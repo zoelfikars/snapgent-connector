@@ -13,6 +13,10 @@ def configure(path: Path) -> None:
         format="%(asctime)s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    # The websockets library logs every connect/disconnect at INFO level, which floods
+    # the log while an extension is waiting for terminal approval. Keep our own messages.
+    for name in ("websockets", "websockets.server", "websockets.client", "websockets.protocol"):
+        logging.getLogger(name).setLevel(logging.WARNING)
 
 
 def log(message: str) -> None:

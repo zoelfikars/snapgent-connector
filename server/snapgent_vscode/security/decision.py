@@ -15,7 +15,7 @@ from .session import SessionState
 
 ALLOW, CONFIRM, DENY = "allow", "confirm", "deny"
 # Tools that return file CONTENT, which would be sent to a third-party website.
-CONTENT_TOOLS = frozenset({"read_file", "read_files", "read_file_lines", "get_file_outline", "git_diff"})
+CONTENT_TOOLS = frozenset({"read_files", "git_diff"})
 SCRIPT_TOOLS = frozenset({"run_project_script", "run_tests"})
 
 

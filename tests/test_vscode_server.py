@@ -42,7 +42,7 @@ class ServerTests(WorkspaceCase):
         self.assertEqual(self.ask("ping")["result"], {})
 
     def test_tools_list_is_empty_when_no_workspace_is_open(self):
-        self.assertEqual(len(self.ask("tools/list")["result"]["tools"]), 28)
+        self.assertEqual(len(self.ask("tools/list")["result"]["tools"]), 23)
         self.assertEqual(self.ask("tools/list", open_workspace=False)["result"]["tools"], [])
 
     def test_notifications_get_no_reply(self):
@@ -54,14 +54,15 @@ class ServerTests(WorkspaceCase):
 
     def test_a_tool_call_returns_text_and_structured_content(self):
         self.write("a.txt", "hello")
-        reply = self.ask("tools/call", {"name": "read_file", "arguments": {"path": "a.txt"}})
-        self.assertEqual(reply["result"]["content"][0]["text"], "hello")
-        self.assertEqual(reply["result"]["structuredContent"], {"result": "hello"})
+        reply = self.ask("tools/call", {"name": "read_files", "arguments": {"paths": ["a.txt"]}})
+        self.assertIn("hello", reply["result"]["content"][0]["text"])
+        self.assertIn("hello", reply["result"]["structuredContent"]["result"])
 
     def test_every_failure_becomes_a_readable_error_reply(self):
+        reply = self.ask("tools/call", {"name": "read_files", "arguments": {"paths": ["../x"]}})
+        self.assertIn("escapes workspace", reply["result"]["content"][0]["text"])
         for params, text in (
-            ({"name": "read_file", "arguments": {"path": "../x"}}, "escapes workspace"),
-            ({"name": "read_file", "arguments": {}}, "Missing required"),
+            ({"name": "read_files", "arguments": {}}, "Missing required"),
             ({"name": "nope"}, "Unknown tool"),
             ({"arguments": {}}, "Unknown tool"),
         ):
@@ -70,7 +71,7 @@ class ServerTests(WorkspaceCase):
             self.assertIn(text, reply["error"]["message"])
 
     def test_tool_calls_without_a_workspace_explain_what_to_do(self):
-        reply = self.ask("tools/call", {"name": "list_dir"}, open_workspace=False)
+        reply = self.ask("tools/call", {"name": "tree"}, open_workspace=False)
         self.assertIn("Open a project folder in VS Code", reply["error"]["message"])
 
     def test_serve_loop_skips_blank_lines_garbage_and_non_objects(self):

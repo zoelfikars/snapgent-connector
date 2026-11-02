@@ -2,13 +2,13 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { BridgeMonitor, PROBE_INTERVAL_MS } from "../src/application/bridge-monitor.js";
 
-function monitor({ tools = [{ name: "vscode__list_dir" }], listResult = { ok: true } } = {}) {
+function monitor({ tools = [{ name: "vscode__tree" }], listResult = { ok: true } } = {}) {
   const state = { now: 100_000, tools, calls: [], ensures: 0, changes: 0, logs: [], listResult, listError: null, ensureError: null };
   const mon = new BridgeMonitor({
     ensureTools: async () => { state.ensures++; if (state.ensureError) throw state.ensureError; },
     activeTools: () => state.tools,
     listRoot: async (name, timeout) => { state.calls.push([name, timeout]); if (state.listError) throw state.listError; return state.listResult; },
-    isListTool: (name) => /list_dir$/.test(name),
+    isListTool: (name) => /tree$/.test(name),
     now: () => state.now,
     onChange: () => { state.changes++; },
     log: (...args) => state.logs.push(args),
@@ -60,7 +60,7 @@ describe("BridgeMonitor: is a workspace open", () => {
     mon.update(status(), "vscode");
     assert.equal(mon.workspaceProbePending, true);
     await settle();
-    assert.deepEqual(state.calls, [["vscode__list_dir", 5000]]);
+    assert.deepEqual(state.calls, [["vscode__tree", 5000]]);
     assert.deepEqual([mon.workspaceReady, mon.workspaceProbePending, state.changes], [true, false, 1]);
   });
 

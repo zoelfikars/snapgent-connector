@@ -1113,7 +1113,7 @@
       ensureTools: () => catalogue.ensure(false),
       activeTools,
       listRoot: (name, timeout) => bg({ type: "call_tool", name, arguments: { path: "." }, timeout }),
-      isListTool: (name) => bareToolName(name) === "list_dir",
+      isListTool: (name) => bareToolName(name) === "tree",
       onChange: () => renderBar(),
       log: (...args) => console.warn("[snapgentV3]", ...args),
     });
@@ -1295,6 +1295,9 @@
         pinnedWorkspace = reply.pinned;
         wsMenuEl.hidden = true;
         renderWorkspace();
+        // A successfully pinned folder is a usable workspace right away; "Auto" goes back to probing.
+        bridgeMonitor.workspaceReady = !!pinnedWorkspace;
+        bridgeMonitor.workspaceProbePending = false;
         catalogue.ensure(true);
         notifications.toast(pinnedWorkspace ? `Working in ${ZSUi.workspaceLabel(pinnedWorkspace)}` : "Following the active VS Code window");
       }

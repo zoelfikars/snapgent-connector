@@ -8,7 +8,7 @@ const WORKSPACE = { title: "VS Code workspace required", text: "Open a project f
 
 function setup(over = {}) {
   const log = [];
-  const state = { superseded: false, stopped: false, tools: [tool("list_dir"), tool("read_file")], empty: true, started: false, composerReady: true, probe: { ok: true }, responses: [], connected: true, serverAlive: true, targetId: "vscode", ...over.state };
+  const state = { superseded: false, stopped: false, tools: [tool("tree"), tool("read_files")], empty: true, started: false, composerReady: true, probe: { ok: true }, responses: [], connected: true, serverAlive: true, targetId: "vscode", ...over.state };
   const queue = [...state.responses];
   const deps = {
     session: {
@@ -50,7 +50,7 @@ describe("SessionStarter", () => {
     const t = setup({ state: { responses: [handshakeTurn, ready] } });
     await t.starter.start();
     assert.deepEqual(t.log.filter((e) => typeof e === "string" && !e.startsWith("diag")), [
-      "begin", "ensure:true", `probe:list_dir:{"path":"."}:5000`, "skills.load", "submit:PROMPT", "chip:starting", "next",
+      "begin", "ensure:true", `probe:tree:{"path":"."}:5000`, "skills.load", "submit:PROMPT", "chip:starting", "next",
       "handshake:run:", "run:list_commands", "handshake:done:2 commands", "submit:Output of 'l", "next", "markStarted", "toast:Agent on.", "end:true",
     ]);
   });
@@ -156,11 +156,11 @@ describe("SessionStarter", () => {
 });
 
 describe("start preconditions", () => {
-  const base = { target: "vscode", targetName: "VS Code", bridgeConnected: true, serverAlive: true, toolNames: ["list_dir"] };
+  const base = { target: "vscode", targetName: "VS Code", bridgeConnected: true, serverAlive: true, toolNames: ["tree"] };
   test("ready when the probe tool exists", () => assert.equal(checkStartPreconditions(base), null));
-  test("connected vscode server without list_dir means no workspace", () => assert.deepEqual(checkStartPreconditions({ ...base, toolNames: ["read_file"] }), WORKSPACE));
+  test("connected vscode server without list_dir means no workspace", () => assert.deepEqual(checkStartPreconditions({ ...base, toolNames: ["read_files"] }), WORKSPACE));
   test("no tools at all", () => assert.equal(checkStartPreconditions({ ...base, serverAlive: false, toolNames: [] }).title, "VS Code tools unavailable"));
-  test("prefixed names still count", () => assert.equal(checkStartPreconditions({ ...base, toolNames: ["vscode/list_dir"] }), null));
+  test("prefixed names still count", () => assert.equal(checkStartPreconditions({ ...base, toolNames: ["vscode/tree"] }), null));
   test("a non-vscode target needs no probe tool", () => assert.equal(checkStartPreconditions({ ...base, target: "x", toolNames: ["foo"] }), null));
   test("probe success", () => { assert.equal(probeSucceeded({ ok: true }), true); assert.equal(probeSucceeded(null), false); });
   test("handshake detection", () => {

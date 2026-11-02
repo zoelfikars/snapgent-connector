@@ -55,7 +55,7 @@ export class SkillsService {
     this._all = [];
     try {
       const find = this._findTool("find_files");
-      const read = this._findTool("read_file");
+      const read = this._findTool("read_files");
       if (!find || !read) return;
       const found = await this._callTool(find.name, { path: SKILLS_DIR, pattern: "**/SKILL.md" }, CALL_TIMEOUT_MS);
       if (!found || !found.ok || !found.text) return;
@@ -65,9 +65,13 @@ export class SkillsService {
       const skills = [];
       for (const path of paths.slice(0, MAX_SKILLS_LOADED)) {
         if (typeof path !== "string") continue;
-        const file = await this._callTool(read.name, { path }, CALL_TIMEOUT_MS);
+        const file = await this._callTool(read.name, { paths: [path], max_total_chars: CALL_TIMEOUT_MS }, CALL_TIMEOUT_MS);
         if (!file || !file.ok || !file.text) continue;
-        const header = parseSkillHeader(file.text);
+        // read_files returns "===== path =====\\n1: content"; strip the wrapper and line numbers.
+        const lines = file.text.split("\n");
+        const body = lines.slice(1).map((line) => line.replace(/^\d+: /, "")).join("\n");
+        const header = parseSkillHeader(body);
+        console.log("DEBUG header=", header);
         if (header) skills.push({ ...header, path });
       }
       this._all = skills;

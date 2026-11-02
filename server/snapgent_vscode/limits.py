@@ -4,8 +4,8 @@ IGNORED_DIRECTORIES = frozenset({
     ".git", ".hg", ".svn", ".venv", "venv", "node_modules",
     "__pycache__", ".pytest_cache", ".mypy_cache", ".next", "dist", "build",
 })
-MAX_RESULTS = 500
-MAX_FILE_CHARS = 100_000
+MAX_RESULTS = 2000
+MAX_FILE_CHARS = 200_000
 MAX_FILES_PER_READ = 50
 MAX_LINES_PER_READ = 1000
 MAX_TREE_DEPTH = 8

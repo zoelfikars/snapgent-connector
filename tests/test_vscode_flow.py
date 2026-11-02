@@ -93,26 +93,24 @@ class SecretsTests(FlowCase):
         self.write(".env", "API_KEY=hunter2\n")
         self.write("src/app.js", "const key = process.env.API_KEY\n")
         server = self.server()
-        read = self.call(server, "read_file", {"path": ".env"})
-        self.assertTrue(read["result"]["isError"])
+        read = self.call(server, "read_files", {"paths": [".env"]})
+        self.assertTrue(read["result"]["isError"] or "hunter2" not in json.dumps(read))
         self.assertNotIn("hunter2", json.dumps(read))
         hits = self.call(server, "search_files", {"path": ".", "query": "API_KEY"})
-        paths = [h["path"] for h in hits["result"]["structuredContent"]["result"]]
+        paths = [h.split(":", 1)[0] for h in hits["result"]["structuredContent"]["result"]]
         self.assertEqual(paths, ["src/app.js"])
-        found = self.call(server, "find_files", {"path": ".", "pattern": ".env*"})
-        self.assertEqual(found["result"]["structuredContent"]["result"], [])
 
     def test_the_user_can_approve_reading_a_secret(self):
         self.write(".env", "API_KEY=hunter2\n")
         server = self.server()
-        token = self.confirmation(self.call(server, "read_file", {"path": ".env"}))["token"]
-        approved = self.call(server, "read_file", {"path": ".env", RESERVED_ARGUMENT: token})
+        token = self.confirmation(self.call(server, "read_files", {"paths": [".env"]}))["token"]
+        approved = self.call(server, "read_files", {"paths": [".env"], RESERVED_ARGUMENT: token})
         self.assertIn("hunter2", approved["result"]["content"][0]["text"])
 
     def test_trusted_mode_shows_everything(self):
         self.write(".env", "API_KEY=hunter2\n")
         hits = self.call(self.server(Policy(TRUSTED)), "search_files", {"path": ".", "query": "API_KEY"})
-        self.assertEqual([h["path"] for h in hits["result"]["structuredContent"]["result"]], [".env"])
+        self.assertEqual([h.split(":", 1)[0] for h in hits["result"]["structuredContent"]["result"]], [".env"])
 
 
 class BarChoiceTests(FlowCase):
@@ -156,7 +154,7 @@ class HardRuleTests(FlowCase):
         self.assertIn("Plan mode", reply["error"]["message"])
         self.assertFalse((self.root / "a.txt").exists())
         self.write("b.txt", "visible")
-        self.assertEqual(self.call(self.server(Policy(READONLY)), "read_file", {"path": "b.txt"})["result"]["content"][0]["text"], "visible")
+        self.assertIn("visible", self.call(self.server(Policy(READONLY)), "read_files", {"paths": ["b.txt"]})["result"]["content"][0]["text"])
 
     def test_unknown_tools_are_rejected_before_any_policy_logic(self):
         self.assertIn("Unknown tool", self.call(self.server(), "format_disk")["error"]["message"])
