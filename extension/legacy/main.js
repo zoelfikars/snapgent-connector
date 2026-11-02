@@ -1390,7 +1390,7 @@
 
       const syncTheme = () => ZSUi.applyTheme(document);
       syncTheme();
-      setInterval(syncTheme, 2000); // follow the host page toggling its theme
+      setInterval(syncTheme, 4000); // follow the host page toggling its theme
       renderBar();
       placeBar(); // start the per-frame anchoring loop
     }
@@ -2045,7 +2045,7 @@
   // the first tool result after a reload already knows the real tally.
   sysTally.hydrate();
   bg({ type: "status" }).then(onStatus);
-  statusTimer = setInterval(() => bg({ type: "status" }).then(onStatus), 5000);
+  statusTimer = setInterval(() => bg({ type: "status" }).then(onStatus), 10000);
 
   // Session state is derived from the ACTUAL chat and remembered per conversation (src/application/session-tracker.js).
   const { SessionTracker, textShowsSession } = ZSApp;
@@ -2147,7 +2147,7 @@
   mo.observe(document.documentElement, { childList: true, subtree: true });
   // Belt-and-braces: a low-frequency sweep regardless of tab visibility or
   // mutation timing, so camouflage always converges.
-  setInterval(scheduleSweep, 1500);
+  setInterval(scheduleSweep, 2500);
   // When the user returns to the tab, immediately refresh camouflage/state.
   document.addEventListener("visibilitychange", () => { if (!document.hidden) scheduleSweep(); });
   // The provider swapped (a site profile was stored or removed): redraw the bar and re-read the page now.
