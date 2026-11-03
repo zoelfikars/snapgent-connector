@@ -15,6 +15,13 @@ All notable changes to snapgentV3 Free are documented here.
 - `scripts/package_release.py` assembles the release zip (tested).
 
 ### Fixed
+- **A command's output kept its start and lost its end.** Output beyond the limit is now cut in the middle (head + tail) with a note of
+  how much was left out, because a failing build says why at the end. stderr is kept next to stdout (it was dropped whenever stdout
+  had anything), and `read_files` cuts even its first file to the budget it is given.
+- **Only the first command of a reply was read.** The parser stopped at the first JSON command, so a second one in the same reply was
+  dropped without a word. Every command is now read, in order.
+- **A reply with a "thinking" section was read from its thoughts.** A turn holds the reply-body selector twice (the thoughts, then the
+  answer) and the first match was taken, so a command in the answer was never seen. The last match is taken now.
 - **A long tool call no longer makes the bridge look offline.** The bridge handled one request at a time per connection, so a
   minute-long command (a docker build) left the extension's pings unanswered; the extension then dropped the socket and told the
   model the bridge was unreachable. Each request now runs on its own task.
@@ -22,6 +29,24 @@ All notable changes to snapgentV3 Free are documented here.
 - The bridge's terminal shows only where it listens, the approval question and fatal errors; everything else is in `logs/bridge_debug.log`.
 
 ### Added
+- **Several commands in one reply.** They run in order and are answered with ONE message (fewer turns, so fewer requests). A failure, an
+  image result or a stop ends the batch and the rest is listed as `NOT RUN` so the model can send it again. The composer cover says
+  which command is running (`Running 2/4 · run_command · command: sleep`).
+- **One size limit per message**, set with a slider in the toolbar popup (20k to 400k characters, 100k by default; a site that refuses a
+  message as too long lowers it for that site). The command reminder and a re-stated system prompt count too. Each command in a batch gets
+  a share of what is left, tools that can limit their own output do (`read_files` lists the files that did not fit), and a message that
+  is still too big is trimmed in the middle. A toast suggests a new chat when a conversation has sent a lot.
+- **`get_command_output`**: the cut part of a command's output stays on the server under a `run_id` (the last 20 runs) and can be read
+  by line range without running the command again.
+- **Commands are jobs.** The extension names each command (batch id + place + content) and the VS Code server keeps it under that name.
+  If the page is reloaded in the middle of a batch, the reply is run again under the same name: what already ran is answered from the
+  server, a command still running is waited for, the rest runs. **Stop** now ends the process (and what it started) instead of only
+  giving up waiting. The server answers several requests at once so a running job can be asked about or cancelled. Reading tools are
+  not kept (they are cheap to repeat and should show fresh data). A restart of the bridge or the server clears the record.
+- **Stop while the bar is hidden**: a Stop button appears on top of the show/hide button (under it when the bar sits in the top corner).
+- **The project tree and the command list reach the model at the start.** If the model answers the start prompt in plain words instead of
+  asking for the command list, the extension fetches it and sends it together with the tree (within the size limit).
+- Start diagnostics (`start.*`, `send.*`, `resume.skip`, `loop.crash` in the `[zs-diag]` log) say why a session did not begin or a reply was not run.
 - **Choose the workspace in the bar**: a pill beside the mode pill. *Auto* (default) follows VS Code's active window as before; the menu
   also lists every folder VS Code has open, and **Choose a folder…** opens the system's own folder window (through the desktop portal, zenity, kdialog, PowerShell or osascript), so no path is copied by hand; a box for typing a path only appears when the machine has no folder window. The bridge keeps
   the chosen folder until it is changed or the bridge restarts. The root folder or a whole drive is refused.

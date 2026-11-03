@@ -609,7 +609,34 @@
     },
   };
 
+  // The id of the batch being run for a reply, kept across a page reload: the reply is run again after one, and under the
+  // same id the VS Code server answers the commands that already ran instead of running them twice (see BatchRunner).
+  // It is dropped when the batch is answered or stopped, so running the same reply later is a new batch.
+  const BATCHES_KEY = "zsBatches";
+  const BATCH_LIFETIME_MS = 15 * 60 * 1000;
+  const batchKey = (item) => `${P.conversationKey() || "new"}|${turnKey(item)}`;
+  const readBatches = () => new Promise((resolve) => {
+    try { chrome.storage.local.get(BATCHES_KEY, (r) => resolve((r && r[BATCHES_KEY]) || {})); } catch { resolve({}); }
+  });
+  const writeBatches = (all) => { try { chrome.storage.local.set({ [BATCHES_KEY]: all }); } catch {} };
+  const batchJobs = {
+    async begin(item) {
+      const now = Date.now();
+      const all = Object.fromEntries(Object.entries(await readBatches()).filter(([, batch]) => now - batch.at < BATCH_LIFETIME_MS));
+      const key = batchKey(item);
+      if (!all[key]) all[key] = { id: `${now.toString(36)}${Math.random().toString(36).slice(2, 8)}`, at: now };
+      writeBatches(Object.fromEntries(Object.entries(all).slice(-50)));
+      return all[key].id;
+    },
+    async end(item) {
+      const all = await readBatches();
+      delete all[batchKey(item)];
+      writeBatches(all);
+    },
+  };
+
   const loop = new AgentLoop({
+    jobs: batchJobs,
     budget: messageBudget,
     chat: loopChat,
     view: loopView,
@@ -1168,7 +1195,7 @@
   const ui = (() => {
     let renderMode = () => {};
     let pinnedWorkspace = null;
-    let toggleEl, root, bar, stateEl, actionBtn, stopBtn, targetSelect, switchBtn, menuEl, unstableEl, notifications;
+    let toggleEl, stopFloatEl, root, bar, stateEl, actionBtn, stopBtn, targetSelect, switchBtn, menuEl, unstableEl, notifications;
     let targetBtn, targetMenuEl;
     let barRaf;
     let openMenuFn = null; // set by build(); lets the popup force the panel open via runtime message
@@ -1224,6 +1251,7 @@
           ${ZSUi.pillHtml({ id: "zs-target-btn", nameId: "zs-target-name", label: "Choose MCP target", title: "Choose which MCP server receives commands", popup: "listbox" })}
           ${ZSUi.pillHtml({ id: "zs-switch", nameId: "zs-switch-name", label: "Switch AI and options", title: "Switch AI and options" })}
         </div>
+        <button id="zs-stop-float" type="button" hidden>■ Stop</button>
         <button id="zs-toggle" type="button" aria-label="Show or hide snapgent"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></button>
         <div id="zs-menu" hidden></div>
         <div id="zs-target-menu" hidden></div>
@@ -1416,6 +1444,8 @@
 
       actionBtn.addEventListener("click", onActionClick);
       stopBtn.addEventListener("click", stopLoop);
+      stopFloatEl = root.querySelector("#zs-stop-float");
+      stopFloatEl.addEventListener("click", (e) => { e.stopPropagation(); stopBtn.click(); }); // the same Stop, reachable while the bar is hidden
       unstableEl = root.querySelector("#zs-unstable");
       if (unstableEl) {
         // Set the native tooltip via PROPERTY, not the HTML template: the warning
@@ -1814,7 +1844,7 @@
 
     // Where the bar goes on the page (inline in the composer, anchored above it, floating, or hidden): src/ui/bar-placer.js.
     const barPlacer = ZSUi.createBarPlacer({
-      document, provider: P, prefs: () => barPrefs, parts: () => ({ bar, root, menuEl, unstableEl, toggleEl }), positionMenu,
+      document, provider: P, prefs: () => barPrefs, parts: () => ({ bar, root, menuEl, unstableEl, toggleEl, stopEl: stopBtn, stopFloatEl }), positionMenu,
     });
     function placeBar() {
       barRaf = requestAnimationFrame(placeBar); // scheduled first, so a throw below cannot stop the loop

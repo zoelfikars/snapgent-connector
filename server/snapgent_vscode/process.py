@@ -1,9 +1,11 @@
 """Running child processes with bounded output and time."""
 
+import os
 import subprocess
 from pathlib import Path
 from typing import List, Optional
 
+from .jobs import CANCELLED_MESSAGE, current_job, stop_process
 from .limits import COMMAND_OUTPUT_CHARS, COMMAND_TIMEOUT_SECONDS, MAX_OUTPUT_CHARS
 from .outputs import CACHE
 
@@ -29,23 +31,36 @@ def compact(output: str, limit: int, run_id: str) -> str:
 
 def run_process(command: List[str], cwd: Path, timeout: int = COMMAND_TIMEOUT_SECONDS,
                 max_output_chars: Optional[int] = None) -> str:
-    """Run without a shell. Returns trimmed output; a non-zero exit becomes a RuntimeError with that output."""
+    """Run without a shell. Returns trimmed output; a non-zero exit becomes a RuntimeError with that output.
+    When it runs for a job, the job can stop it (and what it started) at any time."""
+    job = current_job()
+    group = {"start_new_session": True} if os.name != "nt" else {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)}
+    process = subprocess.Popen(
+        command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
+        errors="replace", shell=False, **group,
+    )
+    if job:
+        job.attach(process)
     try:
-        result = subprocess.run(
-            command, cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace",
-            shell=False, timeout=timeout, check=False,
-        )
+        stdout, stderr = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired as error:
+        stop_process(process)
+        process.communicate()
         raise RuntimeError(
             f"The command was stopped after {timeout} seconds without finishing. It may still be needed: "
             "run long jobs detached or in smaller steps (for example start a build in the background and check on it)."
         ) from error
-    stdout, stderr = result.stdout.strip(), result.stderr.strip()
+    finally:
+        if job:
+            job.detach(process)
+    if job and job.cancelled:
+        raise RuntimeError(CANCELLED_MESSAGE)
+    stdout, stderr = stdout.strip(), stderr.strip()
     # Both streams: a failing build prints its reason on stderr even when stdout is not empty.
     output = f"{stdout}\n[stderr]\n{stderr}" if stdout and stderr else (stdout or stderr or "(no output)")
     limit = clamp_chars(max_output_chars)
     if len(output) > limit:
-        output = compact(output, limit, CACHE.store(" ".join(command), result.returncode, output))
-    if result.returncode:
-        raise RuntimeError(f"Command exited with status {result.returncode}:\n{output}")
+        output = compact(output, limit, CACHE.store(" ".join(command), process.returncode, output))
+    if process.returncode:
+        raise RuntimeError(f"Command exited with status {process.returncode}:\n{output}")
     return output

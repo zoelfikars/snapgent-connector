@@ -11,7 +11,7 @@
 //   5. shape the result for the model          -> domain/tools/result-feedback
 
 import { FEEDBACK } from "../domain/prompt/feedback.js";
-import { MODE_ARGUMENT, RESERVED_ARGUMENT, declinedFeedback, needsApproval, unavailableFeedback, withoutReserved } from "../domain/tools/confirmation.js";
+import { JOB_ARGUMENT, JOB_OP_ARGUMENT, MODE_ARGUMENT, RESERVED_ARGUMENT, declinedFeedback, needsApproval, unavailableFeedback, withoutReserved } from "../domain/tools/confirmation.js";
 import { isolationError } from "../domain/tools/isolation.js";
 import { toFeedback } from "../domain/tools/result-feedback.js";
 import { LIST_SERVERS, isListCommands, renderCommandList, renderServerList } from "../domain/tools/virtual-commands.js";
@@ -49,9 +49,10 @@ export class ToolRunner {
 
   /**
    * @param {{ tool: string, arguments?: object }} call
-   * @param {{ budgetChars?: number }} [options]  the most output the model may be sent for this call
+   * @param {{ budgetChars?: number, jobKey?: string }} [options]  the most output the model may be sent for this call;
+   *   the name the VS Code server knows the call by (the same call again is answered, not run twice; Stop cancels it)
    */
-  async run(call, { budgetChars } = {}) {
+  async run(call, { budgetChars, jobKey } = {}) {
     const name = call.tool;
     const args = call.arguments || {};
     if (!name) return FEEDBACK.parseError("malformed");
@@ -72,7 +73,7 @@ export class ToolRunner {
     if (!this._catalogue.names().size) await this._catalogue.ensure();
     if (!this._catalogue.knows(name)) return FEEDBACK.unknownTool(name, [...this._catalogue.names()]);
 
-    return this._execute(name, this._withBudget(name, withoutReserved(args), budgetChars), target);
+    return this._execute(name, this._withBudget(name, withoutReserved(args), budgetChars), target, jobKey);
   }
 
   /**
@@ -110,9 +111,9 @@ export class ToolRunner {
     });
   }
 
-  _callBridge(name, args, target) {
-    // The VS Code server applies the bar's choice (plan / manual / auto); other servers know nothing of it.
-    const sent = target === "vscode" ? { ...args, [MODE_ARGUMENT]: this._approvalMode() } : args;
+  _callBridge(name, args, target, jobKey) {
+    // The VS Code server applies the bar's choice (plan / manual / auto) and keeps the call under its job key; other servers know nothing of either.
+    const sent = target === "vscode" ? { ...args, [MODE_ARGUMENT]: this._approvalMode(), ...(jobKey ? { [JOB_ARGUMENT]: jobKey } : {}) } : args;
     return callWithGuards(
       () => this._bridge.callTool({ name, arguments: sent, timeout: this._timeoutMs, server: target }),
       { timeoutMs: this._timeoutMs, isStopped: () => this._session.isStopped(), timers: this._timers },
@@ -127,15 +128,22 @@ export class ToolRunner {
     return approved ? null : declinedFeedback(confirmation.description);
   }
 
-  async _execute(name, args, target) {
-    let result = await this._callBridge(name, args, target);
-    if (result && result.kind === "stopped") return "(stopped by user)";
+  /** Stop only abandons the wait: the command itself keeps running on the machine unless the server is told to end it. */
+  _cancelJob(name, target, jobKey) {
+    if (!jobKey || target !== "vscode") return;
+    const cancel = { [JOB_ARGUMENT]: jobKey, [JOB_OP_ARGUMENT]: "cancel", [MODE_ARGUMENT]: this._approvalMode() };
+    Promise.resolve(this._bridge.callTool({ name, arguments: cancel, timeout: 5000, server: target })).catch(() => {});
+  }
+
+  async _execute(name, args, target, jobKey) {
+    let result = await this._callBridge(name, args, target, jobKey);
+    if (result && result.kind === "stopped") { this._cancelJob(name, target, jobKey); return "(stopped by user)"; }
     if (needsApproval(result)) {
       const refusal = await this._askUser(result.confirmation);
       if (refusal) return refusal;
       // Repeat the very same call, now carrying the one-time token only the extension was given.
-      result = await this._callBridge(name, { ...args, [RESERVED_ARGUMENT]: result.confirmation.token }, target);
-      if (result && result.kind === "stopped") return "(stopped by user)";
+      result = await this._callBridge(name, { ...args, [RESERVED_ARGUMENT]: result.confirmation.token }, target, jobKey);
+      if (result && result.kind === "stopped") { this._cancelJob(name, target, jobKey); return "(stopped by user)"; }
     }
 
     const feedback = toFeedback(result, {

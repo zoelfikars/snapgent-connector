@@ -8,6 +8,7 @@ arguments, for a short time. A model cannot guess one (128 random bits).
 
 import json
 import secrets
+import threading
 import time
 from typing import Any, Callable, Dict, Tuple
 
@@ -27,17 +28,20 @@ class ConfirmationStore:
         self._clock = clock
         self._make_token = token_factory
         self._pending: Dict[str, Tuple[str, float]] = {}
+        self._lock = threading.Lock()  # calls are answered on several threads
 
     def issue(self, tool: str, arguments: Dict[str, Any]) -> str:
-        self._expire()
-        token = self._make_token()
-        self._pending[token] = (fingerprint(tool, arguments), self._clock() + TOKEN_LIFETIME_SECONDS)
-        return token
+        with self._lock:
+            self._expire()
+            token = self._make_token()
+            self._pending[token] = (fingerprint(tool, arguments), self._clock() + TOKEN_LIFETIME_SECONDS)
+            return token
 
     def redeem(self, token: Any, tool: str, arguments: Dict[str, Any]) -> bool:
         """True exactly once per token, for the call it was issued for."""
-        self._expire()
-        entry = self._pending.pop(token, None) if isinstance(token, str) else None
+        with self._lock:
+            self._expire()
+            entry = self._pending.pop(token, None) if isinstance(token, str) else None
         return entry is not None and entry[0] == fingerprint(tool, arguments)
 
     def _expire(self) -> None:

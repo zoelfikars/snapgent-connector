@@ -24,6 +24,20 @@ export function toggleGeometry(viewport, corner) {
 }
 
 /**
+ * The Stop button that stands in for the hidden bar: right on top of the show/hide button (bottom corner), or right
+ * under it (top corner), its right edge in line with the button's.
+ * @returns {{ left: number, top: number }}
+ */
+export function floatingStopGeometry(viewport, size, corner) {
+  const t = toggleGeometry(viewport, corner);
+  const height = size.height || 32;
+  return {
+    left: Math.round(viewport.width - MARGIN - (size.width || 90)),
+    top: corner === "top" ? t.top + TOGGLE + TOGGLE_GAP : Math.max(4, t.top - TOGGLE_GAP - height),
+  };
+}
+
+/**
  * The bar, a narrow column above the button (bottom corner) or below it (top corner), its right edge in line with the button's.
  * @returns {{ left: number, top: number, maxHeight: number }}
  */

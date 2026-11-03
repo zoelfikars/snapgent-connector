@@ -1107,6 +1107,16 @@ html.zs-light #zs-mcp-status { color: #6b7280; }
   cursor: pointer;
 }
 #zs-toggle:hover { background: rgba(40, 40, 56, 0.98); }
+/* Stop, standing in for the hidden bar: on top of the show/hide button (placed by bar-placer.js). */
+#zs-stop-float {
+  position: fixed; display: inline-flex; align-items: center; justify-content: center;
+  height: 32px; padding: 0 14px; box-sizing: border-box; white-space: nowrap;
+  background: #eab308; color: #000; border: 1px solid rgba(234, 179, 8, 0.75); border-radius: 18px;
+  font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+#zs-stop-float[hidden] { display: none; }
+#zs-stop-float:hover { background: #facc15; }
+#zs-stop-float[data-state="stopping"] { cursor: progress; opacity: 0.6; }
 html.zs-light #zs-toggle { background: rgba(255, 255, 255, 0.97); color: #3730a3; }
 
 /* ── the bar is a narrow column in the corner (overrides the older horizontal layout above) ── */
