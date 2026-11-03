@@ -3,7 +3,7 @@
 // their own context; the model then keeps the gist of the task but forgets that an
 // extension runs its commands. A periodic re-statement fixes that. Pure rules only.
 
-import { SYS_MARKER } from "../constants.js";
+import { LEGACY_SESSION_MARKER, SESSION_PHRASE } from "../constants.js";
 import { isInjectedFeedback } from "../parser/detect.js";
 
 /** Injected tool results measure context VOLUME, which is what makes a site summarise. */
@@ -18,17 +18,13 @@ export function isResendDue({ users, results }, { everyUsers, everyResults = RES
 /** Does the rider fit in the site's send budget alongside the result it rides on? */
 export const fitsBudget = (resultLength, riderLength, cap = Infinity) => resultLength + riderLength <= cap;
 
-/** The passenger appended to a tool result. Clearly framed as automatic, not a request. */
+/** The passenger appended to a tool result: the instructions again, framed as a reminder and not a request. */
 export function buildResendRider(prompt) {
   return (
-    "\n\n────────────────────────────────\n" +
-    "(System note from snapgentV3 - an automatic re-statement of your operating " +
-    "instructions, NOT a new request and NOT something to reply to. This conversation " +
-    "may have been summarised, which drops the part explaining how you actually run " +
-    "commands. To be explicit: the snapgentV3 extension IS running in this page right " +
-    "now, it DOES read your replies, and the commands below DO execute for real - the " +
-    "results you have been receiving are proof of it. Keep using them exactly as " +
-    "described. Just carry on with the task; do not acknowledge this note.)\n" +
+    "\n\n---\n" +
+    "(A reminder from me, not a new request: there is nothing to answer here. In a long conversation this can get lost, so here is how we are working " +
+    "together once more. The commands do run on my machine, and what they return is what you have been getting from me. Just carry on with the task; " +
+    "do not acknowledge this note.)\n\n" +
     prompt
   );
 }
@@ -45,7 +41,7 @@ export function countSinceLastMarker(length, itemAt) {
   let results = 0;
   for (let i = length - 1; i >= 0; i--) {
     const { text, isUser } = itemAt(i);
-    if (text.includes(SYS_MARKER)) break;
+    if (text.includes(SESSION_PHRASE) || text.includes(LEGACY_SESSION_MARKER)) break;
     if (!isUser) continue;
     if (isInjectedFeedback(text)) results++;
     else users++;

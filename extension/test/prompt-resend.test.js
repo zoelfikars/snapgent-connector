@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { SYS_MARKER } from "../src/domain/constants.js";
+import { SESSION_PHRASE } from "../src/domain/constants.js";
 import { buildResendRider, countSinceLastMarker, fitsBudget, isResendDue } from "../src/domain/prompt/resend.js";
 import { SysTally } from "../src/application/sys-tally.js";
 import { PromptResender } from "../src/application/prompt-resender.js";
@@ -27,7 +27,7 @@ describe("resend rules", () => {
   test("counting stops at the newest marker turn and separates typed turns from injected results", () => {
     const items = [
       { text: "old typed", isUser: true },
-      { text: `${SYS_MARKER} prompt`, isUser: true },
+      { text: `proj ${SESSION_PHRASE}. prompt`, isUser: true },
       { text: "hello", isUser: true },
       { text: "assistant words", isUser: false },
       { text: "» read_file\nx", isUser: true },
@@ -131,7 +131,7 @@ describe("PromptResender", () => {
     const { resender, tally, sent, diags } = setup();
     for (let i = 0; i < 12; i++) resender.bump("results");
     const out = resender.attach("result");
-    assert.ok(out.startsWith("result") && out.includes("re-statement") && out.endsWith("SYS"));
+    assert.ok(out.startsWith("result") && out.includes("A reminder from me") && out.endsWith("SYS"));
     assert.deepEqual(tally.counts(), { users: 0, results: 0 });
     assert.deepEqual(sent, [42]);
     assert.ok(diags.some(([e, d]) => e === "sys.resend" && d.via === "toolResult"));

@@ -88,6 +88,12 @@ All notable changes to snapgentV3 Free are documented here.
   stop workarounds, per-site badges and mode warnings.
 
 ### Changed
+- **The start is one message, and it reads like a person wrote it.** It opens with the project ("snapgent-connector is your current workspace. It is at
+  /home/… and it is a git repository…") instead of a `⟦ZS-SYS⟧` tag and a "CONTEXT:" line, and it already holds what the model used to ask for one
+  command at a time: the command list, the workspace the user chose and the project tree. The model's whole part is to answer "understood", so a
+  start costs one turn instead of two or three (and a site that checks git status or lists files on its own has nothing left to do). A conversation is
+  now recognised as a session by the words "is your current workspace" (the old tag is still recognised in chats started with it), and the reminder that
+  re-states the instructions is worded the same way.
 - **Results are headed `» name`** instead of `Output of 'name':`, so they read as plain text rather than as a protocol. Chats started with
   the old wording are still recognised (session detection and the system-prompt budget).
 - **The extension is rebuilt as layers** (`domain`, `application`, `infrastructure`, `ui`, `page`) with ONE content script,

@@ -3,7 +3,7 @@
 
 import { MessageSender, ResponseWatcher } from "../application/index.js";
 import { describeAnchor } from "../infrastructure/chat/index.js";
-import { SYS_MARKER } from "../domain/constants.js";
+import { SESSION_PHRASE } from "../domain/constants.js";
 import { sleep, waitFor } from "./visibility.js";
 
 /**
@@ -15,12 +15,12 @@ export function createChat({ document, provider, state, visibility, catalogue, d
   const optional = (name) => (typeof provider[name] === "function" ? (...args) => provider[name](...args) : undefined);
 
   // What the page looks like, for the log when the engine cannot find what it expects: the element chains around text we KNOW
-  // is there (our marker, the model's command) are what is needed to teach a new page layout.
+  // is there (our own words, the model's command) are what is needed to teach a new page layout.
   const describeLayout = () => ({
     provider: provider.id,
     users: provider.userCount(),
     assistants: provider.assistantCount(),
-    markerChain: describeAnchor(document, SYS_MARKER),
+    markerChain: describeAnchor(document, SESSION_PHRASE),
     replyChain: describeAnchor(document, '"command"'),
   });
 

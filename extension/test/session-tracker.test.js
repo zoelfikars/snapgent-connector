@@ -2,7 +2,7 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { SessionTracker, textShowsSession } from "../src/application/session-tracker.js";
 
-const MARK = "⟦ZS-SYS⟧";
+const MARK = "is your current workspace";
 
 async function tracker(saved) {
   const writes = [];
@@ -15,7 +15,8 @@ const facts = (over = {}) => ({ starting: false, startingKey: null, running: fal
 
 describe("textShowsSession", () => {
   test("the marker, an injected result and a system note are session signals", () => {
-    assert.equal(textShowsSession(`${MARK} hello`, MARK), true);
+    assert.equal(textShowsSession(`proj ${MARK}. hello`, MARK), true);
+    assert.equal(textShowsSession("⟦ZS-SYS⟧ hello", MARK), true, "the tag older versions started with");
     assert.equal(textShowsSession("intro\n» read_file\nbody", MARK), true);
     assert.equal(textShowsSession("intro\nOutput of 'read_file':\nbody", MARK), true, "the older wording");
     assert.equal(textShowsSession("(System note: the reply was cut off.)", MARK), true);

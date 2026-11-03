@@ -1,7 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { SessionStarter } from "../src/application/session-starter.js";
-import { checkStartPreconditions, handshakeUnavailable, isHandshake, probeSucceeded } from "../src/domain/agent/session-start.js";
+import { checkStartPreconditions, handshakeUnavailable, probeSucceeded } from "../src/domain/agent/session-start.js";
 
 const tool = (name) => ({ name });
 const WORKSPACE = { title: "VS Code workspace required", text: "Open a project folder in VS Code, then try again." };
@@ -22,7 +22,8 @@ function setup(over = {}) {
     catalogue: { ensure: async (force) => log.push(`ensure:${force}`), active: () => state.tools },
     callTool: async (name, args, timeout) => { log.push(`probe:${name}:${JSON.stringify(args)}:${timeout}`); return state.probe; },
     skills: { load: async () => log.push("skills.load") },
-    systemPrompt: () => "PROMPT",
+    workspace: { refresh: async () => log.push("workspace") },
+    startMessage: ({ commands, tree }) => `START|${commands}|${tree}`,
     chat: {
       submit: async (text) => { log.push(`submit:${text.slice(0, 12)}`); return `base${log.length}`; },
       next: async () => { log.push("next"); const r = queue.shift(); if (!r) throw new Error("no scripted reply"); return typeof r === "function" ? r(state) : r; },
@@ -39,25 +40,43 @@ function setup(over = {}) {
   return { starter: new SessionStarter(deps), log, state };
 }
 
-const handshakeTurn = { kind: "tool", item: { id: "x" }, calls: [{ tool: "list_commands" }] };
-const ready = { kind: "text", text: "ready" };
+const ready = { kind: "text", text: "understood" };
 const banners = (log) => log.filter((e) => Array.isArray(e) && e[0] === "banner");
 
 describe("SessionStarter", () => {
-  test("happy path: prompt, handshake, ready -> started", async () => {
-    const t = setup({ state: { responses: [handshakeTurn, ready] } });
+  test("happy path: one message with everything in it, one answer -> started", async () => {
+    const t = setup({ state: { responses: [ready] } });
     await t.starter.start();
     assert.deepEqual(t.log.filter((e) => typeof e === "string" && !e.startsWith("diag")), [
-      "begin", "ensure:true", `probe:tree:{"path":"."}:5000`, "skills.load", "submit:PROMPT", "next",
-      "run:list_commands", "submit:» list_comma", "next", "markStarted", "toast:Agent on.", "end:true",
+      "begin", "ensure:true", `probe:tree:{"path":"."}:5000`, "skills.load", "workspace", "run:list_commands",
+      "submit:START|vscode", "next", "markStarted", "toast:Agent on.", "end:true",
     ]);
   });
 
-  test("a model that skips the handshake still starts, and is handed the command list", async () => {
-    const t = setup({ state: { responses: [ready, ready] } });
+  test("the model is never asked to fetch anything: the command list is run here and goes into the message", async () => {
+    const t = setup({ state: { responses: [ready], handshakeFeedback: "» list_commands\nvscode commands (2):\n\nread_files" } });
+    const submitted = [];
+    t.starter._d.chat.submit = async (text) => { submitted.push(text); return "base"; };
     await t.starter.start();
-    assert.ok(t.log.includes("markStarted"));
-    assert.ok(t.log.includes("run:list_commands"));
+    assert.equal(submitted.length, 1);
+    assert.ok(submitted[0].startsWith("START|vscode commands (2):"), "the result's header line is not part of the message");
+    assert.ok(!submitted[0].includes("»"));
+  });
+
+  test("the project tree goes into the message, cut to its share, when the start is given a budget", async () => {
+    const t = setup({ state: { responses: [ready], probe: { ok: true, text: "root\n" + "x\n".repeat(30000) } }, deps: { initialContext: { limit: () => 10000 } } });
+    const submitted = [];
+    t.starter._d.chat.submit = async (text) => { submitted.push(text); return "base"; };
+    await t.starter.start();
+    assert.ok(submitted[0].length < 5000 && submitted[0].includes("omitted"));
+  });
+
+  test("a list that says the target is offline stops the start with a banner and sends nothing", async () => {
+    const t = setup({ state: { handshakeFeedback: "» list_commands\nNo commands available - offline" } });
+    await t.starter.start();
+    assert.deepEqual(banners(t.log)[0].slice(1), ["VS Code unavailable", "Is the server online?"]);
+    assert.ok(!t.log.some((e) => String(e).startsWith("submit")));
+    assert.ok(!t.log.includes("markStarted"));
   });
 
   test("does nothing while another start/loop is running", async () => {
@@ -92,14 +111,8 @@ describe("SessionStarter", () => {
     assert.deepEqual(banners(t.log)[0].slice(1), ["VS Code tools unavailable", "Is the server online?"]);
   });
 
-  test("an unavailable target is still reported to the model", async () => {
-    const t = setup({ state: { responses: [handshakeTurn, ready], handshakeFeedback: "» list_commands\nNo commands available - offline" } });
-    await t.starter.start();
-    assert.ok(t.log.includes("submit:» list_comma"));
-  });
-
   test("superseded mid-way: stops quietly, never marks started, and end() is told it is not alive", async () => {
-    const t = setup({ state: { responses: [() => { t.state.superseded = true; return handshakeTurn; }] } });
+    const t = setup({ state: { responses: [() => { t.state.superseded = true; return ready; }] } });
     await t.starter.start();
     assert.ok(!t.log.includes("markStarted"));
     assert.equal(t.log.at(-1), "end:false");
@@ -130,22 +143,22 @@ describe("SessionStarter", () => {
 
   test("a sent message that is not recognised as a user turn warns and logs the page, but the start continues", async () => {
     const layout = { sentMessageVisible: async () => false, describe: () => ({ chain: ["div[x]"] }) };
-    const t = setup({ state: { responses: [ready, ready] }, deps: { layout } });
+    const t = setup({ state: { responses: [ready] }, deps: { layout } });
     await t.starter.start();
-    assert.deepEqual(banners(t.log)[0].slice(1), ["TestAI page not fully recognised", "Your message was sent but not detected as a user turn, so hiding it may not work."]);
+    assert.deepEqual(banners(t.log)[0].slice(1), ["TestAI page not fully recognised", "Your message was sent but not detected as a user turn."]);
     assert.ok(t.log.includes("diag:layout.sentMissing"));
     assert.ok(t.log.includes("markStarted"));
   });
 
   test("a recognised sent message raises no warning", async () => {
     const layout = { sentMessageVisible: async () => true, describe: () => ({}) };
-    const t = setup({ state: { responses: [ready, ready] }, deps: { layout } });
+    const t = setup({ state: { responses: [ready] }, deps: { layout } });
     await t.starter.start();
     assert.equal(banners(t.log).length, 0);
   });
 
   test("non-vscode targets skip the workspace probe and skills", async () => {
-    const t = setup({ state: { targetId: "other", responses: [ready, ready] } });
+    const t = setup({ state: { targetId: "other", responses: [ready] } });
     await t.starter.start();
     assert.ok(!t.log.some((e) => String(e).startsWith("probe")));
     assert.ok(!t.log.includes("skills.load"));
@@ -161,12 +174,6 @@ describe("start preconditions", () => {
   test("prefixed names still count", () => assert.equal(checkStartPreconditions({ ...base, toolNames: ["vscode/tree"] }), null));
   test("a non-vscode target needs no probe tool", () => assert.equal(checkStartPreconditions({ ...base, target: "x", toolNames: ["foo"] }), null));
   test("probe success", () => { assert.equal(probeSucceeded({ ok: true }), true); assert.equal(probeSucceeded(null), false); });
-  test("handshake detection", () => {
-    assert.equal(isHandshake({ kind: "tool", calls: [{ tool: "list_tools" }] }), true);
-    assert.equal(isHandshake({ kind: "tool", calls: [{ tool: "list_commands" }, { tool: "x" }] }), true);
-    assert.equal(isHandshake({ kind: "tool", calls: [{ tool: "x" }, { tool: "list_commands" }] }), false);
-    assert.equal(isHandshake({ kind: "text" }), false);
-  });
   test("unavailable notes", () => {
     assert.equal(handshakeUnavailable("No commands available - offline"), true);
     assert.equal(handshakeUnavailable("vscode commands (2):"), false);

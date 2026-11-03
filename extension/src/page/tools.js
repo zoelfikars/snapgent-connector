@@ -6,6 +6,7 @@ import { SkillsService, ToolCatalogue, ToolRunner } from "../application/index.j
 import { bareToolName } from "../domain/tools/names.js";
 import { buildSystemPrompt } from "../domain/prompt/system-prompt.js";
 import { toolsReminder } from "../domain/prompt/reminder.js";
+import { withoutResultHeader } from "../domain/tools/result-marker.js";
 import { createConfirmDialog } from "../ui/index.js";
 
 /**
@@ -38,17 +39,28 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
     log: (...args) => console.log("[snapgentV3]", ...args),
   });
 
-  /** The system prompt for this site and these settings: one definition for the start and for any re-statement. */
+  // Which folder the user chose, as the server sees it (the prompt opens with its name).
+  let workspaceInfo = null;
+  const workspace = {
+    async refresh() {
+      const feedback = await runner.run({ tool: "get_workspace_info" });
+      try {
+        const info = JSON.parse(withoutResultHeader(feedback));
+        workspaceInfo = { name: info.name, path: info.path, git: !!info.is_git_repository };
+      } catch { workspaceInfo = null; } // a target without that command: the prompt then speaks of "this folder"
+    },
+  };
+
+  /** The instructions for this workspace and these settings: one definition for the start and for any re-statement. */
   const systemPrompt = () => buildSystemPrompt({
-    siteName: provider.displayName,
-    customPrompt: serverDirectory.customPrompt,
-    targetServer: settings.target(),
+    workspace: workspaceInfo,
     targetName: serverDirectory.name(settings.target()),
+    customPrompt: serverDirectory.customPrompt,
     skills: skills.enabled,
   });
 
   /** The command list the model is reminded of every so often, scoped to the selected target. */
   const reminderText = () => toolsReminder(catalogue.active(), serverDirectory.name(settings.target()), settings.target());
 
-  return { bridge, session, catalogue, confirm, runner, skills, systemPrompt, reminderText };
+  return { bridge, session, catalogue, confirm, runner, skills, workspace, systemPrompt, reminderText };
 }

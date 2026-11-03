@@ -3,7 +3,8 @@
 // conversation (session-tracker), so it survives reloads and virtualised lists that drop the system prompt from the page.
 
 import { SessionStarter, SessionTracker, textShowsSession } from "../application/index.js";
-import { SYS_MARKER } from "../domain/constants.js";
+import { SESSION_PHRASE } from "../domain/constants.js";
+import { buildStartMessage } from "../domain/prompt/start-message.js";
 import { waitFor } from "./visibility.js";
 
 /**
@@ -62,21 +63,22 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
     catalogue: tools.catalogue,
     callTool: (name, args, timeout) => tools.bridge.callTool({ name, arguments: args, timeout }),
     skills: tools.skills,
-    systemPrompt: tools.systemPrompt,
+    workspace: tools.workspace,
+    startMessage: ({ commands, tree }) => buildStartMessage({ prompt: tools.systemPrompt(), commands, tree }),
     chat: chat.turns,
     runner: tools.runner,
     initialContext: { limit },
     view: { toast: bar.toast, banner: bar.banner },
     layout: {
-      // Our prompt must show up as a user turn carrying the marker: that is how the session is recognised later.
-      sentMessageVisible: () => waitFor(() => provider.allItems().some((item) => provider.isUserItem(item) && provider.itemText(item).includes(SYS_MARKER)), 5000),
+      // Our message must show up as a user turn carrying its own words: that is how the session is recognised later.
+      sentMessageVisible: () => waitFor(() => provider.allItems().some((item) => provider.isUserItem(item) && provider.itemText(item).includes(SESSION_PHRASE)), 5000),
       describe: chat.describeLayout,
     },
     isStopped: () => state.stop,
     diag,
   });
 
-  const markerInDom = () => provider.allItems().some((item) => textShowsSession(item.textContent || "", SYS_MARKER));
+  const markerInDom = () => provider.allItems().some((item) => textShowsSession(item.textContent || "", SESSION_PHRASE));
 
   /** Reconcile the flags with the conversation now on screen. Called on every page change. */
   function sync() {

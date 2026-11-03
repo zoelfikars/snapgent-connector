@@ -52,7 +52,7 @@ export function createBar({ document, window, provider, state, settings, serverD
   el.toggle.addEventListener("click", (event) => { event.stopPropagation(); barPrefs.set({ hidden: !prefs.hidden }); });
 
   const group = createMenuGroup();
-  const menus = createBarMenus({ document, root, group, settings, serverDirectory, send, confirm: tools.confirm, catalogue: tools.catalogue, monitor, toast: notifications.toast });
+  const menus = createBarMenus({ document, root, group, settings, serverDirectory, send, confirm: tools.confirm, catalogue: tools.catalogue, workspace: tools.workspace, monitor, toast: notifications.toast });
   const filesMenu = createFilesMenu({ document, root, group, state, settings, files, toast: notifications.toast });
   const siteMenu = createSiteMenu({
     document, window, menu: el.menu, button: $("#zs-switch"), group, provider, settings, serverDirectory, skills: tools.skills, calibration, barPrefs,

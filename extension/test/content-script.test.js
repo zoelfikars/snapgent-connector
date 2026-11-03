@@ -127,7 +127,7 @@ describe("content script on a supported site that is not calibrated yet", () => 
 // A profile stored by the calibration UI switches the same provider script from "not calibrated" to the calibrated engine.
 describe("content script with a stored profile", () => {
   const PAGE = `<html><body>
-    <div class="turn-user">⟦ZS-SYS⟧ hello</div>
+    <div class="turn-user">proj is your current workspace. hello</div>
     <div class="turn-assistant"><pre>{"command":"read_file","params":{"path":"a.js"}}</pre></div>
     <form><div id="box" contenteditable="true" role="textbox"></div><button aria-label="Send prompt"></button></form>
   </body></html>`;

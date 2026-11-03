@@ -7,10 +7,10 @@ import { createPillMenu } from "./pill-menu.js";
 
 /**
  * @param {{ document: Document, root: HTMLElement, group: object, settings: object, serverDirectory: object, send: Function,
- *           confirm: object, catalogue: object, monitor: object, toast: (text: string) => void }} deps
+ *           confirm: object, catalogue: object, workspace: object, monitor: object, toast: (text: string) => void }} deps
  * @returns {{ sync: () => void }} redraw the pills from the current settings
  */
-export function createBarMenus({ document, root, group, settings, serverDirectory, send, confirm, catalogue, monitor, toast }) {
+export function createBarMenus({ document, root, group, settings, serverDirectory, send, confirm, catalogue, workspace, monitor, toast }) {
   const $ = (selector) => root.querySelector(selector);
   const make = (button, menu, width, align, roomAbove, render) => createPillMenu({ document, button: $(button), menu: $(menu), group, width, align, roomAbove, render });
 
@@ -72,6 +72,7 @@ export function createBarMenus({ document, root, group, settings, serverDirector
     monitor.workspaceReady = !!pinned;
     monitor.workspaceProbePending = false;
     catalogue.ensure(true);
+    workspace.refresh();
     toast(pinned ? `Working in ${workspaceLabel(pinned)}` : "Following the active VS Code window");
   }
 

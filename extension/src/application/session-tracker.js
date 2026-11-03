@@ -6,19 +6,20 @@
 // away. "Started" is therefore remembered per conversation key (persisted, so it survives reloads) and
 // only recomputed when the key changes. Pure decisions: the page applies the returned actions.
 
+import { LEGACY_SESSION_MARKER } from "../domain/constants.js";
 import { containsResult } from "../domain/tools/result-marker.js";
 
 const KEY = "zsStartedSessions";
 const REMEMBER_LIMIT = 300;
 
 /**
- * Does this turn's text prove the chat is a session? The system-prompt marker, an injected tool result or a system
+ * Does this turn's text prove the chat is a session? The start message's own words, an injected tool result or a system
  * note do. A bare {"command":...} deliberately does not: a model explaining the format in a plain chat is not a session,
  * and treating it as one executed quoted JSON in a chat with no agent. A command only counts once it RAN, and a run is
  * always followed by our injected result turn, which is caught here.
  */
-export function textShowsSession(text, sysMarker) {
-  return text.includes(sysMarker) || containsResult(text) || text.includes("(System note:");
+export function textShowsSession(text, sessionPhrase) {
+  return text.includes(sessionPhrase) || text.includes(LEGACY_SESSION_MARKER) || containsResult(text) || text.includes("(System note:");
 }
 
 export class SessionTracker {

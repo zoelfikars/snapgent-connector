@@ -2,14 +2,26 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as ZS from "../src/domain/index.js";
 
-const prompt = ZS.buildSystemPrompt({ siteName: "TestAI", targetServer: "vscode", targetName: "VS Code" });
-test("system prompt leads with the session marker", () => assert.ok(prompt.startsWith(ZS.SYS_MARKER)));
-test("system prompt names the target", () => assert.ok(prompt.includes("VS Code") && prompt.includes('server "vscode"')));
+const workspace = { name: "snapgent-connector", path: "/home/me/snapgent-connector", git: true };
+const prompt = ZS.buildSystemPrompt({ workspace, targetName: "VS Code" });
+test("the prompt opens with the project, in plain words and with no tag", () => assert.ok(prompt.startsWith("snapgent-connector is your current workspace.")));
+test("the prompt says where the project is and that it is a git repository", () => assert.ok(prompt.includes("/home/me/snapgent-connector and it is a git repository")));
+test("without a known workspace it speaks of this folder", () => assert.ok(ZS.buildSystemPrompt().startsWith("This folder is your current workspace.")));
+test("the prompt names the target", () => assert.ok(prompt.includes("VS Code")));
+test("the prompt looks like nothing a bot or a system tag would say", () => assert.ok(!/CONTEXT:|ZS-SYS|snapgentV3|extension|━━━|SYSTEM/.test(prompt)));
 test("system prompt carries no Roblox leftovers", () => assert.ok(!/roblox|luau|###LUA/i.test(prompt)));
 
 const custom = ZS.buildSystemPrompt({ customPrompt: "Reply in Indonesian", providerNotes: "site note" });
 test("custom prompt appended last", () => assert.ok(custom.endsWith("Reply in Indonesian")));
 test("provider notes included", () => assert.ok(custom.includes("site note")));
+
+const start = ZS.buildStartMessage({ prompt: "P", commands: "vscode commands (2):\n\nread_files(...)", tree: "root\n└── a.js" });
+test("the start message holds the prompt, the commands and the tree, and asks for a short answer", () => {
+  assert.ok(start.startsWith("P\n\n") && start.includes("read_files(...)") && start.includes("└── a.js"));
+  assert.ok(start.endsWith("I will tell you what I want to do."));
+  assert.match(start, /reply "understood"/);
+});
+test("a start message without a tree leaves that part out", () => assert.ok(!ZS.buildStartMessage({ prompt: "P", commands: "c" }).includes("project looks like")));
 
 const skilled = ZS.buildSystemPrompt({ skills: [{ name: "commit", description: "write commits" }] });
 test("skills listed", () => assert.ok(skilled.includes("- commit: write commits")));
