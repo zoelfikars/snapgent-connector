@@ -8,7 +8,7 @@ export const MIN_PROMPT_CHARS = 20000;
 export const MAX_PROMPT_CHARS = 400000;
 /** A command is only worth running when at least this much room is left for its output. */
 export const MIN_CALL_CHARS = 2000;
-/** The "Output of 'name':" label and separators around each result. */
+/** The name line and separators around each result. */
 export const CALL_OVERHEAD_CHARS = 200;
 /** One reply may carry this many commands; more are reported as not run. */
 export const MAX_BATCH_CALLS = 8;
@@ -44,7 +44,7 @@ export function trimMiddle(text, limit, what = "this message") {
 }
 
 /**
- * One message out of several results. Each result already names its command ("Output of 'x':"), so they are
+ * One message out of several results. Each result already names its command (see result-marker.js), so they are
  * simply stacked; commands that did not run are listed so the model can send them again.
  * @param {string[]} results
  * @param {{ tool: string, why: string }[]} notRun

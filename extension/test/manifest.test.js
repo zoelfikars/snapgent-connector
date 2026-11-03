@@ -21,11 +21,11 @@ describe("site registry", () => {
 });
 
 describe("manifest generation", () => {
-  test("every site gets exactly one content script: core scripts around the one uncalibrated provider", () => {
+  test("every site gets exactly one content script, the same bundle everywhere", () => {
     for (const site of SITES) {
       const entries = chrome.content_scripts.filter((c) => c.matches === site.matches);
       assert.equal(entries.length, 1, site.id);
-      assert.deepEqual(entries[0].js, ["globals.js", "providers/provider.js", "main.js"]);
+      assert.deepEqual(entries[0].js, ["content.js"]);
     }
   });
 

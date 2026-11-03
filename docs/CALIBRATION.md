@@ -4,7 +4,7 @@ Status: **design, agreed in discussion. Phases 0, 1 and 2 are built (see "Phase 
 
 ## Why
 
-Today every supported site has a hand-written adapter (`legacy/providers/*.js`, ~8,000 lines) full of selectors
+Every supported site used to have a hand-written adapter (~8,000 lines, in the git tag `pre-calibration`) full of selectors
 and site quirks. Sites change their markup often (ChatGPT, Gemini and Meta each broke at least once while this
 project was being tidied), and every change means editing code, shipping a release and, for a fork, merging it.
 
@@ -92,15 +92,15 @@ current "unreadable after 15 s" check.
 
 ## The engine implements the existing provider contract
 
-`legacy/main.js` and the application layer already talk to the page through one object (`P`). The calibrated engine
-is a new implementation of that same object, so nothing above it changes. Members, and where each now comes from:
+The page layer (`src/page`) and the application layer talk to the page through one object, the provider. The calibrated engine
+is an implementation of that object (the extension also has an *uncalibrated* one, in `src/page/provider.js`), so nothing above it changes. The members
+below are the old, wider contract; what the engine implements today is what `src/page` uses. Members, and where each now comes from:
 
 | Group | Members | Source in the new engine |
 |---|---|---|
 | Turns | `allItems`, `isUserItem`, `isAssistantItem`, `assistantCount`, `userCount`, `lastAssistant`, `lastAssistantId`, `itemKey`, `itemText`, `classifyText`, `readAssistant`, `chatIsEmpty`, `isFreshChat`, `conversationKey`, `thinkingSel` | profile (`reply`, `user`); keys from stable attributes (`data-*id`), else position; `conversationKey` from the URL |
 | Generation | `isGenerating`, `isHardGenerating`, `isBusyNow`, `streamLen`, `snapshot`, `genDebug`, `turnHalted`, `stopGeneration`, `timings` | stop button (learned) + reply text growth (`StreamSampler`); generic timings |
 | Composer | `getEditor`, `editorText`, `typeAndSend`, `installSendHooks`, `setInputLock`, `enforceComposer`, `ensureComposerReady`, `composerFrame`, `barAnchor`, `barMount`, `coverTarget` | profile (`composer`, `send`, `card`); writing method probed and remembered |
-| Chips | `findToolBlockSpot`, `chipAtItemLevel`, `chipAnchor`, `chipAppend`, `chipTrailRef` | blocks found by content (`{"command"…`), chips placed in the reply container |
 | Errors | `scanError`, `isTooLongMsg`, `isBusyMsg`, `findContinueBtn`, `clickContinueBtn` | generic text patterns only (see "not preserved") |
 | Identity | `id`, `displayName`, `supportsVision`, `sendRetryLimit`, `sendCharBudget`, `reliableCounts`, `promptExtra`, `resendSystemEvery`, `unstableWarning`, `modeWarning`, `describeLayout`, `init` | profile metadata and neutral defaults |
 
@@ -147,8 +147,7 @@ the whole application layer (agent loop, tool runner, session logic) and the gen
    Outcome is a go / no-go, with a list of anything the engine could not do generically.
 2. **Calibration UI**: picker, write/read-back test, preview, per-role re-calibration, health check, storage,
    export / import, seed profiles from `profiles/`.
-3. **Delete the last old code** once calibrated sites work: the site-specific rules left in `overlay.css`, the
-   adapter-only members of the provider contract that `main.js` still checks, leftover helpers and registry fields.
+3. **Delete the last old code** *(done)*: chips and the per-site rules of `overlay.css`, `legacy/`, and the members of the provider contract nothing reads any more.
 4. **Unknown sites.** Any chat site can be used by calibrating it; the match list becomes the user's choice
    (optional host permission) instead of a fixed registry.
 
@@ -164,17 +163,16 @@ the whole application layer (agent loop, tool runner, session logic) and the gen
 
 ## Phase 1 results (spike)
 
-Built: `src/infrastructure/calibration/` (selector learning, profile, engine) and a loader in `legacy/providers/provider.js`
+Built: `src/infrastructure/calibration/` (selector learning, profile, engine) and a loader in `src/page/provider.js`
 that uses a stored `zsProfiles[<host>]` when there is one. No UI yet: profiles are learned in tests from simulated
 clicks and stored by hand.
 
 **Acceptance.** `test/calibration.test.js` learns a profile from five clicks (text box, send button, a reply, a message
 of the user's, optionally the part of the reply to read) on three pages and runs the contract on it: counts, telling
-user from assistant turns, reading the tool call, the marker in the user's turn, the composer and its card, hiding the
-raw block with its chrome, the stop control, a fresh chat, writing and sending (button and Enter), and a missing part
+user from assistant turns, reading the tool call, the marker in the user's turn, the composer and its card, the stop control, a fresh chat, writing and sending (button and Enter), and a missing part
 named by the health check. ChatGPT (captured 2026-10 reply chain), Gemini (captured reply structure) and Meta
 (captured Lexical composer structure) all pass, and the real content script (`test/content-script.test.js`) boots with
-a stored profile and draws chips through it. 41 + 4 tests; mutations of each rule make them fail.
+a stored profile and reads the page through it. 41 + 4 tests; mutations of each rule make them fail.
 
 **What the spike taught (design changes, already applied above):**
 - A reply cannot be selected in isolation. The turn is the outermost element around the click that differs from the

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Tracks whether the assistant's reply is still growing. Most chat sites expose
-// no reliable "generating" flag, so adapters sample the reply length and treat
+// no reliable "generating" flag, so the engine samples the reply length and treat
 // "grew recently" as "still generating".
 
 const REGRESSION_TOLERANCE = 400; // a shrink larger than this means a different reply/regeneration

@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The markup of the bar's two pop-over menus (MCP target, Switch AI). Pure string builders: every value that
+// The markup of the bar's pop-over menus (MCP target, approval mode, workspace, Switch AI). Pure string builders: every value that
 // comes from a server name or a site list is escaped here, in one place, instead of inline in the page script.
 import { escapeHtml } from "./html.js";
-
-/** The <option> list behind the target dropdown. */
-export const targetOptionsHtml = (options) =>
-  options.map((option) => `<option value="${escapeHtml(option.id)}">${escapeHtml(option.name)}</option>`).join("");
 
 /** The MCP target pop-over: one row per option, the active one badged. */
 export function targetMenuHtml(options, currentId) {

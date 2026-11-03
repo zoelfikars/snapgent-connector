@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { SYS_MARKER, RESEND_MARKER } from "../src/domain/constants.js";
+import { SYS_MARKER } from "../src/domain/constants.js";
 import { buildResendRider, countSinceLastMarker, fitsBudget, isResendDue } from "../src/domain/prompt/resend.js";
 import { SysTally } from "../src/application/sys-tally.js";
 import { PromptResender } from "../src/application/prompt-resender.js";
@@ -21,7 +21,7 @@ describe("resend rules", () => {
 
   test("the rider carries the marker and the prompt, and tells the model not to reply", () => {
     const rider = buildResendRider("PROMPT BODY");
-    assert.ok(rider.includes(RESEND_MARKER) && rider.endsWith("PROMPT BODY") && rider.includes("do not acknowledge this note"));
+    assert.ok(rider.endsWith("PROMPT BODY") && rider.includes("do not acknowledge this note"));
   });
 
   test("counting stops at the newest marker turn and separates typed turns from injected results", () => {
@@ -30,7 +30,7 @@ describe("resend rules", () => {
       { text: `${SYS_MARKER} prompt`, isUser: true },
       { text: "hello", isUser: true },
       { text: "assistant words", isUser: false },
-      { text: "Output of 'read_file':\nx", isUser: true },
+      { text: "» read_file\nx", isUser: true },
       { text: "ERROR: nope", isUser: true },
     ];
     assert.deepEqual(countSinceLastMarker(items.length, (i) => items[i]), { users: 1, results: 2 });
@@ -131,7 +131,7 @@ describe("PromptResender", () => {
     const { resender, tally, sent, diags } = setup();
     for (let i = 0; i < 12; i++) resender.bump("results");
     const out = resender.attach("result");
-    assert.ok(out.startsWith("result") && out.includes(RESEND_MARKER) && out.endsWith("SYS"));
+    assert.ok(out.startsWith("result") && out.includes("re-statement") && out.endsWith("SYS"));
     assert.deepEqual(tally.counts(), { users: 0, results: 0 });
     assert.deepEqual(sent, [42]);
     assert.ok(diags.some(([e, d]) => e === "sys.resend" && d.via === "toolResult"));

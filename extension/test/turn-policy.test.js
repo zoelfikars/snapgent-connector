@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_TRUNCATED_RESUMES, parseErrorDetail, planTurn } from "../src/domain/agent/turn-policy.js";
+import { MAX_TRUNCATED_RESUMES, planTurn } from "../src/domain/agent/turn-policy.js";
 import { FEEDBACK } from "../src/domain/prompt/feedback.js";
 
 const ctx = (over = {}) => ({ displayName: "TestAI", truncCount: 0, isHalted: () => false, ...over });
@@ -60,14 +60,9 @@ describe("planTurn: truncated replies", () => {
 });
 
 describe("planTurn: commands", () => {
-  test("one call runs, with its category", () => {
+  test("one call runs", () => {
     const plan = planTurn({ kind: "tool", calls: [{ tool: "read_file" }] }, ctx());
-    assert.deepEqual([plan.type, plan.call.tool, plan.category], ["run", "read_file", "read"]);
-  });
-
-  test("a tool known to return images gets the screen category", () => {
-    const plan = planTurn({ kind: "tool", calls: [{ tool: "vscode/snap" }] }, ctx({ isLearnedImageTool: (n) => n === "vscode/snap" }));
-    assert.equal(plan.category, "screen");
+    assert.deepEqual([plan.type, plan.calls.map((c) => c.tool)], ["run", ["read_file"]]);
   });
 
   test("several calls in one reply are all planned to run", () => {
@@ -75,22 +70,11 @@ describe("planTurn: commands", () => {
     assert.deepEqual([plan.type, plan.calls.map((c) => c.tool), plan.truncCount], ["run", ["a", "b"], 0]);
   });
 
-  test("parse errors name the command, label the chip and ask for a rewrite", () => {
-    const item = { id: 1 };
-    const plan = planTurn({ kind: "parse_error", reason: "unclosed", raw: '{"command":"edit_file","params":{', item }, ctx());
-    assert.equal(plan.type, "parse-error");
-    assert.deepEqual(plan.chip, { item, name: "edit_file", detail: "cut off", category: "edit" });
-    assert.equal(plan.feedback, FEEDBACK.parseError("unclosed"));
-  });
-
-  test("a parse error with no node has no chip; unknown name falls back to 'command'", () => {
-    const plan = planTurn({ kind: "parse_error", reason: "x", raw: "garbage" }, ctx());
-    assert.equal(plan.chip, null);
+  test("a parse error asks for a rewrite", () => {
+    const plan = planTurn({ kind: "parse_error", reason: "unclosed", raw: '{"command":"edit_file","params":{', item: { id: 1 } }, ctx());
+    assert.deepEqual([plan.type, plan.feedback], ["parse-error", FEEDBACK.parseError("unclosed")]);
   });
 
   test("unknown kinds are skipped", () => assert.equal(planTurn({ kind: "weird" }, ctx()).type, "skip"));
 
-  test("parse-error labels", () => {
-    assert.deepEqual(["unclosed", "envelope", "dsml", "other"].map(parseErrorDetail), ["cut off", "bad format", "wrong format", "bad JSON"]);
-  });
 });

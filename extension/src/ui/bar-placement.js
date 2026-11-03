@@ -4,13 +4,10 @@
 // squeeze, cover or hide it. Pure geometry: rectangles in, pixel numbers out.
 
 export const BAR_WIDTH = 210;
-export const CORNERS = ["bottom", "top"];
 const MARGIN = 16;
 const TOGGLE = 34;       // the show/hide button's size
 const TOGGLE_GAP = 8;
 const MIN_HEIGHT = 40;
-const PILL_GAP = 5;
-const DEFAULT_PILL_HEIGHT = 20;
 
 /** A stored corner, or the default when it is not one of the two. @returns {"bottom"|"top"} */
 export const cornerOf = (value) => (value === "top" ? "top" : "bottom");
@@ -53,10 +50,3 @@ export function barGeometry(viewport, barSize, corner) {
   };
 }
 
-/** The "unstable" pill floats just above (or, in the top corner, below) the bar's left edge. @returns {{left:number, top:number}|null} */
-export function pillPosition(barRect, pillHeight, corner = "bottom") {
-  if (!barRect || !barRect.width) return null;
-  const height = pillHeight || DEFAULT_PILL_HEIGHT;
-  const top = corner === "top" ? barRect.bottom + PILL_GAP : Math.max(4, barRect.top - height - PILL_GAP);
-  return { left: Math.round(barRect.left), top: Math.round(top) };
-}

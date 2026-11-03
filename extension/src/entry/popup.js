@@ -31,7 +31,7 @@ function render(s) {
     : "";
 }
 
-// The most one message into the chat may hold (read by the page; see messageBudget in legacy/main.js).
+// The most one message into the chat may hold (read by the page; see src/page/message-budget.js).
 const LIMIT_STEP = 10000;
 const limitInput = document.getElementById("limit");
 const limitValue = document.getElementById("limit-value");

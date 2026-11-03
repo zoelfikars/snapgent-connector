@@ -2,8 +2,6 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { ToolReminder } from "../src/application/tool-reminder.js";
 import { StallWatchdog } from "../src/application/stall-watchdog.js";
-import { describeOutcome } from "../src/domain/tools/outcome.js";
-import { callBody } from "../src/domain/tools/result-summary.js";
 import { fakeTimers } from "./support/fakes.js";
 
 describe("ToolReminder", () => {
@@ -78,17 +76,3 @@ describe("StallWatchdog", () => {
   });
 });
 
-describe("describeOutcome / callBody", () => {
-  test("success and error outcomes", () => {
-    const good = describeOutcome("Output of 'x':\nline one\nline two");
-    assert.deepEqual([good.isErr, good.phase, good.summary, good.lineCount, good.firstLine, good.lastLine], [false, "done", "line one · 2 lines", 2, "line one", "line two"]);
-    const bad = describeOutcome("ERROR: nope");
-    assert.deepEqual([bad.isErr, bad.phase], [true, "err"]);
-  });
-
-  test("callBody pretty-prints arguments and survives cycles", () => {
-    assert.equal(callBody({ arguments: { a: 1 } }), '{\n  "a": 1\n}');
-    const cyc = {}; cyc.self = cyc;
-    assert.equal(typeof callBody({ arguments: cyc }), "string");
-  });
-});

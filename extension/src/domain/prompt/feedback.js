@@ -54,7 +54,7 @@ export const FEEDBACK = {
   // / disable+enable). Nothing here can recover it - only a page reload can -
   // so the model must NOT be told the bridge is down and must NOT retry, or it
   // burns the whole conversation re-issuing commands that can never run. See
-  // isContextInvalidated in core/main.js.
+  // createExtensionBridge (src/page/extension-bridge.js).
   staleExtension:
     "ERROR: the snapgentV3 extension was reloaded or updated while this page was open, so this " +
     "tab is running a version of it that no longer exists and NO command can reach the user's " +

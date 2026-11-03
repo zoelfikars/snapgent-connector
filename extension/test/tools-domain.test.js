@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { bareToolName, isKnownName } from "../src/domain/tools/names.js";
 import { isolationError } from "../src/domain/tools/isolation.js";
 import { toFeedback } from "../src/domain/tools/result-feedback.js";
-import { renderCommandList, renderServerList, isVirtualCommand } from "../src/domain/tools/virtual-commands.js";
+import { renderCommandList, renderServerList } from "../src/domain/tools/virtual-commands.js";
 
 describe("names", () => {
   test("bareToolName strips a server prefix", () => {
@@ -34,11 +34,6 @@ describe("isolationError", () => {
 });
 
 describe("virtual commands", () => {
-  test("recognition", () => {
-    for (const name of ["list_commands", "list_tools", "list_mcp_servers"]) assert.equal(isVirtualCommand(name), true);
-    assert.equal(isVirtualCommand("read_file"), false);
-  });
-
   test("renderCommandList: ordered refusals, then the scoped catalogue", () => {
     const tools = [{ name: "a", description: "A", inputSchema: {} }];
     const base = { name: "list_commands", target: "vscode", enabled: true, tools };
@@ -59,8 +54,8 @@ describe("toFeedback", () => {
   const opts = { name: "read_file", supportsVision: false };
 
   test("success, empty success, and a parameter complaint disguised as success", () => {
-    assert.equal(toFeedback({ ok: true, text: "x" }, opts).text, "Output of 'read_file':\nx");
-    assert.equal(toFeedback({ ok: true, text: "" }, opts).text, "Output of 'read_file':\n(tool returned an empty result)");
+    assert.equal(toFeedback({ ok: true, text: "x" }, opts).text, "» read_file\nx");
+    assert.equal(toFeedback({ ok: true, text: "" }, opts).text, "» read_file\n(tool returned an empty result)");
     assert.match(toFeedback({ ok: true, text: "path is required" }, opts).text, /^ERROR calling 'read_file': path is required\./);
   });
 

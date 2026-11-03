@@ -22,7 +22,6 @@ export class MessageSender {
    *   effects: import("./ports.js").SendEffectsPort,
    *   clock: { sleep: (ms: number) => Promise<void>, waitFor: (predicate: () => boolean, timeoutMs: number) => Promise<boolean> },
    *   isStopped: () => boolean,
-   *   beforeSend?: () => Promise<void>,
    *   retryLimit?: number,
    *   notify: { banner: (level: string, title: string, text: string) => void },
    *   diag?: (event: string, data?: object) => void,
@@ -35,7 +34,7 @@ export class MessageSender {
   }
 
   /** @returns {Promise<number>} the assistant-turn count before the reply */
-  async submit(text, images) {
+  async submit(text) {
     const { page, effects } = this._d;
     effects.begin();
     this._diag("send", { text: String(text).slice(0, 60), busy: page.isBusyNow() });
@@ -43,9 +42,8 @@ export class MessageSender {
       await this._settlePreviousReply();
       const base = page.assistantCount();
       const preUser = page.userCount();
-      effects.armPrehide(preUser); // the very next NEW user turn is ours: mask it on creation
       const landed = () => page.userCount() > preUser || page.assistantCount() > base;
-      const { sent, tries } = await this._sendWithRetries(text, images, landed);
+      const { sent, tries } = await this._sendWithRetries(text, landed);
       if (sent) this._diag("send.cleared", { tries });
       // Returning silently here leaves the loop waiting ~60s for a reply that will never come.
       if (!sent && !landed() && !this._d.isStopped()) {
@@ -73,7 +71,7 @@ export class MessageSender {
     }
   }
 
-  async _sendWithRetries(text, images, landed) {
+  async _sendWithRetries(text, landed) {
     const { page, visibility, effects, clock, isStopped } = this._d;
     let tries = 0;
     let sent = false;
@@ -84,11 +82,8 @@ export class MessageSender {
         this._diag("send.waitVisible", { tries });
         if (!(await visibility.waitUntilVisible()) || isStopped()) break;
       }
-      if (this._d.beforeSend) await this._d.beforeSend();
-      this._diag("submit.typeAndSend", { hasImages: !!(images && images.length) });
-      await page.typeAndSend(text, images);
-      // typeAndSend can block seconds uploading an image, past the first pre-hide window: re-arm now.
-      effects.rearmPrehide();
+      this._diag("submit.typeAndSend");
+      await page.typeAndSend(text);
       // The site clears the composer as soon as the send is accepted: faster and more reliable than a turn count.
       await clock.waitFor(() => {
         if (page.editorText().trim() === "") sent = true;

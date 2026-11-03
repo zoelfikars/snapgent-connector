@@ -2,7 +2,7 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { MessageSender, resolveRetryLimit } from "../src/application/message-sender.js";
 
-function setup({ behaviour = "clears", hidden = false, stopped = false, retryLimit, streamGrows = false, images } = {}) {
+function setup({ behaviour = "clears", hidden = false, stopped = false, retryLimit, streamGrows = false } = {}) {
   const log = [];
   const state = { users: 3, assistants: 3, editor: "", stopped, hidden, sends: 0, streamLen: 100, generating: false, item: { id: 1 } };
   const page = {
@@ -26,16 +26,15 @@ function setup({ behaviour = "clears", hidden = false, stopped = false, retryLim
     sleep: async (ms) => { log.push(["sleep", ms]); if (streamGrows) { state.streamLen += 50; state.generating = true; } },
     waitFor: async (predicate, timeout) => { log.push(["waitFor", timeout]); const ok = predicate(); if (!ok) state.generating = false; return ok; },
   };
-  const effects = ["begin", "armPrehide", "rearmPrehide", "end"].reduce((o, k) => ({ ...o, [k]: (...a) => log.push([k, ...a]) }), {});
+  const effects = ["begin", "end"].reduce((o, k) => ({ ...o, [k]: (...a) => log.push([k, ...a]) }), {});
   const visibility = { isHidden: () => state.hidden, waitUntilVisible: async () => { log.push(["waitUntilVisible"]); state.hidden = false; return true; } };
   const sender = new MessageSender({
     page, visibility, effects, clock, retryLimit,
     isStopped: () => state.stopped,
-    beforeSend: async () => log.push(["jitter"]),
     notify: { banner: (...a) => log.push(["banner", ...a]) },
     diag: (e, d) => log.push(["diag", e, d]),
   });
-  return { sender, state, log, names: () => log.map((e) => e[0] === "diag" ? `diag:${e[1]}` : e[0]), run: () => sender.submit("hello", images) };
+  return { sender, state, log, names: () => log.map((e) => e[0] === "diag" ? `diag:${e[1]}` : e[0]), run: () => sender.submit("hello") };
 }
 
 describe("MessageSender", () => {
@@ -44,13 +43,6 @@ describe("MessageSender", () => {
     assert.equal(await t.run(), 3);
     assert.equal(t.names()[0], "begin");
     assert.equal(t.names().at(-1), "end");
-  });
-
-  test("arms the pre-hide with the user count, and re-arms after typing", async () => {
-    const t = setup();
-    await t.run();
-    assert.deepEqual(t.log.find((e) => e[0] === "armPrehide"), ["armPrehide", 3]);
-    assert.ok(t.names().indexOf("typeAndSend") < t.names().indexOf("rearmPrehide"));
   });
 
   test("one attempt is enough when the composer clears", async () => {

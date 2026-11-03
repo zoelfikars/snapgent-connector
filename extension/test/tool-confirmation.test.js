@@ -47,7 +47,7 @@ describe("ToolRunner: asking the user", () => {
   test("approved: the call is repeated with the token and its result is returned", async () => {
     const t = setup({ results: [REQUEST, { ok: true, text: "Deleted a.txt" }] });
     const text = await t.runner.run({ tool: "delete_file", arguments: { path: "a.txt" } });
-    assert.equal(text, "Output of 'delete_file':\nDeleted a.txt");
+    assert.equal(text, "» delete_file\nDeleted a.txt");
     assert.deepEqual(t.asked, [{ description: "Delete file: a.txt", tool: "delete_file", risk: "destructive" }]);
     assert.equal(t.calls.length, 2);
     assert.equal(t.calls[0].arguments[RESERVED_ARGUMENT], undefined);

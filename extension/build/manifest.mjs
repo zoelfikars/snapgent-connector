@@ -6,13 +6,11 @@ export const TARGETS = ["chrome", "firefox"];
 const GECKO_ID = "snapgent@herdodp.github.io";
 const FIREFOX_MIN_VERSION = "128.0"; // first release with MV3 `world: "MAIN"` content scripts
 
-const CORE_SCRIPTS = ["globals.js", "main.js"];
-
-// One provider script for every site: it is calibrated from a stored profile or says "not calibrated" (docs/CALIBRATION.md).
+// One content script for every site: it is calibrated from a stored profile or says "not calibrated" (docs/CALIBRATION.md).
 export function contentScripts(sites = SITES) {
   return sites.map((site) => ({
     matches: site.matches,
-    js: ["globals.js", "providers/provider.js", "main.js"],
+    js: ["content.js"],
     css: ["overlay.css"],
     run_at: "document_idle",
   }));
@@ -40,5 +38,3 @@ export function buildManifest(base, { target, version }) {
   }
   return manifest;
 }
-
-export { CORE_SCRIPTS };

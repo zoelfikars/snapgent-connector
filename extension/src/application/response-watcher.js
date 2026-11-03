@@ -15,7 +15,7 @@ const UNSETTLED_GRACE_MS = 8000;     // max hold-off while a provider reports it
 const GEN_STOP_GRACE_MS = 2500;      // gen off this long => an "open tool block" is DOM churn, not live output
 const OPEN_BLOCK_QUIET_MS = 6000;    // an open block only counts as streaming while the text keeps changing
 const PRE_START_SILENCE_MS = 60000;  // a reply turn that never appears
-const UNREADABLE_MS = 15000;         // generating, yet the adapter sees no reply turn: the page layout is not understood
+const UNREADABLE_MS = 15000;         // generating, yet no reply turn is found: the page layout is not understood
 const SETTLE_MS = 500;               // DOM must be stable this long before we parse
 
 const pass = null;

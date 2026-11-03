@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // A chat-site provider built from a profile (profile.js) instead of written per site. It implements the same object
 // the page script has always talked to, so nothing above it changes. It knows no site: where things are comes from the
-// profile; how to write into a composer, when a reply is finished and where to put a chip are found by looking.
+// profile; how to write into a composer and when a reply is finished are found by looking.
 
-import { hasCommandShape } from "../../domain/parser/index.js";
 import { setNativeValue } from "../chat/dom-helpers.js";
 import { StreamSampler } from "../chat/stream-sampler.js";
 import { waitFor } from "../chat/wait.js";
@@ -13,8 +12,6 @@ import { profileProblems } from "./profile.js";
 
 const TIMINGS = { GEN_IDLE_MS: 2000, REASON_IDLE_MS: 15000, WARMUP_MS: 60000, REASON_NOREPLY_MS: 120000, STABLE_MS: 10000, RESPONSE_TIMEOUT_MS: 300000 };
 const STOP_LABEL = /\b(stop|cancel|halt|arr[êe]ter)\b/i;
-const CHROME_WORDS = 2;   // a label like "JSON" or "Copy code" may share a wrapper with the block and be hidden with it
-const CHROME_CHARS = 24;
 const SETTLE_MS = 150;        // let a rich editor learn where the caret is before input arrives
 
 const isValueEditor = (el) => !!el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT");
@@ -37,9 +34,9 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   const firstVisible = (selector) => find(selector).find(visible) || null;
 
   // ── turns ─────────────────────────────────────────────────────────────────
-  // A turn is something laid out on the page (or hidden by us on purpose): a template, a script or a collapsed copy that
-  // happens to carry the same attributes is not a message, and would make an empty chat look started.
-  const turnsOf = (selector) => outermost(find(selector).filter((el) => visible(el) || !!el.closest(".zs-hidden")));
+  // A turn is something laid out on the page: a template, a script or a collapsed copy that happens to carry the same attributes is
+  // not a message, and would make an empty chat look started.
+  const turnsOf = (selector) => outermost(find(selector).filter(visible));
   const assistantTurns = () => turnsOf(profile.assistant.turn);
   const userTurns = () => turnsOf(profile.user.turn);
   const allItems = () => [...new Set([...assistantTurns(), ...userTurns()])].sort(byDocumentOrder);
@@ -56,7 +53,6 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     return matches.length ? matches[matches.length - 1] : item;
   };
   const itemText = (item) => (item ? readText(isAssistantItem(item) ? bodyOf(item) : item) : "");
-  const classifyText = (item, exclude) => (item ? readText(isAssistantItem(item) ? bodyOf(item) : item, exclude) : "");
   const readAssistant = () => {
     const item = lastAssistant();
     return { present: !!item, reply: item ? readText(bodyOf(item)).trim() : "", thinking: "", item };
@@ -259,44 +255,11 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   };
   const stopGeneration = () => { const button = stopButton(); if (button) try { button.click(); } catch { /* gone */ } };
 
-  // ── chips ─────────────────────────────────────────────────────────────────
-  // The raw command block is found by what it says, not by where a site puts it, and hidden together with the chrome that
-  // belongs to it (a language label, a copy button). Climbing from the block, a parent is taken in only while everything
-  // else in it is chrome: a button, an empty element, or a label of a word or two. A paragraph or a sentence is the reply
-  // itself, and hiding it would make the answer vanish with the command.
-  const isChrome = (sibling) => {
-    if (sibling.nodeType !== 1) return !(sibling.textContent || "").trim();
-    if (sibling.matches("p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, table, ul, ol") || sibling.querySelector("p, li, blockquote, pre, table")) return false;
-    const words = (sibling.textContent || "").trim().split(/\s+/).filter(Boolean);
-    return words.length <= CHROME_WORDS && words.join("").length <= CHROME_CHARS;
-  };
-  function blockWrapper(el, item, body) {
-    let wrapper = el;
-    for (let n = el.parentElement; n && n !== item && n !== body; n = n.parentElement) {
-      if (![...n.childNodes].filter((child) => child !== wrapper).every(isChrome)) break;
-      wrapper = n;
-    }
-    return wrapper;
-  }
-  function findToolBlockSpot(item) {
-    const body = bodyOf(item);
-    let found = null;
-    for (const el of item.querySelectorAll("pre, code, p, li")) {
-      if (el.closest(".zs-chip, .zs-tool-hide")) continue;
-      const text = (el.textContent || "").trim();
-      if (!text || !hasCommandShape(text)) continue;
-      const wrapper = blockWrapper(el, item, body);
-      wrapper.classList.add("zs-tool-hide");
-      found = found || { parent: wrapper.parentElement, ref: wrapper };
-    }
-    return found;
-  }
-
   // ── what the profile finds on the page, for the calibration review ───────────
   function review() {
     const last = lastAssistant();
     const body = last ? bodyOf(last) : null;
-    const codeBlocks = last ? [...last.querySelectorAll("pre")].filter((el) => !el.closest(".zs-chip")) : [];
+    const codeBlocks = last ? [...last.querySelectorAll("pre")] : [];
     return {
       users: userTurns(), assistants: assistantTurns(), body: body && body !== last ? body : null, card: composerFrame(), composer: getEditor(), send: sendButton(),
       codeBlocks: codeBlocks.length, codeBlocksRead: body ? codeBlocks.filter((el) => body.contains(el)).length : codeBlocks.length,
@@ -321,7 +284,6 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     supportsVision: false,
     sendRetryLimit: 1,
     get reliableCounts() { return !!idOf(lastAssistant()); },
-    chipAtItemLevel: false, // the chip takes the place of the hidden block, in the reply's own column (it is repainted if the site wipes it)
     init() {},
     modeWarning() {
       const { problems } = health();
@@ -342,7 +304,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     },
     get needsCalibration() { return !health().ok; },
 
-    allItems, isUserItem, isAssistantItem, itemText, classifyText, assistantCount, userCount, lastAssistant,
+    allItems, isUserItem, isAssistantItem, itemText, assistantCount, userCount, lastAssistant,
     lastAssistantId: () => idOf(lastAssistant()), itemKey: idOf, readAssistant, chatIsEmpty,
     isFreshChat: () => chatIsEmpty() && !!getEditor(), conversationKey,
 
@@ -353,7 +315,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     enforceComposer: () => ({ ready: !!getEditor() }), ensureComposerReady: async () => ({ ready: !!getEditor() }),
     typeAndSend, attachImages: () => false, clearAttachments() {},
 
-    findToolBlockSpot, scanError: () => null, isTooLongMsg: () => false, isBusyMsg: () => false,
+    scanError: () => null, isTooLongMsg: () => false, isBusyMsg: () => false,
     findContinueBtn: () => null, clickContinueBtn: () => false,
   };
 }

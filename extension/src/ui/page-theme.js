@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Decides whether the host page is light or dark, so the overlay can pick readable colours.
-// Knows nothing about chips or the bar: it reads the page and toggles one class on <html>.
+// Knows nothing about the bar: it reads the page and toggles one class on <html>.
 
 /**
  * The theme the site declares itself (class, data attribute or CSS color-scheme).

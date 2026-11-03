@@ -83,16 +83,3 @@ describe("toast", () => {
   });
 });
 
-describe("screenshots", () => {
-  test("shows the images as data URLs with a count, and a new capture replaces the old", () => {
-    const t = setup();
-    t.n.showImages([{ data: "AAA", mimeType: "image/png" }, { data: "BBB" }], "capture");
-    assert.equal(t.$(".zs-shot-ttl").textContent, "capture · 2 images");
-    assert.deepEqual(t.$$(".zs-shot-img").map((i) => i.src), ["data:image/png;base64,AAA", "data:image/jpeg;base64,BBB"]);
-    t.n.showImages([{ data: "C" }], "again");
-    assert.equal(t.$$(".zs-shot").length, 1);
-    assert.equal(t.$(".zs-shot-ttl").textContent, "again · 1 image");
-    t.click(t.$(".zs-shot-x"));
-    assert.equal(t.$$(".zs-shot").length, 0);
-  });
-});

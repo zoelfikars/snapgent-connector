@@ -7,7 +7,6 @@
 // drawn lives behind the `view` port.
 
 import { planTurn } from "../domain/agent/turn-policy.js";
-import { bareToolName } from "../domain/tools/names.js";
 import { FEEDBACK } from "../domain/prompt/feedback.js";
 import { DEFAULT_PROMPT_CHARS } from "../domain/prompt/budget.js";
 import { BatchRunner } from "./batch-runner.js";
@@ -64,7 +63,6 @@ export class AgentLoop {
           displayName: this._d.displayName(),
           truncCount,
           isHalted: () => this._d.chat.isHalted(res.item),
-          isLearnedImageTool: (name) => this._d.tools.isImageTool(bareToolName(name)),
         });
         truncCount = plan.truncCount;
 
@@ -80,16 +78,10 @@ export class AgentLoop {
           continue;
         }
         if (plan.type === "parse-error") {
-          if (plan.chip) this._d.view.parseErrorChip(plan.chip);
           base = await this._d.chat.submit(plan.feedback);
           continue;
         }
-        if (plan.type === "feedback") {
-          base = await this._d.chat.submit(plan.feedback);
-          continue;
-        }
-        // plan.type === "run": one command, or several written in the same reply
-        const outcome = await this._batch.run(res.item, plan.calls || [plan.call], plan.category);
+        const outcome = await this._batch.run(res.item, plan.calls);
         if (outcome.halted) break;
         base = outcome.base;
       }

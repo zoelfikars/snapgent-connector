@@ -27,7 +27,7 @@ export class SessionStarter {
    *   chat: { submit: (text: string) => Promise<*>, next: (base: *) => Promise<object> },
    *   runner: { run: (call: object) => Promise<string> },
    *   initialContext?: { limit: () => number },        // when present, the project tree rides on the handshake result (within this message size)
-   *   layout?: import("./ports.js").LayoutCheckPort,   // verifies the adapter understands the page
+   *   layout?: import("./ports.js").LayoutCheckPort,   // verifies the engine understands the page
    *   view: import("./ports.js").StartViewPort,
    *   isStopped: () => boolean,
    *   diag?: (event: string, data?: object) => void,
@@ -129,7 +129,6 @@ export class SessionStarter {
     const base = await chat.submit(this._d.systemPrompt());
     if (!alive()) return false;
     await this._checkSentMessageIsRecognised();
-    view.showStartingChip(); // the animated "Starting Up" chip, immediately
     this._diag("start.promptSent");
     const first = await chat.next(base);
     this._diag("start.firstReply", { kind: first.kind, text: first.kind === "text" ? String(first.text || "").slice(0, 300) : undefined, calls: first.calls ? first.calls.map((call) => call.tool) : undefined, alive: alive() });
@@ -144,12 +143,9 @@ export class SessionStarter {
     if (isStopped() || first.kind === "stopped") { this._diag("start.aborted", { kind: first.kind }); return false; }
 
     if (isHandshake(first)) {
-      view.handshake(first.item, "run", "");
       const answer = await runner.run(first.calls[0]);
       this._diag("start.handshakeRan", { chars: answer.length, tree: this._tree.length });
       const unavailable = handshakeUnavailable(answer);
-      if (unavailable) view.handshake(first.item, "err", `${target.name()} unavailable`);
-      else view.handshake(first.item, "done", `${catalogue.active().length} commands`);
       const extra = first.calls.length > 1 ? HANDSHAKE_EXTRA_NOTE : "";
       return this._deliver((unavailable ? answer : answer + this._treeBlock()) + extra, alive);
     }

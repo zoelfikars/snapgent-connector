@@ -64,6 +64,9 @@ All notable changes to snapgentV3 Free are documented here.
   result can be exported, imported and removed from the switch-AI menu. See [docs/CALIBRATION.md](docs/CALIBRATION.md).
 
 ### Removed
+- **The chip code and everything that only served it** (turn chips, the command-phase and regenerate-look rules, hiding raw command blocks,
+  pre-hiding injected turns, screenshots, the "unstable" pill, the send jitter, per-site CSS). The chat has been left as the site draws it
+  for a while; this removes what was switched off. `overlay.css` is about 40% smaller.
 - **All per-site chat adapters** (ChatGPT, Gemini, Claude, DeepSeek, Grok, Mistral, Kimi, Qwen, GLM, Arena, Meta,
   Ptero), their main-world scripts, the ChatGPT layout table and every test and fixture that only exercised them.
   They are replaced by one *uncalibrated* provider until the calibration-based engine is built
@@ -73,6 +76,11 @@ All notable changes to snapgentV3 Free are documented here.
   stop workarounds, per-site badges and mode warnings.
 
 ### Changed
+- **Results are headed `» name`** instead of `Output of 'name':`, so they read as plain text rather than as a protocol. Chats started with
+  the old wording are still recognised (session detection and the system-prompt budget).
+- **The extension is rebuilt as layers** (`domain`, `application`, `infrastructure`, `ui`, `page`) with ONE content script,
+  `src/entry/content.js`, that only composes the page modules. `legacy/` (the 2,400-line `main.js` and the provider loader), the global
+  bridge (`ZSApp`, `ZSUi`, ...) and `globals.js` are gone; the manifest loads a single `content.js`. The "switch AI" list comes from the site registry.
 - **The user chooses the model and the thinking mode, never the extension.** Meta AI no longer switches itself to
   Thinking on Start, and DeepSeek no longer forces Expert or turns the DeepThink toggle on; whichever Instant /
   Thinking / Expert / Vision the user picked stays. The extension is only the bridge between the chat and the IDE.

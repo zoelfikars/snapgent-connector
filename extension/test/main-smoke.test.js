@@ -1,11 +1,9 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { build } from "esbuild";
 
 const root = new URL("../", import.meta.url).pathname;
-const read = (path) => readFileSync(root + path, "utf8");
 
 // Same permissive stand-in used by providers-smoke: any property is another stand-in.
 function permissive() {
@@ -17,15 +15,13 @@ function permissive() {
   });
 }
 
-async function bundledGlobals() {
-  const result = await build({
-    entryPoints: [root + "src/entry/legacy-globals.js"], bundle: true, format: "iife", write: false, logLevel: "silent",
-  });
+async function bundledContentScript() {
+  const result = await build({ entryPoints: [root + "src/entry/content.js"], bundle: true, format: "iife", write: false, logLevel: "silent" });
   return result.outputFiles[0].text;
 }
 
-describe("content script boot order: globals.js -> adapter -> main.js", () => {
-  test("main.js initialises and wires the tool runner to the real bundle", async () => {
+describe("content script boot", () => {
+  test("the bundle initialises and wires every part together", async () => {
     const queued = [];
     const ctx = {
       console: { log() {}, warn() {}, error() {} },
@@ -42,11 +38,8 @@ describe("content script boot order: globals.js -> adapter -> main.js", () => {
     ctx.globalThis = ctx;
     vm.createContext(ctx);
 
-    vm.runInContext(await bundledGlobals(), ctx, { filename: "globals.js" });
-    assert.equal(typeof ctx.ZSApp.ToolRunner, "function");
-    vm.runInContext(read("legacy/providers/provider.js"), ctx, { filename: "provider.js" });
-    // Throws on a ReferenceError (e.g. use-before-define of the catalogue or runner).
-    vm.runInContext(read("legacy/main.js"), ctx, { filename: "main.js" });
+    // Throws on a ReferenceError (a part used before it is made) or a missing export.
+    vm.runInContext(await bundledContentScript(), ctx, { filename: "content.js" });
     await new Promise((resolve) => setImmediate(resolve)); // let startup microtasks surface their errors
   });
 });

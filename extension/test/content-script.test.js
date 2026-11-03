@@ -1,8 +1,7 @@
-// Runs the REAL extension (bundled globals.js + the ChatGPT adapter + main.js) against captured page
+// Runs the REAL extension (the bundled content script) against captured page
 // markup in a real DOM. Catches what unit tests cannot: the pieces not fitting together on a page.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import { build } from "esbuild";
 import { JSDOM, VirtualConsole } from "jsdom";
@@ -10,10 +9,9 @@ import { learnProfile } from "../src/infrastructure/calibration/index.js";
 import { pageWith } from "./support/jsdom-provider.js";
 
 const root = new URL("../", import.meta.url).pathname;
-const source = (path) => readFileSync(root + path, "utf8");
 
-async function bundledGlobals() {
-  const result = await build({ entryPoints: [root + "src/entry/legacy-globals.js"], bundle: true, format: "iife", write: false, logLevel: "silent" });
+async function bundledContentScript() {
+  const result = await build({ entryPoints: [root + "src/entry/content.js"], bundle: true, format: "iife", write: false, logLevel: "silent" });
   return result.outputFiles[0].text;
 }
 
@@ -43,15 +41,10 @@ async function startOn(html, url = "https://chatgpt.com/c/test", { storage = {} 
       lastError: null,
     },
   };
-  // Classic scripts share one global lexical scope, as in a real content script.
-  const context = dom.getInternalVMContext();
-  const run = (code, filename) => new vm.Script(code, { filename }).runInContext(context);
-  run(await bundledGlobals(), "globals.js");
-  run(source("legacy/providers/provider.js"), "provider.js");
-  run(source("legacy/main.js"), "main.js");
-  await new Promise((resolve) => setTimeout(resolve, 1200)); // let the first camouflage sweep run
-  const providerId = () => run("ZSProvider.id", "probe.js");
-  return { window, document: window.document, warnings, providerId, count: (selector) => window.document.querySelectorAll(selector).length };
+  new vm.Script(await bundledContentScript(), { filename: "content.js" }).runInContext(dom.getInternalVMContext());
+  await new Promise((resolve) => setTimeout(resolve, 1200)); // let the first page sweep run
+  const barText = () => window.document.getElementById("zs-state").textContent;
+  return { window, document: window.document, warnings, barText, count: (selector) => window.document.querySelectorAll(selector).length };
 }
 
 // Until a site is calibrated (docs/CALIBRATION.md) the extension must still boot cleanly and say why it cannot start.
@@ -171,11 +164,11 @@ describe("content script with a stored profile", () => {
   test("storing and removing a profile switches the provider while the page stays open", async () => {
     const page = await startOn(PAGE, "https://chatgpt.com/c/test");
     try {
-      assert.equal(page.providerId(), "uncalibrated");
+      assert.match(page.barText(), /Not calibrated for this site yet/);
       page.window.__storageListeners.forEach((listener) => listener({ zsProfiles: { newValue: { "chatgpt.com": storedProfile() } } }, "local"));
-      assert.equal(page.providerId(), "chatgpt-com");
+      assert.doesNotMatch(page.barText(), /Not calibrated/);
       page.window.__storageListeners.forEach((listener) => listener({ zsProfiles: { newValue: {} } }, "local"));
-      assert.equal(page.providerId(), "uncalibrated");
+      assert.match(page.barText(), /Not calibrated for this site yet/);
     } finally {
       page.window.close();
     }

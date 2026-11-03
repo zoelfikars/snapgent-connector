@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import * as ZSParse from "../src/domain/parser/index.js";
 import { createCalibratedProvider, learnProfile, learnSelector, profileProblems, updateProfile } from "../src/infrastructure/calibration/index.js";
-import { createChipPainter } from "../src/ui/chip-painter.js";
 import { pageWith } from "./support/jsdom-provider.js";
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
@@ -74,20 +73,13 @@ for (const [key, site] of Object.entries(SITES)) {
     test("the user turn exposes the session marker", () => {
       const { provider } = calibrated(site);
       const user = provider.allItems().find(provider.isUserItem);
-      assert.ok(provider.classifyText(user, ".zs-chip").includes(MARKER));
+      assert.ok(provider.itemText(user).includes(MARKER));
     });
 
     test("finds the composer, and the card around it holds the send button", () => {
       const { provider, document } = calibrated(site);
       assert.ok(provider.getEditor());
       assert.ok(provider.composerFrame().contains(document.querySelector("[aria-label^='Send'], [data-testid='send-button'], [data-testid='composer-send-button']")));
-    });
-
-    test("finds the raw command block and hides it with its chrome", () => {
-      const { provider, document } = calibrated(site);
-      assert.ok(provider.findToolBlockSpot(provider.lastAssistant()), "a place to put the chip");
-      assert.ok(document.querySelector("pre").closest(".zs-tool-hide"), "the block is hidden");
-      assert.ok(document.querySelector(site.codeBlock).closest(".zs-tool-hide"), "and so is the whole block around it (its header, its copy button)");
     });
 
     test("a visible Stop control means it is generating, and it is idle without one", () => {
@@ -182,7 +174,7 @@ describe("the box around the text field (where the bar is seated)", () => {
   });
 });
 
-describe("where a chip goes, and what the reply read includes", () => {
+describe("what the reply read includes", () => {
   // The turn element is as wide as the page; the reply's text sits in a centred column inside it (Gemini, Meta).
   const WIDE = `<html><body>
     <div class="turn-user">hello</div>
@@ -196,33 +188,6 @@ describe("where a chip goes, and what the reply read includes", () => {
     const provider = createCalibratedProvider({ document, location: window.location, profile: learned.profile });
     return { document, provider, profile: learned.profile };
   }
-
-  test("the chip takes the place of the hidden command block, inside the reply's column, not at the page-wide turn root", () => {
-    const { provider, document } = on(() => ({}));
-    const painter = createChipPainter({ document, provider });
-    const turn = provider.lastAssistant();
-    painter.toolBox(turn, "list_commands", "run", "", false);
-    const chip = turn.querySelector(".zs-chip");
-    assert.equal(chip.parentElement, document.querySelector(".column"));
-    assert.ok(document.querySelector(".block").classList.contains("zs-tool-hide"));
-  });
-
-  test("short prose next to the command is never hidden with it: the answer does not vanish", () => {
-    const { provider, document } = on(() => ({}));
-    provider.findToolBlockSpot(provider.lastAssistant());
-    assert.equal(document.querySelector(".prose").closest(".zs-tool-hide"), null, "the sentence is still visible");
-    assert.ok(document.querySelector("pre").closest(".zs-tool-hide"));
-  });
-
-  test("a longer sentence, a paragraph or a second code block next to it stops the climb too", () => {
-    for (const sibling of ['<div>Here are the tools I will use for the task</div>', "<p>ok</p>", "<pre>other</pre>"]) {
-      const { document: doc, window: win } = pageWith(WIDE.replace('<p class="prose">I will check the tools.</p>', sibling), "https://x.test/");
-      const learned = learnProfile({ hostname: "x.test", name: "X", picks: { composer: doc.getElementById("box"), send: null, assistant: doc.querySelector(".block pre"), user: doc.querySelector(".turn-user") } });
-      const provider = createCalibratedProvider({ document: doc, location: win.location, profile: learned.profile });
-      provider.findToolBlockSpot(provider.lastAssistant());
-      assert.equal(doc.querySelector(".column").classList.contains("zs-tool-hide"), false, sibling);
-    }
-  });
 
   test("an answer part picked in the prose is grown to include the command block, so the command is still read", () => {
     const { provider, profile } = on((d) => ({ assistantInner: d.querySelector(".prose") }));

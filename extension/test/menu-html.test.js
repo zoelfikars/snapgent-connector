@@ -1,18 +1,12 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
-import { switchMenuHtml, targetMenuHtml, targetOptionsHtml } from "../src/ui/menu-html.js";
+import { switchMenuHtml, targetMenuHtml } from "../src/ui/menu-html.js";
 
 const parse = (html) => new JSDOM(`<body>${html}</body>`).window.document;
 const NASTY = { id: 'a"><img src=x onerror=1>', name: "<b>Bold</b> & 'quotes'" };
 
 describe("target menus", () => {
-  test("options carry id and name, escaped, as real attributes and text", () => {
-    const select = parse(`<select>${targetOptionsHtml([{ id: "vscode", name: "VS Code" }, NASTY])}</select>`).querySelector("select");
-    assert.deepEqual([...select.options].map((o) => [o.value, o.textContent]), [["vscode", "VS Code"], [NASTY.id, NASTY.name]]);
-    assert.equal(select.querySelector("img"), null);
-  });
-
   test("the menu lists every option and badges only the active one", () => {
     const doc = parse(targetMenuHtml([{ id: "vscode", name: "VS Code" }, NASTY], "vscode"));
     const rows = [...doc.querySelectorAll(".zs-target-opt")];

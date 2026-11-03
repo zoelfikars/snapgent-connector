@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Cheap, side-effect-free predicates the response watcher asks about a reply.
 
-import { START_M, CMD_KEY_RE, DSML_RE } from "./markers.js";
+import { START_M, CMD_KEY_RE } from "./markers.js";
 import { matchBrace } from "./json-scan.js";
+import { startsWithResult } from "../tools/result-marker.js";
 
 export function hasToolSignature(r) {
   return (
@@ -36,13 +37,8 @@ export function hasOpenToolBlock(r) {
 }
 
 export function toolNameFromText(txt) {
-  // Match the name even BEFORE its closing quote (`[^"]*`), so the chip shows
-  // the real command name AS IT IS TYPED instead of a generic "command"
-  // placeholder until the JSON closes. A still-empty value falls through.
-  // Trim: while the value is still streaming it can be whitespace-only (e.g.
-  // Kimi renders `"tool": "    "` for a beat), which would otherwise show a
-  // blank chip label until the loop repaints it. A whitespace value falls
-  // through to the placeholder below instead.
+  // The name even BEFORE its closing quote, so a command still being typed is named as it is typed. A value that is still empty
+  // or only whitespace (a site can render `"tool": "    "` for a beat) falls through to the placeholder below.
   const m = txt.match(/"(?:command|tool)"\s*:\s*"([^"]*)/);
   if (m && m[1].trim()) return m[1].trim();
   return "command";
@@ -53,22 +49,7 @@ export function toolNameFromText(txt) {
 // shapes we emit - never by command-like keywords, since a parse-error note
 // quotes a {"command": …} example that must NOT be read as a real command.
 export function isInjectedFeedback(txt) {
-  return /^\s*Output of '/.test(txt) ||
+  return startsWithResult(txt) ||
          /^\s*ERROR\b/.test(txt) ||
          /^\s*\(System note:/.test(txt);
-}
-
-// The assistant emitted a snapgentV3 command (JSON or an ###MCP_TOOL### block), or a
-// command-turn ATTEMPT the camouflage sweep should still mask. DSML counts:
-// the turn IS the model calling a tool, just in the wrong dialect, so it gets a
-// chip like any other command turn instead of dumping raw markup at the user
-// (reported live 2026-08-22 - the error fired correctly but the tags stayed on
-// screen). Note this is deliberately NOT mirrored in hasToolSignature: that
-// one gates the parse/execute path, and DSML must keep falling through to the
-// classify ladder so it fires the "dsml" parse_error rather than being handed
-// to parseToolCalls, which cannot read it.
-export function hasCommandShape(txt) {
-  return txt.includes(START_M) ||
-         DSML_RE.test(txt) ||
-         CMD_KEY_RE.test(txt); // command/tool with OR without params (e.g. list_commands)
 }

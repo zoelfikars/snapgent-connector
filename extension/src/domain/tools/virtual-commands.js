@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Commands the extension answers itself (they never reach the bridge).
 
+import { resultHeader } from "./result-marker.js";
 import { formatCatalogue } from "./catalogue.js";
 
 export const LIST_SERVERS = "list_mcp_servers";
 export const isListCommands = (name) => name === "list_commands" || name === "list_tools";
-export const isVirtualCommand = (name) => name === LIST_SERVERS || isListCommands(name);
 
 /** A tool without a "server" tag comes from an older bridge: treat it as the default server. */
 export const serverOf = (tool) => tool.server || "vscode";
@@ -22,7 +22,7 @@ export function renderServerList({ servers, target }) {
       })
     : ["- vscode: VS Code (default target) - unknown (bridge did not report server health)"];
   return (
-    `Output of '${LIST_SERVERS}':\n` +
+    `${resultHeader(LIST_SERVERS)}\n` +
     `Connected MCP servers (${lines.length}):\n${lines.join("\n")}\n` +
     `Use list_commands with a "server" param (one of the ids above) to see that server's exact commands. Without "server", list_commands defaults to "${target}".`
   );
@@ -33,7 +33,7 @@ export function renderServerList({ servers, target }) {
  *   `tools` is the full advertised catalogue; it is scoped to `target` here.
  */
 export function renderCommandList({ name, target, asked = "", enabled, tools }) {
-  const out = (body) => `Output of '${name}':\n${body}`;
+  const out = (body) => `${resultHeader(name)}\n${body}`;
   // Only the selected server can be listed. Asking for any other gets a generic
   // refusal that does not reveal whether that server exists or is connected.
   if (asked && asked !== target) {

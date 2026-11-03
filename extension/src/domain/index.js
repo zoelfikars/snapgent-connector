@@ -3,4 +3,3 @@
 export * as parser from "./parser/index.js";
 export * from "./prompt/index.js";
 export * from "./constants.js";
-export { toolCategory } from "./tools/category.js";

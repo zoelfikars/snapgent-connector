@@ -46,7 +46,7 @@
 /**
  * @typedef {Object} ChatTurnsPort  The conversation, as the loop sees it.
  * @property {(base: *) => Promise<object>} next   Wait for the model's next reply (a classified response).
- * @property {(text: string, images?: object[]|null) => Promise<*>} submit  Send text; resolves to the new base.
+ * @property {(text: string) => Promise<*>} submit  Send text; resolves to the new base.
  * @property {(item: object) => boolean} isHalted    Was this turn halted by a stop?
  * @property {() => Promise<boolean>} resumeTruncated  Click the site's Continue; true if generation resumed.
  */
@@ -56,12 +56,9 @@
  * @property {(level: string, title: string, text: string) => void} banner
  * @property {(text: string) => void} toast
  * @property {() => void} keepCover   Keep the "agent is working" cover up (e.g. while parked).
- * @property {(chip: {item: object, name: string, detail: string, category: string}) => void} parseErrorChip
- * @property {(item: object, call: object, category: string, text: {arg: string, body: string}) => void} toolRunning
- * @property {(text: string) => void} [progress]  which command is running now (empty: none), for the composer cover
+ * @property {(item: object, call: object) => void} toolRunning
  * @property {() => void} toolFinished
- * @property {(item: object, call: object, category: string) => void} toolStopped
- * @property {(item: object, call: object, outcome: object) => void} toolSettled
+ * @property {(text: string) => void} [progress]  which command is running now (empty: none), for the composer cover
  */
 
 /**
@@ -75,10 +72,6 @@
 /**
  * @typedef {Object} LoopToolsPort  Tool-related state the loop reads and updates.
  * @property {() => boolean} hasCatalogue
- * @property {(bareName: string) => boolean} isImageTool
- * @property {(name: string) => void} learnImageTool
- * @property {() => boolean} hasPendingImages
- * @property {() => object[]|null} takePendingImages
  * @property {() => string} reminderText
  */
 
@@ -107,15 +100,13 @@
  * @property {() => number} assistantCount
  * @property {() => number} userCount
  * @property {() => string} editorText
- * @property {(text: string, images?: object[]|null) => Promise<void>} typeAndSend
+ * @property {(text: string) => Promise<void>} typeAndSend
  */
 
 /**
- * @typedef {Object} SendEffectsPort  Page-side effects around one send (masking, cover, sweeps).
+ * @typedef {Object} SendEffectsPort  Page-side effects around one send (the composer cover).
  * @property {() => void} begin      Remember which turn is last, mark injecting, cover the composer.
- * @property {(preUserCount: number) => void} armPrehide  Mask the next new user turn on creation.
- * @property {() => void} rearmPrehide
- * @property {() => void} end        Lift the cover (unless a loop owns it) and nudge the camouflage sweep.
+ * @property {() => void} end        Lift the cover (unless a loop owns it).
  */
 
 /**
@@ -127,7 +118,7 @@
  */
 
 /**
- * @typedef {Object} LayoutCheckPort  Does the chat adapter understand the page it is on?
+ * @typedef {Object} LayoutCheckPort  Does the engine understand the page it is on?
  * @property {() => Promise<boolean>} sentMessageVisible  Our just-sent message is recognised as a user turn (waits briefly).
  * @property {() => object} describe                      What the page looks like, for the log.
  */
@@ -136,8 +127,6 @@
  * @typedef {Object} StartViewPort
  * @property {(text: string) => void} toast
  * @property {(level: string, title: string, text: string) => void} banner
- * @property {() => void} showStartingChip
- * @property {(item: object, phase: "run"|"done"|"err", detail: string) => void} handshake  The "Loading commands" chip.
  */
 
 export {};

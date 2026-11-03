@@ -1,14 +1,7 @@
 # Architecture
 
-> **Chat-site support is being rebuilt.** The per-site adapters (`legacy/providers/*`, ~8k lines of selectors) were
-> removed; one *uncalibrated* provider remains, so the extension boots, shows its bar, talks to the bridge and offers
-> the switch-AI shortcuts, but cannot run the agent on a chat site yet. Sites will be taught by the user in a short
-> calibration and stored as data: see [CALIBRATION.md](CALIBRATION.md). The last version with the old adapters is
-> the git tag `pre-calibration`. Sections below that describe adapters, layouts and fixtures describe that old
-> design and are kept only until the calibrated engine replaces them.
-
-snapgent connects an AI chat in the browser to VS Code through MCP. Three
-deployable parts, one direction of dependency inside each.
+snapgent connects an AI chat in the browser to VS Code through MCP. Three deployable parts, one direction of dependency inside each.
+How a chat site is read is taught by the user and stored as data: see [CALIBRATION.md](CALIBRATION.md).
 
 ```
  browser tab (AI chat site)              local machine
@@ -26,73 +19,77 @@ deployable parts, one direction of dependency inside each.
 Dependencies point **down** only. A layer never imports from a layer above it.
 
 ```
-ui/              presentation: bar, menus, chips, banners          (DOM we own)
-application/     use cases: agent loop, tool runner, session       (talks to ports)
-infrastructure/  adapters: chat sites, bridge client, browser APIs (DOM we don't own, I/O)
-domain/          pure rules: parser, prompt, tool formatting       (no DOM, no I/O)
+entry/           composition: one content script, the background worker, the popup
+page/            this page: state, settings, the bar, the loop's wiring   (DOM and chrome.* allowed)
+ui/              presentation: bar view, menus, notifications, dialogs    (DOM we own)
+application/     use cases: agent loop, batch runner, tool runner, session (talks to ports)
+infrastructure/  the chat site (calibrated engine), DOM helpers           (DOM we don't own)
+domain/          pure rules: parser, prompt, results, budget              (no DOM, no I/O)
 ```
 
 | Layer | Responsibility (one reason to change) | May use |
 |---|---|---|
-| `domain/` | What a command is, how it is parsed, what we tell the model, how results read | nothing external |
-| `application/` | The order of steps in a turn; session state machine | `domain`, ports |
-| `infrastructure/` | Reading/writing one specific chat site; the WebSocket; `chrome.*`/`browser.*` | `domain` |
+| `domain/` | What a command is, how it is parsed, what we tell the model, how results read, how big a message may be | nothing external |
+| `application/` | The order of steps in a turn; one batch of commands; the session state machine | `domain`, ports |
+| `infrastructure/` | Reading and writing one chat page from its stored profile | `domain` |
 | `ui/` | Drawing state; emitting user intents | `domain` |
-| `entry/` | Wiring only: construct adapters, inject them, start | everything |
+| `page/` | Wiring the above to this page: storage, the extension's worker, timers, the site's events | every layer below |
+| `entry/` | Building the page objects in dependency order and starting them | everything |
 
-**Ports** (interfaces the application layer depends on, implemented in
-infrastructure): `ChatPort` (read replies, send text, stop, lock input),
-`BridgePort` (list tools, call tool, status), `StoragePort`, `ClockPort`.
-Because the loop only sees ports, it is tested with in-memory fakes and never
-needs a browser.
+**Ports** (interfaces the application layer depends on, implemented in `page/`) are typedefs in `application/ports.js`. Because the loop only
+sees ports, it is tested with in-memory fakes and never needs a browser.
 
 ### Directory layout
 
 ```
 extension/
   src/
-    sites/registry.js        ONE list of supported sites -> manifest, background, popup
+    sites/registry.js        ONE list of supported sites -> manifest, background, popup, the switch-AI menu
     domain/
-      parser/                markers · json-scan · tool-call · salvage · detect
-      prompt/                system-prompt · feedback · reminder
-      tools/                 category · catalogue · result-summary · names · isolation
-                             virtual-commands · result-feedback
-      agent/                 turn-policy · reply-classifier · session-start (preconditions, handshake)
-      skills/                skill-text (frontmatter parsing + validation)
-      constants.js
-    application/             AgentLoop · ResponseWatcher (+ WatchState) · MessageSender · SessionStarter
-                             ToolRunner · ToolCatalogue · SkillsService · PromptResender (+ SysTally)
-                             StallWatchdog · ToolReminder · call-guard · ports (typedefs)
-    ui/                      confirm-dialog · notifications · mcp-settings · skills-settings · setup-card · popup
-                             bar-view · bar-placement · menu-position · cover-geometry · cover-color · page-theme
-                             chip-view · chip-icons · turn-chips · html (escaping) · index
-    infrastructure/chat/     chatgpt-layouts (page layouts as data) · dom-diagnostics · waitFor · StreamSampler · dom-helpers (shared by adapters)
-    entry/                   background.js · popup.js · legacy-globals.js
-  legacy/                    not yet migrated (see Status): main.js, providers/*
+      parser/                markers · json-scan · tool-call (every command of a reply) · salvage · detect
+      prompt/                system-prompt · feedback · reminder · resend · budget (size of one message)
+      tools/                 catalogue · result-marker (the "» name" line) · result-summary · result-feedback · job-key
+                             names · isolation · confirmation · virtual-commands
+      agent/                 turn-policy · reply-classifier · session-start
+      skills/                skill-text
+    application/             AgentLoop · BatchRunner · ResponseWatcher · MessageSender · SessionStarter · ToolRunner
+                             ToolCatalogue · SkillsService · PromptResender (+ SysTally) · SessionTracker · TurnMemory
+                             BridgeMonitor · ServerDirectory · ProfileStore · StallWatchdog · ToolReminder · call-guard · ports
+    infrastructure/
+      calibration/           profile · selector-learning · engine (the provider built from a profile)
+      chat/                  waitFor · StreamSampler · dom-helpers · dom-diagnostics
+    ui/                      bar-view · bar-placer · bar-placement · menu-html · menu-position · pill · notifications
+                             confirm-dialog · setup-card · mcp-settings · skills-settings · calibration wizard · input-cover · page-theme
+    page/                    state · storage · settings · diagnostics · extension-bridge · provider (stored profile or "not calibrated")
+                             visibility · chat (watcher + sender) · tools · loop · session · stop · user-input · auto-resume
+                             prompt-resend · message-budget · batch-jobs · turns · page-watch · bridge-status
+                             bar · bar-menus · pill-menu · site-menu · calibration-actions
+    entry/                   content.js (composition root) · background.js · popup.js
   manifests/base.json        shared manifest; per-browser deltas live in build/manifest.mjs
   build/                     manifest generation + esbuild bundling -> dist/{chrome,firefox}
   static/                    popup.html, overlay.css, icon
-  test/                      node:test; domain tests need no browser
+  test/                      node:test; domain and application tests need no browser
 ```
+
+### How a turn runs
+
+1. The page watches the site (`page-watch`, `user-input`, `auto-resume`). A reply that holds commands starts `AgentLoop`.
+2. `ResponseWatcher` waits until the reply is complete and classifies it; `turn-policy` decides what to do with it.
+3. `BatchRunner` runs the reply's commands in order. Each command carries a job key (batch id + place + content) and a share of the
+   message-size budget; a failure, a stop or a full budget ends the batch and the rest is listed as not run.
+4. `ToolRunner` calls the bridge under the user's approval mode. The VS Code server keeps each non-reading command as a job under its
+   key, so a page reloaded mid-batch picks the batch up again instead of running it twice, and Stop can end the process.
+5. The results go back as ONE message (`MessageSender`), each under its own `» name` line.
 
 ### Principles and where they are enforced
 
-- **SRP** — one module, one reason to change. `test/architecture.test.js`
-  caps domain and application modules at 250 lines.
-- **Separation of concerns** — the same test fails if `domain/` or
-  `application/` touch `document`, `window`, `chrome`, `fetch`, etc., or import
-  from a layer above them (`domain` imports only `domain`; `application` only
-  `application` + `domain`).
-- **DRY** — site hosts were repeated in `manifest.json`, `background.js` and
-  `popup.js`; they now come from `sites/registry.js`. The 14 content-script
-  blocks are generated, not hand-written. Chat-site code that is identical
-  across adapters moves into a shared base (see roadmap).
-- **Testable** — `ToolRunner` runs against fake bridge/session/timer ports with
-  no browser; smoke tests also boot the real `globals.js → adapter → main.js`
-  sequence in a sandbox. Pure functions take data and return data. Anything that needs
-  the clock, the DOM or the network is behind a port.
-- **Browser-neutral** — one source tree, two builds. Chrome gets
-  `background.service_worker`; Firefox gets `background.scripts` plus
+- **SRP** — one module, one reason to change. `test/architecture.test.js` caps every module of `domain`, `application`, `ui` and `page` at 250 lines.
+- **Separation of concerns** — the same test fails if `domain/` or `application/` touch `document`, `window`, `chrome`, `fetch`, etc., if `ui/`
+  touches `chrome.*` or the network, if a layer imports one above it, or if anything below `page/` imports it.
+- **DRY** — site hosts, names and links come from `sites/registry.js`; the content-script blocks of the manifest are generated.
+- **Testable** — the loop, the batch runner and the tool runner run against fake bridge/session/timer ports; the whole bundle is also booted
+  against captured pages in jsdom (`test/content-script.test.js`). Pure functions take data and return data.
+- **Browser-neutral** — one source tree, two builds. Chrome gets `background.service_worker`; Firefox gets `background.scripts` plus
   `browser_specific_settings.gecko`.
 
 ### Build
@@ -100,60 +97,16 @@ extension/
 ```bash
 cd extension && npm install
 npm run build            # dist/chrome and dist/firefox
-npm test                 # unit + smoke tests (no browser needed)
-npm run lint             # no-undef across legacy code catches dangling references
+npm test                 # unit + integration tests (no browser needed)
+npm run lint             # no-undef catches dangling references
 ```
 
-Load `extension/dist/chrome` as an unpacked extension in Chrome/Edge, or
-`extension/dist/firefox/manifest.json` via `about:debugging` → *This Firefox* →
-*Load Temporary Add-on* (or `npm run run:firefox` with `web-ext`).
+Load `extension/dist/chrome` as an unpacked extension in Chrome/Edge, or `extension/dist/firefox/manifest.json` via `about:debugging` →
+*This Firefox* → *Load Temporary Add-on* (or `npm run run:firefox` with `web-ext`).
 
-### Status — strangler migration
-
-The old code keeps working while it is replaced piece by piece; every step is
-shippable.
-
-| Piece | State |
-|---|---|
-| Parser, prompt, feedback, tool formatting, result summaries | **Migrated** to `domain/`, unit-tested |
-| Manifest, host lists, per-browser build | **Migrated** (`sites/`, `build/`) |
-| Bridge origin check | **Done** (`server/snapgent_bridge`) |
-| Tool execution (`runTool`, catalogue, isolation, `list_commands`, result shaping) | **Migrated** to `application/` + `domain/tools/`, tested with fake ports |
-| Agent loop (`agentLoop`: turn policy, lifecycle, stall watchdog, reminder cadence) | **Migrated** to `domain/agent` + `application/`, scripted-scenario tests |
-| Response watcher (`waitForResponse`: timing gates + reply classification) | **Migrated** to `application/response-watcher` + `domain/agent/reply-classifier`, fake-clock tests |
-| Send path (`submitAndGetBase`), session bootstrap (`startSession`), system-prompt re-injection, skills | **Migrated** (`MessageSender`, `SessionStarter`, `PromptResender`/`SysTally`, `SkillsService`), tested with scripted ports |
-| UI: dialog, bar decision/placement, menus, cover, theme, chips for our own turns, notifications, setup card, popups | **Migrated** to `ui/`, jsdom/unit tested |
-| `BridgeMonitor` (is the server usable, workspace probe), `SessionTracker` (is this chat a session, moved-away detection), `ServerDirectory` (server names, toggles, custom prompt), `TurnMemory` (halted/executed turns outside the DOM) | **Migrated** to `application/`, tested with fake ports |
-| `legacy/main.js` (~2.1k lines: `decorate.classify` for model turns, bar `build()`, menus, stop button, wiring) | Next; the per-site DOM fixtures it needs now exist (below) |
-| `legacy/providers/*` | **Removed** (tag `pre-calibration`). One `uncalibrated.js` provider remains; the calibrated engine replaces it (see CALIBRATION.md) |
-| `entry/background.js` | Bridge client + message router still in one file |
-
-### Roadmap (each item is its own PR)
-
-1. **Shared chat-adapter primitives.** *(first part done)* Measuring the 12
-   adapters showed that most same-named functions (`typeAndSend`, `snapshot`,
-   `readAssistant`, `installSendHooks`, ...) are genuinely site-specific, so a
-   big base class would have hidden real differences. Only the code that was
-   truly identical moved to `infrastructure/chat/`: `waitFor`, `StreamSampler`
-   (reply-growth detection), `clickIfPresent`, `setNativeValue`, `fileFromImage`,
-   plus `COMMAND_SHAPE_RE` in the domain. ~250 duplicated lines are gone.
-   Still to do: the near-identical Claude/Grok/Mistral/Ptero family
-   (`getEditor`, `writeText`, `snapshot`, `readAssistant`) becomes a
-   `createGenericAdapter(selectors)` factory; the other eight keep their quirks
-   behind a documented adapter contract (`ChatPort`).
-2. **`application/`** *(done)*: `ToolRunner`, `AgentLoop`, `ResponseWatcher`,
-   `MessageSender`, `SessionStarter`, `PromptResender`, `SkillsService`. What is
-   left in `main.js` is presentation and wiring, which is what `ui/` is for.
-3. **`ui/`** *(mostly done)*. Extracted and tested: the approval dialog, status-bar decision, bar
-   placement (mode choice + geometry), menu placement, input-cover geometry and colour, page theme,
-   chip drawing and chips for system/result turns, notifications, setup card and both settings
-   popups. What is left in `legacy/main.js` is the part that cannot be judged without each site's DOM:
-   `decorate.classify` for turns the MODEL wrote (command turns depend on streaming state and
-   per-site markup flags), the `build()` of the bar, the "more"/target menus, and the stop button
-   state. They are best moved only together with DOM fixtures for the other sites (now in place, see below).
-4. **`infrastructure/bridge/`**: `BridgeClient` (socket, reconnect, heartbeat,
-   request/response correlation) separate from the message router.
-5. **Typing**: JSDoc `@typedef` for ports and messages + `tsc --checkJs` in CI.
+When a chat site changes its markup the answer is to re-calibrate that part (see CALIBRATION.md). Two diagnostics say what the page looks
+like: `[zs-diag] layout.unreadable` (the site is generating but no reply turn is found) and `layout.sentMissing` (our own prompt is not
+recognised as a user turn). Read them from the page console, or copy the whole log with `copy(document.getElementById("zs-diag-log").textContent)`.
 
 ## Bridge (`server/snapgent_bridge/`)
 
@@ -208,7 +161,9 @@ snapgent_vscode/
   limits.py  risk.py  context.py     constants, tool risk levels, Context(root, policy, session)
   workspace.py                       which folder VS Code has open (storage.json parsing is pure)
   paths.py                           every path must resolve inside the workspace root
-  process.py                         child processes with bounded output/time
+  process.py                         child processes with bounded output (head + tail, the rest kept under a run_id) and time
+  outputs.py                         the last 20 runs' full output, read back with get_command_output
+  jobs.py                            commands as jobs under the extension's key: answered again without running twice, cancellable
   tools/                             each tool defined ONCE: schema + handler + risk (registry.py)
     project · reading · editing · git · commands
   security/                          the policy
@@ -217,7 +172,7 @@ snapgent_vscode/
     commands.py     which run_command calls are harmless; cmd.exe metacharacter guard
     confirmation.py one-time, argument-bound approval tokens
     decision.py     decide(policy, tool, args, session) -> allow | confirm | deny   (pure)
-  protocol.py  server.py             JSON-RPC and the stdio loop
+  protocol.py  server.py             JSON-RPC and the stdio loop (a tool call per thread, so a running job can be asked about or cancelled)
 ```
 
 Flow of a risky call: `McpServer` asks `decide`; on `confirm` it refuses with an MCP error result
@@ -247,28 +202,3 @@ visible; it is not a sandbox.
 
 To cut a release: bump the version in `server/snapgent_bridge/__init__.py`, `extension/package.json` and the
 README badge, add the CHANGELOG section, commit, then `git tag vX.Y.Z && git push --tags`.
-
-## When a chat site changes its markup (old design, removed in phase 0)
-
-This section describes the adapters that were removed; with calibration the answer to a changed site is "re-calibrate that part" (see CALIBRATION.md).
-
-Sites change their DOM without notice; this is the expected failure mode, so it is built to be
-visible and cheap to fix.
-
-1. **It fails loudly.** If the site is generating but the adapter sees no reply turn for 15 s,
-   the wait ends as `unreadable` with a banner, and `layout.unreadable` is logged with the element
-   chains around text we know is on the page (our `⟦ZS-SYS⟧` marker and the model's `"command"`).
-   If our own prompt is not recognised as a user turn, `layout.sentMissing` is logged and a warning
-   is shown. Read them from the page console: `[zs-diag] layout.unreadable`.
-2. **Layouts are data.** ChatGPT's turn selectors, role, reply container and id live in
-   `src/infrastructure/chat/chatgpt-layouts.js`, one entry per layout; the adapter uses the first
-   one that matches the page.
-3. **Fixtures pin it.** Every adapter has one in `test/fixtures/sites/` and runs the same contract in
-   `test/sites-contract.test.js` (counts, reading the tool call, ignoring reasoning and page chrome, finding the
-   composer, hiding the block, Stop control). Those fixtures are written from each adapter's selectors, because
-   logged-in captures are not available, so they guard the adapter logic, not drift in the live site: when a site
-   changes, replace its file with a real capture and the same contract applies. ChatGPT's captured layouts
-   live in `test/fixtures/` with their own tests in `test/chatgpt-layouts.test.js`; `test/content-script.test.js` runs the whole extension on it.
-
-Automatic discovery of turns by anchoring on known text was considered and deliberately not built:
-a wrong guess hides or targets the wrong element silently, which is worse than failing loudly.

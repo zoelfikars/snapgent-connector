@@ -46,10 +46,10 @@ describe("detect", () => {
 
   test("signature and shape", () => {
     assert.equal(P.hasToolSignature("Here is how you could use a command in theory."), false);
-    assert.equal(P.hasCommandShape('{"command":"x"}'), true);
   });
 
   test("injected feedback is recognised, command examples inside it are not commands", () => {
+    assert.equal(P.isInjectedFeedback("» read_file\n2"), true);
     assert.equal(P.isInjectedFeedback("Output of 'read_file':\n2"), true);
     assert.equal(P.isInjectedFeedback('ERROR: bad JSON, write {"command": "name"}'), true);
   });
@@ -103,9 +103,8 @@ describe("DeepSeek DSML markup", () => {
     ]) assert.ok(P.DSML_RE.test(text), text);
   });
 
-  test("is a command shape (masked) but not a tool signature (falls to the parse_error ladder)", () => {
+  test("is not a tool signature (falls to the parse_error ladder)", () => {
     assert.equal(P.hasToolSignature(full), false);
-    assert.equal(P.hasCommandShape(full), true);
   });
 
   test("no false positives on prose or a real command", () => {

@@ -77,23 +77,5 @@ export function createNotifications({ root, reload = () => globalThis.location.r
     connectionAlert = el;
   }
 
-  /** The latest tool screenshots. Fed from in-memory base64 so it works on every site; a new one replaces the old. */
-  function showImages(images, toolName) {
-    root.querySelectorAll(".zs-shot").forEach((el) => el.remove());
-    const wrap = element("div", "zs-shot");
-    const header = element("div", "zs-shot-hdr");
-    const close = element("button", "zs-shot-x", "✕");
-    close.addEventListener("click", () => wrap.remove());
-    header.append(element("span", "zs-shot-ttl", `${toolName} · ${images.length} image${images.length > 1 ? "s" : ""}`), close);
-    const body = element("div", "zs-shot-body");
-    for (const image of images) {
-      const img = element("img", "zs-shot-img");
-      img.src = `data:${image.mimeType || "image/jpeg"};base64,${image.data}`;
-      body.append(img);
-    }
-    wrap.append(header, body);
-    root.appendChild(wrap);
-  }
-
-  return { toast, banner, showStaleExtension, setBridgeLost, showImages };
+  return { toast, banner, showStaleExtension, setBridgeLost };
 }

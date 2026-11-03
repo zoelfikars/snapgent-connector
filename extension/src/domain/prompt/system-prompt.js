@@ -66,6 +66,6 @@ Rules:
     ? `\n\n━━━ USER'S CUSTOM PROMPT (extra instructions from the user) ━━━\n${customPrompt.trim()}`
     : "";
 
-  // The marker leads the prompt; it tags the bootstrap turn for camouflage.
+  // The marker leads the prompt: it tags the bootstrap turn.
   return `${SYS_MARKER}\n${prompt}${skillsBlock}${siteRules}${extra}`;
 }

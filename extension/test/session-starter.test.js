@@ -27,12 +27,10 @@ function setup(over = {}) {
       submit: async (text) => { log.push(`submit:${text.slice(0, 12)}`); return `base${log.length}`; },
       next: async () => { log.push("next"); const r = queue.shift(); if (!r) throw new Error("no scripted reply"); return typeof r === "function" ? r(state) : r; },
     },
-    runner: { run: async (call) => { log.push(`run:${call.tool}`); return state.handshakeFeedback ?? "Output of 'list_commands':\nvscode commands (2):"; } },
+    runner: { run: async (call) => { log.push(`run:${call.tool}`); return state.handshakeFeedback ?? "» list_commands\nvscode commands (2):"; } },
     view: {
       toast: (t) => log.push(`toast:${t}`),
       banner: (l, title, text) => log.push(["banner", title, text]),
-      showStartingChip: () => log.push("chip:starting"),
-      handshake: (item, phase, detail) => log.push(`handshake:${phase}:${detail}`),
     },
     isStopped: () => state.stopped,
     diag: (e, d) => log.push(`diag:${e}`),
@@ -50,8 +48,8 @@ describe("SessionStarter", () => {
     const t = setup({ state: { responses: [handshakeTurn, ready] } });
     await t.starter.start();
     assert.deepEqual(t.log.filter((e) => typeof e === "string" && !e.startsWith("diag")), [
-      "begin", "ensure:true", `probe:tree:{"path":"."}:5000`, "skills.load", "submit:PROMPT", "chip:starting", "next",
-      "handshake:run:", "run:list_commands", "handshake:done:2 commands", "submit:Output of 'l", "next", "markStarted", "toast:Agent on.", "end:true",
+      "begin", "ensure:true", `probe:tree:{"path":"."}:5000`, "skills.load", "submit:PROMPT", "next",
+      "run:list_commands", "submit:» list_comma", "next", "markStarted", "toast:Agent on.", "end:true",
     ]);
   });
 
@@ -94,10 +92,10 @@ describe("SessionStarter", () => {
     assert.deepEqual(banners(t.log)[0].slice(1), ["VS Code tools unavailable", "Is the server online?"]);
   });
 
-  test("an unavailable target marks the handshake chip red", async () => {
-    const t = setup({ state: { responses: [handshakeTurn, ready], handshakeFeedback: "Output of 'list_commands':\nNo commands available - offline" } });
+  test("an unavailable target is still reported to the model", async () => {
+    const t = setup({ state: { responses: [handshakeTurn, ready], handshakeFeedback: "» list_commands\nNo commands available - offline" } });
     await t.starter.start();
-    assert.ok(t.log.includes("handshake:err:VS Code unavailable"));
+    assert.ok(t.log.includes("submit:» list_comma"));
   });
 
   test("superseded mid-way: stops quietly, never marks started, and end() is told it is not alive", async () => {

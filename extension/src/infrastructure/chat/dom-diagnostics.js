@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// When an adapter cannot find what it expects, the useful question is "what does the page
+// When the engine cannot find what it expects, the useful question is "what does the page
 // actually look like around the text we KNOW is there?". These helpers answer it compactly,
 // so a layout change can be fixed from one log line instead of a screen-share.
 

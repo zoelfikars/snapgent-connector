@@ -16,12 +16,14 @@ const facts = (over = {}) => ({ starting: false, startingKey: null, running: fal
 describe("textShowsSession", () => {
   test("the marker, an injected result and a system note are session signals", () => {
     assert.equal(textShowsSession(`${MARK} hello`, MARK), true);
-    assert.equal(textShowsSession("intro\nOutput of 'read_file':\nbody", MARK), true);
+    assert.equal(textShowsSession("intro\n» read_file\nbody", MARK), true);
+    assert.equal(textShowsSession("intro\nOutput of 'read_file':\nbody", MARK), true, "the older wording");
     assert.equal(textShowsSession("(System note: the reply was cut off.)", MARK), true);
   });
   test("a model merely showing the command format is not one", () => {
     assert.equal(textShowsSession('Use {"command":"read_file","arguments":{}} like this', MARK), false);
     assert.equal(textShowsSession("I read Output of 'x' somewhere", MARK), false);
+    assert.equal(textShowsSession("an arrow » here and there", MARK), false);
   });
 });
 

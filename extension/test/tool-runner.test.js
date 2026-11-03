@@ -20,7 +20,7 @@ describe("ToolRunner.run — real tools", () => {
   test("a successful call returns 'Output of' and sends the right request to the selected server", async () => {
     const { runner, bridge } = setup({ results: { read_file: { ok: true, text: "file body" } } });
     const text = await runner.run({ tool: "read_file", arguments: { path: "a.js" } });
-    assert.equal(text, "Output of 'read_file':\nfile body");
+    assert.equal(text, "» read_file\nfile body");
     assert.deepEqual(bridge.calls, [{ name: "read_file", arguments: { path: "a.js", __snapgent_mode: "manual" }, timeout: 120000, server: "vscode" }]);
   });
 
@@ -87,7 +87,7 @@ describe("ToolRunner.run — virtual commands", () => {
   test("list_commands renders the selected server's catalogue without calling a tool", async () => {
     const { runner, bridge } = setup();
     const text = await runner.run({ tool: "list_commands" });
-    assert.match(text, /^Output of 'list_commands':\nvscode commands \(2\):/);
+    assert.match(text, /^» list_commands\nvscode commands \(2\):/);
     assert.match(text, /read_file: read_file tool/);
     assert.equal(bridge.calls.length, 0);
   });

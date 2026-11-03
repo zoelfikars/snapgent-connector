@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Polling helper shared by every chat adapter.
+// Polling helper for the chat code.
 
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

@@ -3,7 +3,7 @@
 // their own context; the model then keeps the gist of the task but forgets that an
 // extension runs its commands. A periodic re-statement fixes that. Pure rules only.
 
-import { RESEND_MARKER, SYS_MARKER } from "../constants.js";
+import { SYS_MARKER } from "../constants.js";
 import { isInjectedFeedback } from "../parser/detect.js";
 
 /** Injected tool results measure context VOLUME, which is what makes a site summarise. */
@@ -22,7 +22,6 @@ export const fitsBudget = (resultLength, riderLength, cap = Infinity) => resultL
 export function buildResendRider(prompt) {
   return (
     "\n\n────────────────────────────────\n" +
-    RESEND_MARKER + "\n" +
     "(System note from snapgentV3 - an automatic re-statement of your operating " +
     "instructions, NOT a new request and NOT something to reply to. This conversation " +
     "may have been summarised, which drops the part explaining how you actually run " +

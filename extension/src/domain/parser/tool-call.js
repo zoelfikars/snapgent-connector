@@ -5,7 +5,7 @@ import { START_M, END_M } from "./markers.js";
 import { matchBrace, parseLoose, extractJson } from "./json-scan.js";
 
 // Normalise a parsed JSON object into { tool, arguments }, accepting both the
-// new snapgentV3 schema ("command"/"params") and the legacy/function-calling
+// new snapgentV3 schema ("command"/"params") and the function-calling
 // schema ("tool"/"arguments"/"name"/"args"). Returns null if not a valid call.
 export function normalizeCall(o) {
   if (!o || typeof o !== "object") return null;

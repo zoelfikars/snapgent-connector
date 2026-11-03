@@ -20,7 +20,7 @@ for (const target of targets) {
 
   await build({
     entryPoints: {
-      globals: join(root, "src/entry/legacy-globals.js"),
+      content: join(root, "src/entry/content.js"),
       background: join(root, "src/entry/background.js"),
       popup: join(root, "src/entry/popup.js"),
     },
@@ -33,8 +33,6 @@ for (const target of targets) {
   });
 
   await cp(join(root, "static"), out, { recursive: true });
-  await cp(join(root, "legacy/main.js"), join(out, "main.js"));
-  await cp(join(root, "legacy/providers"), join(out, "providers"), { recursive: true });
 
   const manifest = buildManifest(base, { target, version: pkg.version });
   await writeFile(join(out, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");

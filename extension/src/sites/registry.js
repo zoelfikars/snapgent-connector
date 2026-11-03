@@ -8,24 +8,28 @@
  * @property {string}   id           Short stable id.
  * @property {string}   name         Display name.
  * @property {string[]} matches      Content-script URL match patterns.
+ * @property {string}   url         Where the "switch AI" menu sends the user.
  * @property {string[]} [extraHosts] Extra host permissions beyond `matches`.
  */
 
 /** @type {Site[]} */
 export const SITES = [
-  { id: "deepseek", name: "DeepSeek", matches: ["https://chat.deepseek.com/*"], extraHosts: ["https://deepseek.com/*"] },
-  { id: "chatgpt", name: "ChatGPT", matches: ["https://chatgpt.com/*", "https://chat.openai.com/*"] },
-  { id: "claude", name: "Claude", matches: ["https://claude.ai/*"] },
-  { id: "gemini", name: "Gemini", matches: ["https://gemini.google.com/*"] },
-  { id: "kimi", name: "Kimi", matches: ["https://www.kimi.ai/*", "https://kimi.ai/*"] },
-  { id: "glm", name: "GLM", matches: ["https://chat.z.ai/*"] },
-  { id: "qwen", name: "Qwen", matches: ["https://chat.qwen.ai/*"] },
-  { id: "arena", name: "Arena", matches: ["https://arena.ai/*"] },
-  { id: "meta", name: "Meta AI", matches: ["https://www.meta.ai/*", "https://meta.ai/*"] },
-  { id: "ptero", name: "Ptero", matches: ["https://ptero.pro/*"] },
-  { id: "grok", name: "Grok", matches: ["https://grok.com/*"] },
-  { id: "mistral", name: "Mistral", matches: ["https://chat.mistral.ai/*"] },
+  { id: "deepseek", name: "DeepSeek", url: "https://chat.deepseek.com/", matches: ["https://chat.deepseek.com/*"], extraHosts: ["https://deepseek.com/*"] },
+  { id: "chatgpt", name: "ChatGPT", url: "https://chatgpt.com/", matches: ["https://chatgpt.com/*", "https://chat.openai.com/*"] },
+  { id: "claude", name: "Claude", url: "https://claude.ai/new", matches: ["https://claude.ai/*"] },
+  { id: "gemini", name: "Gemini", url: "https://gemini.google.com/app", matches: ["https://gemini.google.com/*"] },
+  { id: "kimi", name: "Kimi", url: "https://www.kimi.ai/", matches: ["https://www.kimi.ai/*", "https://kimi.ai/*"] },
+  { id: "glm", name: "GLM", url: "https://chat.z.ai/", matches: ["https://chat.z.ai/*"] },
+  { id: "qwen", name: "Qwen", url: "https://chat.qwen.ai/", matches: ["https://chat.qwen.ai/*"] },
+  { id: "arena", name: "Arena", url: "https://arena.ai/text/direct", matches: ["https://arena.ai/*"] },
+  { id: "meta", name: "Meta AI", url: "https://www.meta.ai/", matches: ["https://www.meta.ai/*", "https://meta.ai/*"] },
+  { id: "ptero", name: "Ptero", url: "https://ptero.pro/", matches: ["https://ptero.pro/*"] },
+  { id: "grok", name: "Grok", url: "https://grok.com/", matches: ["https://grok.com/*"] },
+  { id: "mistral", name: "Mistral", url: "https://chat.mistral.ai/code", matches: ["https://chat.mistral.ai/*"] },
 ];
+
+/** The "switch AI" shortcuts. DeepSeek is hidden from the menu (supported, not advertised). */
+export const SITE_LINKS = SITES.filter((site) => site.id !== "deepseek").map(({ name, url }) => ({ name, url }));
 
 export const BRIDGE_PORT = 17613;
 

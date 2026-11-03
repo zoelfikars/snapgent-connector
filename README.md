@@ -238,14 +238,16 @@ The AI sends commands, snapgentV3 runs them in the selected target (VS Code by d
 
 ## `06` &nbsp; Architecture
 
-The extension is split into a **pure domain layer**, a **provider-agnostic core** and **per-site providers**. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for layers, rules and the migration roadmap.
+The extension is split into layers that only depend downwards: a **pure domain**, the **application** use cases, the **page** wiring and one **content script** that composes them. A chat site is read from a profile the user teaches ([docs/CALIBRATION.md](docs/CALIBRATION.md)). See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for layers and rules.
 
 ```
-src/domain/                 pure logic: command parsing, system prompt, tool formatting
+src/domain/                 pure logic: command parsing, system prompt, results, message budget
+src/application/            the agent loop, batches of commands, sessions (against ports)
+src/infrastructure/         the calibrated engine that reads a chat page from its profile
+src/ui/                     bar, menus, notices, dialogs
+src/page/                   wiring to this page: settings, storage, the bar, the loop, the stop button
 src/sites/registry.js       the one list of supported AI sites
-src/entry/                  background worker, popup, legacy globals bridge
-legacy/main.js              agent loop, UI, session state (being split up)
-legacy/providers/<site>.js  site-specific selectors and chat integration
+src/entry/                  content script (composition), background worker, popup
 build/                      per-browser manifest generation and bundling
 ```
 
@@ -260,8 +262,7 @@ Python.
 ```
 snapgent-full/
 ├── extension/                 # Browser extension source (Chrome/Edge and Firefox)
-│   ├── src/                   # Domain logic, site registry, entry points
-│   ├── legacy/                # Code still being migrated (see docs/ARCHITECTURE.md)
+│   ├── src/                   # domain, application, infrastructure, ui, page, entry
 │   ├── build/                 # Manifest generation + bundling -> dist/{chrome,firefox}
 │   └── test/                  # node:test suites (npm test)
 ├── server/                    # Everything you run: same layout as the release zip

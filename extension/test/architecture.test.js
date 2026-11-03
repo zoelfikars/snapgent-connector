@@ -49,3 +49,33 @@ describe("layering rules", () => {
     });
   }
 });
+
+// The page layer wires the other layers to this page: it may use the DOM and the extension APIs, and may import every layer below it,
+// but nothing below it may import the page.
+describe("page layer", () => {
+  const root = join(SRC, "page");
+
+  test("only imports from itself and the layers below it", () => {
+    const allowed = ["page", "domain", "application", "ui", "infrastructure", "sites"].map((name) => join(SRC, name));
+    for (const file of files(root)) {
+      for (const spec of importsOf(readFileSync(file, "utf8"))) {
+        assert.ok(allowed.some((dir) => join(file, "..", spec).startsWith(dir)), `${relative(SRC, file)} imports ${spec}`);
+      }
+    }
+  });
+
+  test("no other layer imports the page", () => {
+    for (const layer of ["domain", "application", "ui", "infrastructure", "sites"]) {
+      for (const file of files(join(SRC, layer))) {
+        for (const spec of importsOf(readFileSync(file, "utf8"))) assert.ok(!join(file, "..", spec).startsWith(root), `${relative(SRC, file)} imports ${spec}`);
+      }
+    }
+  });
+
+  test("every page module stays small enough to hold in your head", () => {
+    for (const file of files(root)) {
+      const lines = readFileSync(file, "utf8").split("\n").length;
+      assert.ok(lines <= 250, `${relative(SRC, file)} has ${lines} lines`);
+    }
+  });
+});

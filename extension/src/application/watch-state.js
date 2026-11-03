@@ -20,7 +20,7 @@ export class WatchState {
     this.reasonSince = 0;    // reasoning written but no answer yet
     this.noTurnSince = 0;    // tried to finalize before this send's reply turn exists
     this.unsettledSince = 0; // command-shaped reply whose read is not yet stable
-    this.unreadableSince = 0; // the site is generating but the adapter sees no reply turn at all
+    this.unreadableSince = 0; // the site is generating but no reply turn can be found
     this.noTurnLoggedAt = 0;
     // Per-turn: reset whenever the turn NODE changes so a new turn never inherits the previous one's text.
     this.curItem = null;

@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { waitFor } from "../src/infrastructure/chat/wait.js";
 import { StreamSampler } from "../src/infrastructure/chat/stream-sampler.js";
 import { clickIfPresent } from "../src/infrastructure/chat/dom-helpers.js";
-import { COMMAND_SHAPE_RE } from "../src/domain/parser/markers.js";
 
 function fakeClock() {
   let t = 1000;
@@ -86,10 +85,3 @@ describe("clickIfPresent", () => {
   });
 });
 
-describe("COMMAND_SHAPE_RE", () => {
-  test("matches commands and MCP blocks, not prose", () => {
-    assert.ok(COMMAND_SHAPE_RE.test('{"command": "read_file"}'));
-    assert.ok(COMMAND_SHAPE_RE.test("###MCP_TOOL###"));
-    assert.ok(!COMMAND_SHAPE_RE.test("just words about a command"));
-  });
-});

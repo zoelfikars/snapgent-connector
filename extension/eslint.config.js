@@ -1,10 +1,5 @@
 import globals from "globals";
 
-const legacyGlobals = {
-  // provided by dist/globals.js (src/entry/legacy-globals.js)
-  ZSParse: "readonly", ZS: "readonly", ZSDomain: "readonly", ZSApp: "readonly", ZSChat: "readonly", ZSUi: "readonly", ZSSites: "readonly", ZSCalibration: "readonly",
-};
-
 export default [
   { ignores: ["dist/**", "node_modules/**"] },
   {
@@ -15,16 +10,5 @@ export default [
   {
     files: ["test/**/*.cjs"],
     languageOptions: { ecmaVersion: 2023, sourceType: "commonjs", globals: { ...globals.node, ...globals.browser } },
-  },
-  {
-    // Adapters define ZSProvider; main.js (loaded after) consumes it.
-    files: ["legacy/**/*.js"],
-    linterOptions: { reportUnusedDisableDirectives: "off" },
-    languageOptions: { ecmaVersion: 2023, sourceType: "script", globals: { ...globals.browser, chrome: "readonly", ...legacyGlobals } },
-    rules: { "no-undef": "error", "no-redeclare": "error" },
-  },
-  {
-    files: ["legacy/main.js"],
-    languageOptions: { globals: { ZSProvider: "readonly" } },
   },
 ];

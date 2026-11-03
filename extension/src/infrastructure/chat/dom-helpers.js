@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Small DOM utilities that several chat adapters need identically.
+// Small DOM utilities for working with a chat page.
 
 /** Click the element returned by `find()` if there is one. Never throws. */
 export function clickIfPresent(find) {

@@ -1,7 +1,8 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { formatToolForModel, formatCatalogue } from "../src/domain/tools/catalogue.js";
-import { argSummary, outSummary, feedbackIsError, stripOutputPrefix } from "../src/domain/tools/result-summary.js";
+import { argSummary, feedbackIsError, runningLabel } from "../src/domain/tools/result-summary.js";
+import { containsResult, resultHeader, startsWithResult, withoutResultHeader } from "../src/domain/tools/result-marker.js";
 
 const readFile = {
   name: "read_file",
@@ -40,22 +41,39 @@ describe("result summary", () => {
 
   test("ERROR wrapper and in-body error lead-ins both count as failures", () => {
     assert.equal(feedbackIsError("ERROR: nope"), true);
-    assert.equal(feedbackIsError("Output of 'x':\nError executing code: boom"), true);
-    assert.equal(feedbackIsError("Output of 'x':\nFailed: 0"), false);
-    assert.equal(feedbackIsError("Output of 'x':\nall good"), false);
+    assert.equal(feedbackIsError("» x\nError executing code: boom"), true);
+    assert.equal(feedbackIsError("» x\nFailed: 0"), false);
+    assert.equal(feedbackIsError("» x\nall good"), false);
+    assert.equal(feedbackIsError("Output of 'x':\nError executing code: boom"), true, "the older wording still counts");
   });
 
-  test("outSummary summarises JSON shape instead of slicing it", () => {
-    assert.equal(outSummary("Output of 'x':\n" + JSON.stringify({ files: [1, 2, 3] })), "3 files");
-    assert.equal(outSummary("Output of 'x':\n" + JSON.stringify({ files: [1] })), "1 file");
-    assert.equal(outSummary("Output of 'x':\n[1,2]"), "2 items");
+  test("runningLabel names the command and its place in a batch", () => {
+    assert.equal(runningLabel({ tool: "read_files", arguments: { paths: ["a"] } }), "read_files · paths: a");
+    assert.equal(runningLabel({ tool: "tree" }, { index: 1, total: 3 }), "2/3 · tree");
+  });
+});
+
+describe("result marker", () => {
+  test("a result starts with the command's name behind a »", () => {
+    assert.equal(resultHeader("tree"), "» tree");
+    assert.equal(startsWithResult("» tree\nbody"), true);
+    assert.equal(startsWithResult("  » tree"), true);
   });
 
-  test("outSummary reports line count for multi-line text", () => {
-    assert.equal(outSummary("Output of 'x':\nfirst\nsecond"), "first · 2 lines");
+  test("the older wording is still recognised", () => {
+    assert.equal(startsWithResult("Output of 'tree':\nbody"), true);
+    assert.equal(containsResult("intro\nOutput of 'tree':\nbody"), true);
   });
 
-  test("stripOutputPrefix", () => {
-    assert.equal(stripOutputPrefix("Output of 'x':\nbody"), "body");
+  test("a » in ordinary text is not a result", () => {
+    for (const text of ["go » next", "I wrote » tree in the middle", "» ", "Output of x", ""]) assert.equal(startsWithResult(text), false, text);
+    assert.equal(containsResult("see the » arrow and more words"), false);
+  });
+
+  test("a result inside a longer turn is found, and its header is stripped", () => {
+    assert.equal(containsResult("intro\n» read_files\nbody"), true);
+    assert.equal(withoutResultHeader("» read_files\nbody"), "body");
+    assert.equal(withoutResultHeader("Output of 'x':\nbody"), "body");
+    assert.equal(withoutResultHeader("plain"), "plain");
   });
 });

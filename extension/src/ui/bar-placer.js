@@ -2,11 +2,11 @@
 // Seats the control bar once per animation frame in a corner of the window, next to its show/hide button. The corner and
 // whether the bar is shown are the user's choice (bar-prefs); the geometry is pure (bar-placement.js).
 
-import { barGeometry, cornerOf, floatingStopGeometry, pillPosition, toggleGeometry } from "./bar-placement.js";
+import { barGeometry, cornerOf, floatingStopGeometry, toggleGeometry } from "./bar-placement.js";
 
 /**
  * @param {{ document: Document, provider: object, prefs: () => { corner: string, hidden: boolean },
- *           parts: () => { bar: HTMLElement|null, root: HTMLElement|null, menuEl: HTMLElement|null, unstableEl: HTMLElement|null, toggleEl: HTMLElement|null,
+ *           parts: () => { bar: HTMLElement|null, root: HTMLElement|null, menuEl: HTMLElement|null, toggleEl: HTMLElement|null,
  *                      stopEl?: HTMLElement|null, stopFloatEl?: HTMLElement|null },
  *           positionMenu: (anchorRect: object) => void }} deps
  *   `parts` is a function because the bar is created later than this placer (by build()).
@@ -49,7 +49,6 @@ export function createBarPlacer({ document, provider, prefs, parts, positionMenu
     if (obstructed || hidden) {
       ui.bar.style.display = "none";
       if (ui.menuEl) ui.menuEl.hidden = true;
-      if (ui.unstableEl) ui.unstableEl.hidden = true;
       return;
     }
     ui.bar.style.display = "flex";
@@ -59,11 +58,6 @@ export function createBarPlacer({ document, provider, prefs, parts, positionMenu
     ui.bar.style.left = `${g.left}px`;
     ui.bar.style.top = `${g.top}px`;
 
-    if (ui.unstableEl) {
-      const pos = pillPosition(ui.bar.getBoundingClientRect(), ui.unstableEl.offsetHeight, where);
-      ui.unstableEl.hidden = !pos;
-      if (pos) { ui.unstableEl.style.left = `${pos.left}px`; ui.unstableEl.style.top = `${pos.top}px`; }
-    }
     if (ui.menuEl && !ui.menuEl.hidden) positionMenu(ui.bar.getBoundingClientRect());
   }
 
