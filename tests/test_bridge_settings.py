@@ -16,7 +16,7 @@ class AppRootTests(unittest.TestCase):
         self.assertEqual(root, Path("/opt/snapgent").resolve())
 
     def test_the_real_root_holds_the_entry_point(self):
-        self.assertTrue((settings.ROOT / "bridge.py").is_file())
+        self.assertTrue((settings.ROOT / "snapgent.py").is_file())
 
 
 class PythonInterpreterTests(unittest.TestCase):

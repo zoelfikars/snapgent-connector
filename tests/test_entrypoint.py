@@ -1,4 +1,4 @@
-"""Runs `python bridge.py` exactly as the Linux/macOS launchers do."""
+"""Runs `python3 snapgent.py` the way a clone is run on Linux and macOS."""
 
 import asyncio
 import json
@@ -26,10 +26,10 @@ def free_port() -> int:
 
 @unittest.skipIf(websockets is None or sys.platform == "win32", "needs websockets and POSIX signals")
 class EntryPointTests(unittest.IsolatedAsyncioTestCase):
-    async def test_bridge_py_serves_extensions_rejects_pages_and_stops_cleanly(self):
+    async def test_snapgent_py_serves_extensions_rejects_pages_and_stops_cleanly(self):
         port = free_port()
         env = {**os.environ, "ZS_BRIDGE_PORT": str(port), "ZS_ALLOWED_ORIGINS": "moz-extension://abc-123"}
-        process = subprocess.Popen([sys.executable, "bridge.py"], cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        process = subprocess.Popen([sys.executable, "snapgent.py"], cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         try:
             client = None
             for _ in range(100):

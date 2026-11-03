@@ -59,7 +59,7 @@ jobs:
       - run: python -m unittest discover -s tests -t . -v
 
   frozen:
-    name: Windows executables build and start
+    name: Windows program builds and starts
     runs-on: windows-latest
     defaults:
       run:
@@ -70,31 +70,48 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install pyinstaller websockets
-      - run: pyinstaller --noconfirm bridge.spec
-      - run: pyinstaller --noconfirm vscode_mcp.spec
-      - name: The VS Code server answers an MCP handshake
+      - run: pyinstaller --noconfirm snapgent.spec
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snapgent-windows-example
+          path: server/dist/snapgent.exe
+          retention-days: 7
+          if-no-files-found: error
+      - name: snapgent.exe answers as the VS Code MCP server
         shell: python
         run: |
           import json, subprocess
           request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}) + "\n"
-          out = subprocess.run(["dist/vscode_mcp.exe"], input=request, capture_output=True, text=True, timeout=60).stdout
+          out = subprocess.run(["dist/snapgent.exe", "--vscode-mcp"], input=request, capture_output=True, text=True, timeout=60).stdout
           assert json.loads(out.splitlines()[0])["result"]["serverInfo"]["name"] == "vscode-mcp", out
-      - name: The bridge starts and listens
+      - name: snapgent.exe starts the bridge, writes its configuration and listens; a second start replaces it
         shell: python
         run: |
-          import os, socket, subprocess, time
-          env = dict(os.environ, ZS_BRIDGE_PORT="17999")
-          process = subprocess.Popen(["dist/bridge.exe"], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-          try:
+          import json, os, socket, subprocess, time
+          env = dict(os.environ, ZS_BRIDGE_PORT="17998")
+          def listening():
               for _ in range(100):
                   try:
-                      socket.create_connection(("127.0.0.1", 17999), timeout=0.5).close(); break
+                      socket.create_connection(("127.0.0.1", 17998), timeout=0.5).close(); return True
                   except OSError:
                       time.sleep(0.2)
-              else:
-                  raise SystemExit("bridge.exe never listened")
-          finally:
-              process.kill()
+              return False
+          def start():
+              return subprocess.Popen(["dist/snapgent.exe"], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+          first = start()
+          assert listening(), "snapgent.exe never listened"
+          assert json.load(open("dist/config.json"))["mcpServers"]["vscode"]["args"] == ["--vscode-mcp"]
+          second = start()
+          for _ in range(50):
+              if first.poll() is not None:
+                  break
+              time.sleep(0.2)
+          else:
+              subprocess.run(["taskkill", "/F", "/T", "/PID", str(second.pid)])
+              subprocess.run(["taskkill", "/F", "/T", "/PID", str(first.pid)])
+              raise SystemExit("the first bridge was not replaced")
+          assert listening(), "the second bridge never listened"
+          subprocess.run(["taskkill", "/F", "/T", "/PID", str(second.pid)])
 
   frozen-linux:
     name: Linux program builds and starts

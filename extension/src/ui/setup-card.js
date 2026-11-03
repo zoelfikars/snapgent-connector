@@ -14,7 +14,7 @@ export function shouldShowSetup({ dismissed, bridgeConnected, hasSession, chatIs
 }
 
 export const SETUP_STEPS = [
-  "Start the bridge: <code>start.bat</code> (Windows), <code>MacOS_Start.command</code> (macOS) or <code>bash Linux_Start.sh</code> (Linux)",
+  "Start the bridge: <code>snapgent.exe</code> (Windows), <code>./snapgent</code> (Linux) or <code>python3 server/snapgent.py</code> (macOS)",
   "Type <b>y</b> in the bridge window when it asks about this extension (only the first time)",
   "Press <b>Start</b> in the bar",
 ];

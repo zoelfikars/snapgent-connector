@@ -180,11 +180,11 @@
             <h3>Start the bridge</h3>
             <p>Keep its window open while you work. Closing it disconnects the agent.</p>
             <dl class="os">
-              <div><dt>Windows</dt><dd><code>start.bat</code></dd></div>
-              <div><dt>macOS</dt><dd><code>MacOS_Start.command</code></dd></div>
-              <div><dt>Linux</dt><dd><code>bash Linux_Start.sh</code></dd></div>
+              <div><dt>Windows</dt><dd><code>snapgent.exe</code></dd></div>
+              <div><dt>macOS</dt><dd><code>python3 server/snapgent.py</code></dd></div>
+              <div><dt>Linux</dt><dd><code>./snapgent</code></dd></div>
             </dl>
-            <p class="note">On macOS the first launch may show a Gatekeeper warning. Choose Done, then allow the script in System Settings, Privacy &amp; Security.</p>
+            <p class="note">On macOS run it from a clone with Python 3.9+ and <code>pip install websockets</code>.</p>
           </li>
           <li>
             <h3>Start a session</h3>

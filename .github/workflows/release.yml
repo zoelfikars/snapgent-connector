@@ -64,16 +64,12 @@ jobs:
           git config --global user.name "CI"
           git config --global user.email "ci@example.invalid"
       - run: python -m unittest discover -s tests -t .
-      - run: pyinstaller --noconfirm bridge.spec
-        working-directory: server
-      - run: pyinstaller --noconfirm vscode_mcp.spec
+      - run: pyinstaller --noconfirm snapgent.spec
         working-directory: server
       - uses: actions/upload-artifact@v4
         with:
-          name: windows-binaries
-          path: |
-            server/dist/bridge.exe
-            server/dist/vscode_mcp.exe
+          name: windows-binary
+          path: server/dist/snapgent.exe
           if-no-files-found: error
 
   linux-binary:
@@ -115,8 +111,8 @@ jobs:
           path: extension-dist
       - uses: actions/download-artifact@v4
         with:
-          name: windows-binaries
-          path: binaries
+          name: windows-binary
+          path: windows-binary
       - uses: actions/download-artifact@v4
         with:
           name: linux-binary
@@ -126,13 +122,7 @@ jobs:
           python3 scripts/package_release.py
           --version "${{ needs.check-version.outputs.version }}"
           --extension-dist extension-dist
-          --binaries binaries
-          --out out
-      - name: Assemble the extension zip and the Linux program
-        run: >
-          python3 scripts/package_release.py
-          --version "${{ needs.check-version.outputs.version }}"
-          --extension-dist extension-dist
+          --windows-binary windows-binary/snapgent.exe
           --linux-binary linux-binary/snapgent
           --out out
       - name: Publish
@@ -142,5 +132,5 @@ jobs:
           v="${{ needs.check-version.outputs.version }}"
           flags=""
           case "$GITHUB_REF_NAME" in *-*) flags="--prerelease";; esac
-          gh release create "$GITHUB_REF_NAME" "out/snapgent-v$v.zip" "out/snapgent-extension-v$v.zip" "out/snapgent-linux-x64-v$v.tar.gz" \
+          gh release create "$GITHUB_REF_NAME" "out/snapgent.exe" "out/snapgent-extension-v$v.zip" "out/snapgent-linux-x64-v$v.tar.gz" \
             --title "snapgentV3 ${GITHUB_REF_NAME}" --notes-file CHANGELOG.md --verify-tag $flags

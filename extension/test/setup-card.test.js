@@ -34,7 +34,7 @@ describe("setup card", () => {
     const t = setup();
     t.card.show();
     const text = t.$("#zs-setup-steps").textContent;
-    for (const word of ["start.bat", "MacOS_Start.command", "Linux_Start.sh", "y", "Start"]) assert.ok(text.includes(word), word);
+    for (const word of ["snapgent.exe", "./snapgent", "snapgent.py", "y", "Start"]) assert.ok(text.includes(word), word);
     assert.match(text, /only the first time/);
   });
 

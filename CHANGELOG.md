@@ -37,6 +37,16 @@ All notable changes to snapgentV3 Free are documented here.
 - The bridge's terminal shows only where it listens, the approval question and fatal errors; everything else is in `logs/bridge_debug.log`.
 
 ### Added
+- **One program on every system.** `snapgent.exe` (Windows) and `snapgent` (Linux) are the same program: it writes its own `config.json`, replaces an
+  older Snapgent bridge on the port (on Windows found with `netstat`, ended with `taskkill`) and serves; when started by a double-click its window waits
+  for Enter at the end so a message can be read. macOS runs the same program with `python3 server/snapgent.py` (`pip3 install websockets`); a ready-made
+  macOS program comes later. CI builds it on Windows and Linux and checks that it answers as the VS Code MCP server, listens, and is replaced by a second start.
+
+### Removed
+- **The old launchers and programs**: `start.bat`, `Linux_Start.sh`, `MacOS_Start.command`, `setup-config.py/.ps1`, `bridge.py`, `vscode_mcp.py`, and the
+  `bridge.exe` / `vscode_mcp.exe` builds. A release is now `snapgent.exe`, `snapgent-linux-x64-v<version>.tar.gz` and `snapgent-extension-v<version>.zip`.
+- Automatic detection of EffectCraft and Roblox Studio (it lived in the setup scripts): add those servers to `config.json` yourself.
+
 - **Calibrations that ship with the extension.** `extension/profiles/default-calibrations.json` (the file "Export all calibrations" writes) is built into the
   content script, and a site the user has not calibrated is read with the profile shipped for it, so a new user starts without calibrating. The user's own
   calibration always wins, and an own profile that is not usable falls back to the shipped one. "Copy diagnostics" says whose calibration is in use.

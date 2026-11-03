@@ -75,7 +75,7 @@ The default target. Automatically connects to the workspace currently open in VS
 4. The **bridge** routes it to the VS Code MCP server.
 5. The **result** is sent back into chat, and the AI continues working.
 
-VS Code's MCP server is configured locally by `start.bat`; it detects the open VS Code workspace automatically.
+VS Code's MCP server is configured by `snapgent` itself; it detects the open VS Code workspace automatically.
 
 ---
 
@@ -104,7 +104,7 @@ VS Code's MCP server is configured locally by `start.bat`; it detects the open V
 - **Microsoft Edge** or **Google Chrome** (Manifest V3).
 - **VS Code** for the default target. Keep the workspace you want to use open in VS Code.
 - **Windows**, **macOS**, or **Linux** for the bridge.
-- **Python 3.9+** on macOS and Linux. Windows includes the bridge executable.
+- **Python 3.9+** on macOS (run from a clone). Windows (`snapgent.exe`) and Linux (`snapgent`) need no Python.
 - The bridge running while you use the agent.
 
 ---
@@ -130,24 +130,18 @@ For VS Code, open the project folder you want to work on before clicking **Start
 
 **③ Start the bridge**
 
-- **Windows** — double-click `start.bat`. It configures VS Code MCP automatically.
-  You can start the bridge before VS Code.
-  Machine-specific settings are written to the ignored local `config.json`.
-- **macOS** — double-click `MacOS_Start.command`. It detects the bundled
-  VS Code MCP server, Roblox Studio's MCP executable, and an installed
-  EffectCraft CLI, then writes their machine-specific paths to the ignored
-  local `config.json`. This launcher uses `bridge.py`; it does not run the
-  Windows-only `bridge.exe`.
-- **Linux (beta)** — download `snapgent-linux-x64-v<version>.tar.gz` from the pre-release, then in a terminal:
+- **Windows** — download `snapgent.exe` from the release and double-click it. One program: it configures VS Code MCP, replaces an older
+  bridge that is still running and serves; keep its window open. You can start the bridge before VS Code. Machine-specific settings are
+  written to a local `config.json` next to the program. Windows SmartScreen may ask once because the program is not signed: choose
+  **More info → Run anyway**.
+- **Linux** — download `snapgent-linux-x64-v<version>.tar.gz`, then in a terminal:
   `tar xzf snapgent-linux-x64-*.tar.gz && ./snapgent`. One program, no Python needed: it writes its own VS Code
   MCP configuration next to itself, replaces an older Snapgent bridge that still holds the port, and runs the bridge.
-  Keep the terminal open while you use Snapgent. The extension comes as `snapgent-extension-v<version>.zip` (`chrome/` and `firefox/`).
-- **Linux from a clone (Python)** — open a terminal in the `server` folder and run
-  `bash Linux_Start.sh`. It detects the bundled VS Code MCP server and
-  installed EffectCraft CLI, then writes
-  machine-specific paths to the ignored local `config.json`. It uses
-  `bridge.py`; the first launch installs `websockets` for your user, or creates
-  a local Python environment if your distribution blocks user installs.
+  Keep the terminal open while you use Snapgent.
+- **macOS** — from a clone, with Python 3.9+: `pip3 install websockets`, then `python3 server/snapgent.py`. It is the same program as the
+  Windows and Linux ones, run by Python. (A ready-made macOS program is not published yet.)
+
+The extension comes as `snapgent-extension-v<version>.zip` (`chrome/` and `firefox/`).
 
 **First connection: approve your extension.** The first time an extension connects, the terminal running the bridge asks:
 
@@ -170,30 +164,13 @@ different extension installed in your browser cannot drive your project). Withou
 the exact origin with the `ZS_ALLOWED_ORIGINS` environment variable instead. Reloading a temporary Firefox
 add-on gives it a new origin, so you will be asked once more.
 
-Keep the terminal window open while the bridge runs. On macOS, the first
-launch may show a Gatekeeper warning; select **Done**, then allow the script
-under **System Settings → Privacy & Security**.
+Keep the terminal window open while the bridge runs.
 
-**Optional: connect EffectCraft**
+**Optional: other MCP servers (EffectCraft, Roblox Studio, ...)**
 
-On Windows, `start.bat` detects EffectCraft in common install locations and
-starts its control channel automatically. On macOS, install the separate
-EffectCraft CLI release and put `effectcraft-cli` on your `PATH`; the launcher
-detects it and starts the app's control channel when EffectCraft is installed
-in `/Applications` or `~/Applications`. On Linux, install the EffectCraft CLI
-and put `effectcraft-cli` on your `PATH`; the launcher detects it and starts
-EffectCraft when its executable is available on `PATH` or in a common
-installation location. On any system, save your work and close EffectCraft
-before restarting the launcher if EffectCraft is already open without the
-control channel. When the bridge connects, choose
-**EffectCraft** in the MCP target selector on the chat bar.
-
-On macOS, Roblox Studio MCP is detected at
-`/Applications/RobloxStudio.app/Contents/MacOS/StudioMCP`; set
-`ZS_STUDIO_MCP_PATH` before launching if it is installed elsewhere.
-Linux does not auto-detect Roblox Studio MCP. If you have a compatible Linux
-MCP executable, set `ZS_STUDIO_MCP_PATH` to its path before running the
-launcher; Roblox Studio itself may not be available on your Linux distribution.
+`snapgent` configures only the VS Code server by itself. It no longer detects EffectCraft or Roblox Studio: add any other MCP server
+to the `mcpServers` section of the local `config.json` (next to the program, or in `server/` from a clone) and restart the bridge.
+It then appears in the MCP target selector on the chat bar.
 
 **④ Start a session**
 
@@ -205,15 +182,13 @@ launcher; Roblox Studio itself may not be available on your Linux distribution.
 
 The extension and the bridge are two separate parts, and each one has to be updated. Reloading only the extension does not update the bridge, and the **Restart** button in the extension popup only restarts the MCP servers, it does not load new bridge code.
 
-1. Get the new version: run `git pull` in the project folder (the launchers are in its `server` folder), or download and extract the [latest release](https://github.com/herdodp/snapgent-connector/releases/latest).
-2. Stop the old bridge: close the terminal window that is running `start.bat`, `MacOS_Start.command` or `Linux_Start.sh`.
-3. Start the bridge again with the same launcher. The launcher replaces an old bridge still holding port 17613. On Linux it first checks that the process on the port is a Snapgent bridge, and stops with an error if it belongs to another program.
+1. Get the new version: run `git pull` in the project folder (the program is `server/snapgent.py`), or download and extract the [latest release](https://github.com/herdodp/snapgent-connector/releases/latest).
+2. Stop the old bridge: close the window or terminal that is running `snapgent`.
+3. Start `snapgent` again. It replaces an old bridge still holding port 17613. On Linux it first checks that the process on the port is a Snapgent bridge, and stops with an error if it belongs to another program.
 4. Reload the extension at `chrome://extensions` (or `edge://extensions`), then refresh open chat tabs (F5).
 5. Check the versions: click the snapgentV3 icon. The popup header shows `ext vX · bridge vY`, and both numbers should match the release you installed. The bridge also writes `snapgent bridge vY` to its startup log.
 
-If the popup shows `bridge old`, the bridge is still running old code: repeat steps 2 and 3. On macOS and Linux, also make sure there is no old executable file named `bridge` in the folder, because the launcher runs it instead of `bridge.py`.
-
-> **Windows note:** releases up to V3.9.3 shipped `bridge.exe`/`vscode_mcp.exe` built before the **origin check that stops websites from controlling the bridge** (and without the V3.9.2 large-response fix). From the next release the executables are built automatically from the same source (see `docs/ARCHITECTURE.md`). Until then, run the Python bridge: install it with `py -3 -m pip install websockets`, close `start.bat`, then run `py -3 bridge.py` in the `server` folder. macOS and Linux already use `bridge.py` and are not affected.
+If the popup shows `bridge old`, the bridge is still running old code: repeat steps 2 and 3.
 
 ---
 
@@ -251,9 +226,8 @@ src/entry/                  content script (composition), background worker, pop
 build/                      per-browser manifest generation and bundling
 ```
 
-The bridge routes commands to the configured MCP servers. Windows uses the
-bundled `bridge.exe`; macOS and Linux run the cross-platform `bridge.py` with
-Python.
+The bridge routes commands to the configured MCP servers. It is one program, `snapgent`: `snapgent.exe` on Windows, `snapgent` on Linux,
+`python3 server/snapgent.py` on macOS (and from any clone).
 
 ---
 
@@ -266,19 +240,12 @@ snapgent-full/
 │   ├── build/                 # Manifest generation + bundling -> dist/{chrome,firefox}
 │   └── test/                  # node:test suites (npm test)
 ├── server/                    # Everything you run: same layout as the release zip
-│   ├── start.bat              # Windows bridge launcher
-│   ├── MacOS_Start.command    # macOS bridge launcher
-│   ├── Linux_Start.sh         # Linux bridge launcher
-│   ├── setup-config.ps1       # Configures Windows MCP servers
-│   ├── setup-config.py        # Detects MCP servers on macOS and Linux
-│   ├── bridge.py              # Bridge entry point (cross-platform Python)
-│   ├── snapgent_bridge/       # Bridge implementation (protocol, registry, router, trust, server)
-│   ├── vscode_mcp.py          # VS Code MCP server entry point
+│   ├── snapgent.py            # The one program: the bridge, or the VS Code MCP server with --vscode-mcp
+│   ├── snapgent_bridge/       # Bridge implementation (protocol, registry, router, trust, server, launcher)
 │   ├── snapgent_vscode/       # VS Code MCP server implementation (tools, security policy)
-│   ├── bridge.spec            # PyInstaller recipes (the .exe files are built by CI)
-│   └── vscode_mcp.spec
+│   └── snapgent.spec          # PyInstaller recipe (snapgent.exe and snapgent are built by CI)
 ├── tests/                     # Python tests (python -m unittest discover -s tests -t .)
-├── scripts/                   # package_release.py assembles the release zip
+├── scripts/                   # package_release.py assembles the release files
 ├── docs/                      # Architecture notes and the project page
 ├── assets/                    # Project images
 └── .github/workflows/         # CI and release automation
@@ -326,10 +293,10 @@ The dialog keeps the dangerous one-liners visible to you.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | snapgentV3 bar is missing | Extension is disabled or site access is blocked | Check the extension is enabled and allowed on the current AI chat site, then reload the tab |
-| Bridge is offline | Bridge is not running | Start `start.bat` (Windows), `MacOS_Start.command` (macOS), or run `bash Linux_Start.sh` (Linux) |
+| Bridge is offline | Bridge is not running | Start `snapgent.exe` (Windows), `./snapgent` (Linux) or `python3 server/snapgent.py` (macOS) |
 | Popup says *Approve in the bridge terminal* | This extension has not been approved yet | Answer `y` in the terminal running the bridge (only if it is your own extension); to reset, delete `trusted_origins.json` |
 | AI replies without using tools | Provider/model stopped following commands | Remind it to use snapgentV3 commands or start a new chat |
-| VS Code target is unavailable | The bridge is offline or the release is incomplete | Run `start.bat` from the extracted release folder and keep the project open in VS Code |
+| VS Code target is unavailable | The bridge is offline or the release is incomplete | Start `snapgent` and keep the project open in VS Code |
 | A configured MCP server is missing from the target dropdown | The server was switched off in the **MCP servers** panel, or the extension is outdated | Open **MCP servers** from the ⋯ menu on the snapgent bar and tick the server, then reload the extension in `chrome://extensions` and refresh the chat tab |
 | Target dropdown closes or the click does nothing | Older extension versions redrew the menu during status updates | Update to the latest release and reload the extension |
 

@@ -1,7 +1,7 @@
 import json
 import re
 import stat
-import sys
+import tarfile
 import tempfile
 import unittest
 import zipfile
@@ -24,70 +24,50 @@ class ReleaseCase(unittest.TestCase):
         for target in pr.EXTENSION_TARGETS:
             (self.dist / target).mkdir(parents=True)
             (self.dist / target / "manifest.json").write_text("{}", encoding="utf-8")
-        self.bins = self.base / "bins"
-        self.bins.mkdir()
-        for name in pr.BINARIES:
-            (self.bins / name).write_bytes(b"MZ")
+        self.windows = self.base / "snapgent.exe"
+        self.windows.write_bytes(b"MZ")
+        self.linux = self.base / "snapgent"
+        self.linux.write_bytes(b"\x7fELF")
         self.out = self.base / "out"
-
-    def build(self, binaries=True):
-        return pr.assemble(REPO, self.out, "1.2.3", self.dist, self.bins if binaries else None)
+        self.out.mkdir()
 
 
-class AssembleTests(ReleaseCase):
-    def test_layout_contains_everything_a_user_needs(self):
-        folder = self.build()
-        self.assertEqual(folder.name, "snapgent-v1.2.3")
-        for expected in ("bridge.py", "vscode_mcp.py", "setup-config.py", "start.bat", "Linux_Start.sh", "MacOS_Start.command", "README.md", "LICENSE",
-                         "snapgent_bridge/__init__.py", "snapgent_vscode/security/decision.py", "chrome/manifest.json", "firefox/manifest.json",
-                         "bridge.exe", "vscode_mcp.exe"):
-            self.assertTrue((folder / expected).exists(), expected)
+class AssetTests(ReleaseCase):
+    def test_the_extension_zip_holds_the_built_folders_of_both_browsers(self):
+        archive = pr.make_extension_zip(self.dist, self.out, "1.2.3")
+        self.assertEqual(archive.name, "snapgent-extension-v1.2.3.zip")
+        with zipfile.ZipFile(archive) as zf:
+            self.assertEqual(sorted(zf.namelist()), ["chrome/manifest.json", "firefox/manifest.json"])
 
-    def test_nothing_that_should_stay_in_the_repo_leaks_into_a_release(self):
-        folder = self.build()
-        names = {p.relative_to(folder).as_posix() for p in folder.rglob("*")}
-        for forbidden in ("tests", "extension", "scripts", ".github", "docs", "config.json", "logs", ".git"):
-            self.assertNotIn(forbidden, names, forbidden)
-        self.assertFalse(any("__pycache__" in n or n.endswith(".pyc") for n in names))
+    def test_the_linux_archive_is_one_executable_named_snapgent_and_the_license(self):
+        archive = pr.make_linux_archive(self.linux, REPO, self.out, "1.2.3")
+        self.assertEqual(archive.name, "snapgent-linux-x64-v1.2.3.tar.gz")
+        with tarfile.open(archive) as tf:
+            self.assertEqual(sorted(tf.getnames()), ["LICENSE", "snapgent"])
+            self.assertTrue(tf.getmember("snapgent").mode & stat.S_IXUSR)
 
-    @unittest.skipIf(sys.platform == "win32", "Windows has no execute bit; the zip test covers it")
-    def test_launchers_are_executable_so_they_can_be_double_clicked(self):
-        folder = self.build()
-        for name in ("Linux_Start.sh", "MacOS_Start.command"):
-            self.assertTrue((folder / name).stat().st_mode & stat.S_IXUSR, name)
-
-    def test_a_dry_run_leaves_out_the_executables(self):
-        folder = self.build(binaries=False)
-        self.assertFalse((folder / "bridge.exe").exists())
-        self.assertTrue((folder / "bridge.py").exists())
+    def test_the_windows_program_is_published_as_it_is(self):
+        target = pr.copy_windows_program(self.windows, self.out)
+        self.assertEqual((target.name, target.read_bytes()), ("snapgent.exe", b"MZ"))
 
     def test_a_missing_input_is_a_clear_error_not_a_half_built_release(self):
-        (self.bins / "bridge.exe").unlink()
-        with self.assertRaisesRegex(pr.ReleaseError, "bridge.exe"):
-            self.build()
+        self.linux.unlink()
+        with self.assertRaisesRegex(pr.ReleaseError, "snapgent"):
+            pr.make_linux_archive(self.linux, REPO, self.out, "1.2.3")
+        self.windows.unlink()
+        with self.assertRaisesRegex(pr.ReleaseError, "snapgent.exe"):
+            pr.copy_windows_program(self.windows, self.out)
         (self.dist / "firefox" / "manifest.json").unlink()
         (self.dist / "firefox").rmdir()
         with self.assertRaisesRegex(pr.ReleaseError, "firefox"):
-            self.build(binaries=False)
+            pr.make_extension_zip(self.dist, self.out, "1.2.3")
 
-    def test_rebuilding_replaces_the_previous_folder(self):
-        first = self.build()
-        (first / "stale.txt").write_text("x", encoding="utf-8")
-        self.assertFalse((self.build() / "stale.txt").exists())
-
-    def test_zip_keeps_the_top_folder_and_the_execute_bit(self):
-        archive = pr.make_zip(self.build())
-        with zipfile.ZipFile(archive) as zf:
-            names = zf.namelist()
-            self.assertTrue(all(n.startswith("snapgent-v1.2.3/") for n in names))
-            self.assertIn("snapgent-v1.2.3/chrome/manifest.json", names)
-            mode = zf.getinfo("snapgent-v1.2.3/MacOS_Start.command").external_attr >> 16
-            self.assertTrue(mode & stat.S_IXUSR)
-
-    def test_command_line_entry_point(self):
-        code = pr.main(["--version", "9.9.9", "--extension-dist", str(self.dist), "--binaries", str(self.bins), "--out", str(self.out)])
+    def test_command_line_entry_point_makes_the_three_files_and_the_extension(self):
+        code = pr.main(["--version", "9.9.9", "--extension-dist", str(self.dist), "--windows-binary", str(self.windows),
+                        "--linux-binary", str(self.linux), "--out", str(self.out / "assets")])
         self.assertEqual(code, 0)
-        self.assertTrue((self.out / "snapgent-v9.9.9.zip").is_file())
+        self.assertEqual(sorted(p.name for p in (self.out / "assets").iterdir()),
+                         ["snapgent-extension-v9.9.9.zip", "snapgent-linux-x64-v9.9.9.tar.gz", "snapgent.exe"])
         self.assertEqual(pr.main(["--version", "9.9.9", "--extension-dist", str(self.base / "nope"), "--out", str(self.out)]), 1)
 
 
@@ -107,9 +87,13 @@ class RepositoryLayoutTests(unittest.TestCase):
         at_root = {path.split("/")[0] for path in tracked}
         self.assertEqual(sorted(at_root - self.ALLOWED_ROOT), [], "move it into server/, extension/, docs/ or scripts/")
 
-    def test_every_release_input_exists_in_the_repository(self):
-        for source, _destination in pr.SOURCES:
-            self.assertTrue((REPO / source).exists(), source)
+    def test_the_server_folder_holds_one_program_and_its_packages(self):
+        try:
+            tracked = subprocess.run(["git", "ls-files", "server"], cwd=REPO, capture_output=True, text=True, check=True).stdout.splitlines()
+        except (OSError, subprocess.CalledProcessError):
+            self.skipTest("not a git checkout")
+        at_top = {path.split("/")[1] for path in tracked}
+        self.assertEqual(sorted(at_top), ["snapgent.py", "snapgent.spec", "snapgent_bridge", "snapgent_vscode"])
 
     def test_no_compiled_binaries_are_tracked(self):
         try:

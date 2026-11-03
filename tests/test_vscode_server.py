@@ -83,13 +83,13 @@ class ServerTests(WorkspaceCase):
 
 
 class EntryPointTests(unittest.TestCase):
-    def test_vscode_mcp_py_speaks_mcp_over_stdio(self):
+    def test_snapgent_py_vscode_mcp_speaks_mcp_over_stdio(self):
         requests = [
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
             {"jsonrpc": "2.0", "method": "notifications/initialized"},
             {"jsonrpc": "2.0", "id": 2, "method": "bogus"},
         ]
-        result = subprocess.run([sys.executable, "vscode_mcp.py"], cwd=ROOT, input="\n".join(map(json.dumps, requests)) + "\n",
+        result = subprocess.run([sys.executable, "snapgent.py", "--vscode-mcp"], cwd=ROOT, input="\n".join(map(json.dumps, requests)) + "\n",
                                 capture_output=True, text=True, timeout=20)
         replies = [json.loads(line) for line in result.stdout.splitlines()]
         self.assertEqual([r["id"] for r in replies], [1, 2])

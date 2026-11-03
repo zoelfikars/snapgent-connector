@@ -110,15 +110,14 @@ recognised as a user turn). Read them from the page console, or copy the whole l
 
 ## Bridge (`server/snapgent_bridge/`)
 
-Everything the user runs lives in `server/`, laid out exactly like the release zip, so the
-launchers work the same from a clone and from a download. Tests live in `tests/` and put
+Everything the user runs lives in `server/`: one program, `snapgent.py`, the same from a clone and (built by PyInstaller) from a release. Tests live in `tests/` and put
 `server/` on `sys.path`.
 
-`bridge.py` is a three-line entry point (every launcher still runs it); the
+`snapgent.py` is the entry point (`snapgent --vscode-mcp` runs the VS Code server instead); the
 implementation is a package where each module has one reason to change.
 
 ```
-bridge.py                  entry point -> snapgent_bridge.server.main()
+snapgent.py                entry point -> snapgent_bridge.server.main()
 snapgent_bridge/
   settings.py              paths, port, limits; the only module reading the environment
   logs.py                  logging (stdout always, file once configured)
@@ -136,8 +135,8 @@ tests/                     unittest; pure modules need no processes or sockets
 Dependencies point one way: `server -> router -> registry -> mcp_client`, with
 `protocol`, `security` and `config` validation as leaves. The router and
 registry are tested with fake servers; `test_server.py` uses real WebSockets and
-a mock MCP process; `test_entrypoint.py` runs `python bridge.py` as the
-launchers do and checks a clean SIGTERM shutdown.
+a mock MCP process; `test_entrypoint.py` runs `python snapgent.py` as a
+user does and checks a clean SIGTERM shutdown.
 
 Security model: the socket only accepts connections whose `Origin` is a browser
 extension (`chrome-extension://`, `moz-extension://`); web pages cannot forge
@@ -154,7 +153,7 @@ could call tools, add servers (spawn commands) and approve its own confirmation 
 
 ## VS Code MCP server (`server/snapgent_vscode/`)
 
-`vscode_mcp.py` is a thin entry point (config files and launchers still point at it).
+The bridge starts it as `snapgent --vscode-mcp` (the same program again).
 
 ```
 snapgent_vscode/
@@ -187,17 +186,17 @@ visible; it is not a sandbox.
 ## CI and releases
 
 - **`.github/workflows/ci.yml`** (every push/PR): extension lint + tests + both browser builds;
-  Python tests on Ubuntu, Windows and macOS (3.9 and 3.14, plus 3.12 on Ubuntu); and a Windows job
-  that builds `bridge.exe`/`vscode_mcp.exe` with PyInstaller and starts them.
+  Python tests on Ubuntu, Windows and macOS (3.9 and 3.14, plus 3.12 on Ubuntu); and a Windows and a Linux job
+  that build `snapgent` with PyInstaller and start it.
 - **`.github/workflows/release.yml`** (push a tag `vX.Y.Z`): refuses a tag that disagrees with
-  `BRIDGE_VERSION`, builds the extension and the Windows executables, assembles the zip with
-  `scripts/package_release.py` and publishes it. The executables are therefore never committed.
+  `BRIDGE_VERSION`, builds the extension, `snapgent.exe` and the Linux `snapgent`, assembles the files with
+  `scripts/package_release.py` and publishes them. The executables are therefore never committed.
 - **`scripts/package_release.py`** is the only place that knows what a release contains and where
-  (launchers at the zip root so they can be double-clicked; execute bits set; no tests/docs/dev files).
+  (three files plus the extension zip: `snapgent.exe`, the Linux `.tar.gz` with the execute bit set, `snapgent-extension-v<version>.zip`).
   If the repository layout changes, change its tables, not the workflows.
 - `tests/test_release.py` also pins the version: `extension/package.json`, `BRIDGE_VERSION`, the README
   badge and a CHANGELOG section must agree.
-- The `.spec` files collect `websockets` and the package submodules; inside an `.exe`, `config.json`
+- `snapgent.spec` collects `websockets` and the package submodules; inside an `.exe`, `config.json`
   and `logs/` live next to the executable, not in PyInstaller's temp unpack folder (`settings.app_root`).
 
 To cut a release: bump the version in `server/snapgent_bridge/__init__.py`, `extension/package.json` and the

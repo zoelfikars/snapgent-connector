@@ -17,8 +17,7 @@ VS Code is the default **MCP target**. The bridge can start before VS Code, but 
 
 **Then set up the Bridge:**
 1. **Download the Bridge** from the [SnapgentV3 release](https://github.com/herdodp/snapgent-connector/releases/tag/V3)
-2. **Run the Bridge** - on Windows, double-click `start.bat`; it configures MCP automatically and can run before VS Code is open. Open the project folder in VS Code before clicking **Start** in the chat bar. Roblox Studio is optional: open a place and enable **Assistant AI** > **...** > **Manage MCP Servers** > **Enable Studio as MCP Server** to use that target too.
-4. On macOS, double-click `MacOS_Start.command`; the current macOS launcher does not auto-configure VS Code MCP, so configure it in the local `config.json` if you want to use that target. The first launch may show a Gatekeeper warning (normal for downloaded scripts): click **Done**, then **System Settings > Privacy & Security**, scroll down, and click **Open Anyway**.
+2. **Run the Bridge** - on Windows, double-click `snapgent.exe`; on Linux, run `./snapgent`; on macOS, run `python3 server/snapgent.py` (Python 3.9+, `pip install websockets`). It configures the VS Code MCP server itself and can run before VS Code is open. Open the project folder in VS Code before clicking **Start** in the chat bar. Roblox Studio is optional: open a place and enable **Assistant AI** > **...** > **Manage MCP Servers** > **Enable Studio as MCP Server** to use that target too.
 5. **Go to https://chat.deepseek.com** (recommended), https://chatgpt.com, https://claude.ai, https://gemini.google.com, https://grok.com, https://www.kimi.ai or https://kimi.ai, https://chat.z.ai, https://chat.qwen.ai, https://arena.ai, https://www.meta.ai, or https://ptero.pro, open a new chat (only works on these exact addresses; sign in to Grok first; on Arena use Direct mode)
 6. Click **Start session** in the snapgentV3 panel
 7. Type what you want to build

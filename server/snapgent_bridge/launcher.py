@@ -43,7 +43,8 @@ def runs_bundled_server(entry: Dict[str, object]) -> bool:
         return True
     args = entry.get("args")
     first = Path(str(args[0])).name if isinstance(args, list) and args else ""
-    return first in {"vscode_mcp.py", VSCODE_FLAG} or (command.name in {"python", "python3"} and not command.exists())
+    # `vscode_mcp.py` is what older versions wrote; `snapgent.py --vscode-mcp` is what a clone writes now.
+    return first in {"vscode_mcp.py", "snapgent.py", VSCODE_FLAG} or (command.name in {"python", "python3"} and not command.exists())
 
 
 def configure_vscode(config_path: Path, command: str, args: List[str]) -> bool:
@@ -67,15 +68,49 @@ def port_in_use(port: int, host: str = "127.0.0.1") -> bool:
         return probe.connect_ex((host, port)) == 0
 
 
+def _run(command: List[str]) -> str:
+    """The output of a system tool, or nothing when it is missing or slow."""
+    try:
+        return subprocess.run(command, capture_output=True, text=True, check=False, timeout=15).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def parse_netstat_listeners(output: str, port: int) -> List[int]:
+    """The pids listening on `port` in the output of `netstat -ano -p tcp` (Windows): `TCP  127.0.0.1:17613  0.0.0.0:0  LISTENING  4321`."""
+    pids: List[int] = []
+    for line in output.splitlines():
+        columns = line.split()
+        if len(columns) >= 5 and columns[0].upper() == "TCP" and columns[3].upper() == "LISTENING" \
+                and columns[1].rsplit(":", 1)[-1] == str(port) and columns[4].isdigit():
+            pids.append(int(columns[4]))
+    return pids
+
+
+def windows_image_name(output: str) -> str:
+    """The program name in the output of `tasklist /FO CSV /NH`: `"snapgent.exe","4321","Console","1","31,000 K"`."""
+    first = output.strip().splitlines()[0] if output.strip() else ""
+    return first.split('","')[0].strip('"').lower()
+
+
 def _listening_pids(port: int) -> List[int]:
+    if os.name == "nt":
+        return parse_netstat_listeners(_run(["netstat", "-ano", "-p", "tcp"]), port)
     lsof = shutil.which("lsof")
     if not lsof:
         return []
-    result = subprocess.run([lsof, "-ti", f"tcp:{port}", "-sTCP:LISTEN"], capture_output=True, text=True, check=False)
-    return [int(item) for item in result.stdout.split() if item.isdigit()]
+    return [int(item) for item in _run([lsof, "-ti", f"tcp:{port}", "-sTCP:LISTEN"]).split() if item.isdigit()]
 
 
 def _is_snapgent(pid: int) -> bool:
+    if os.name == "nt":
+        image = windows_image_name(_run(["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"]))
+        if image in ("snapgent.exe", "bridge.exe"):
+            return True
+        if image in ("python.exe", "pythonw.exe", "py.exe"):  # run from source: only the command line says which script
+            command = _run(["powershell.exe", "-NoProfile", "-Command", f"(Get-CimInstance Win32_Process -Filter 'ProcessId={pid}').CommandLine"])
+            return "bridge.py" in command or "snapgent" in command
+        return False
     try:
         command = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace")
     except OSError:
@@ -83,17 +118,25 @@ def _is_snapgent(pid: int) -> bool:
     return any(name in command for name in ("snapgent", "bridge.py", "/bridge "))
 
 
+def _stop(pid: int) -> None:
+    """End a program and what it started (the VS Code server is a child of the bridge)."""
+    if os.name == "nt":
+        _run(["taskkill", "/F", "/T", "/PID", str(pid)])
+    else:
+        os.kill(pid, signal.SIGTERM)
+
+
 def free_port(port: int, say=print) -> None:
     """Stop an older Snapgent bridge holding the port. Anything else holding it is left alone and reported."""
     if not port_in_use(port):
         return
-    pids = _listening_pids(port) if os.name == "posix" else []
+    pids = _listening_pids(port)
     mine = [pid for pid in pids if pid != os.getpid() and _is_snapgent(pid)]
     if not pids or len(mine) != len(pids):
         raise LauncherError(f"Port {port} is already in use by another program. Close it, or set ZS_BRIDGE_PORT to another port.")
     for pid in mine:
         say(f"Replacing the previous Snapgent bridge (pid {pid})...")
-        os.kill(pid, signal.SIGTERM)
+        _stop(pid)
     for _ in range(20):
         if not port_in_use(port):
             return
