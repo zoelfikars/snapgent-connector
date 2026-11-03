@@ -55,11 +55,11 @@ describe("SessionStarter", () => {
     ]);
   });
 
-  test("a model that skips the handshake still starts", async () => {
-    const t = setup({ state: { responses: [ready] } });
+  test("a model that skips the handshake still starts, and is handed the command list", async () => {
+    const t = setup({ state: { responses: [ready, ready] } });
     await t.starter.start();
     assert.ok(t.log.includes("markStarted"));
-    assert.ok(!t.log.includes("run:list_commands"));
+    assert.ok(t.log.includes("run:list_commands"));
   });
 
   test("does nothing while another start/loop is running", async () => {
@@ -132,7 +132,7 @@ describe("SessionStarter", () => {
 
   test("a sent message that is not recognised as a user turn warns and logs the page, but the start continues", async () => {
     const layout = { sentMessageVisible: async () => false, describe: () => ({ chain: ["div[x]"] }) };
-    const t = setup({ state: { responses: [ready] }, deps: { layout } });
+    const t = setup({ state: { responses: [ready, ready] }, deps: { layout } });
     await t.starter.start();
     assert.deepEqual(banners(t.log)[0].slice(1), ["TestAI page not fully recognised", "Your message was sent but not detected as a user turn, so hiding it may not work."]);
     assert.ok(t.log.includes("diag:layout.sentMissing"));
@@ -141,13 +141,13 @@ describe("SessionStarter", () => {
 
   test("a recognised sent message raises no warning", async () => {
     const layout = { sentMessageVisible: async () => true, describe: () => ({}) };
-    const t = setup({ state: { responses: [ready] }, deps: { layout } });
+    const t = setup({ state: { responses: [ready, ready] }, deps: { layout } });
     await t.starter.start();
     assert.equal(banners(t.log).length, 0);
   });
 
   test("non-vscode targets skip the workspace probe and skills", async () => {
-    const t = setup({ state: { targetId: "other", responses: [ready] } });
+    const t = setup({ state: { targetId: "other", responses: [ready, ready] } });
     await t.starter.start();
     assert.ok(!t.log.some((e) => String(e).startsWith("probe")));
     assert.ok(!t.log.includes("skills.load"));
@@ -165,7 +165,8 @@ describe("start preconditions", () => {
   test("probe success", () => { assert.equal(probeSucceeded({ ok: true }), true); assert.equal(probeSucceeded(null), false); });
   test("handshake detection", () => {
     assert.equal(isHandshake({ kind: "tool", calls: [{ tool: "list_tools" }] }), true);
-    assert.equal(isHandshake({ kind: "tool", calls: [{ tool: "list_commands" }, { tool: "x" }] }), false);
+    assert.equal(isHandshake({ kind: "tool", calls: [{ tool: "list_commands" }, { tool: "x" }] }), true);
+    assert.equal(isHandshake({ kind: "tool", calls: [{ tool: "x" }, { tool: "list_commands" }] }), false);
     assert.equal(isHandshake({ kind: "text" }), false);
   });
   test("unavailable notes", () => {

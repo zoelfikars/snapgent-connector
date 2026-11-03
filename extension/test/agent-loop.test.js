@@ -47,11 +47,12 @@ describe("AgentLoop: a command round-trip", () => {
     assert.equal(h.events("next").length, 2);
   });
 
-  test("two commands in one reply are refused without running either", async () => {
+  test("two commands in one reply both run and are answered with one message", async () => {
     const both = { kind: "tool", item: {}, calls: [{ tool: "a" }, { tool: "b" }] };
     const h = await run({ responses: [both, textTurn] });
-    assert.equal(h.events("run").length, 0);
-    assert.equal(h.state.submitted[0].text, FEEDBACK.multiTool(["a", "b"]));
+    assert.deepEqual(h.events("run"), [["run", "a"], ["run", "b"]]);
+    assert.equal(h.state.submitted.length, 1);
+    assert.equal(h.state.submitted[0].text, "Output of 'a':\nok\n\nOutput of 'b':\nok");
   });
 
   test("a parse error paints its chip and asks the model to rewrite", async () => {

@@ -41,16 +41,11 @@ export const FEEDBACK = {
         "ERROR: you wrote that call in your own internal tool-call markup (the DSML invoke/parameter " +
         "tags). snapgentV3 cannot read that format, so the command did not run. Never use those tags " +
         "here. Write the call as a single plain-text JSON object instead, exactly like " +
-        '{"command": "name", "params": { ...your parameters... }} - one command per reply. ' +
+        '{"command": "name", "params": { ...your parameters... }}. ' +
         "Please retry.",
     };
     return notes[reason] || notes.malformed;
   },
-  multiTool: (names) =>
-    "ERROR: You wrote multiple commands in one reply. Write ONE command at a " +
-    "time and wait for its result before the next. You tried: " +
-    names.join(", ") +
-    ". Start over and write only the first command you need.",
   unknownTool: (name, valid) =>
     `ERROR: unknown command "${name}". It does not exist. Valid commands are: ` +
     valid.join(", ") +

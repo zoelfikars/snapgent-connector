@@ -16,24 +16,25 @@ export function normalizeCall(o) {
   return { tool: name, arguments: args };
 }
 
-function extractToolAnywhere(text) {
-  for (const key of ['"command"', '"tool"']) {
-    let pos = 0;
-    while (true) {
-      const s = text.indexOf(key, pos);
-      if (s === -1) break;
-      const start = text.lastIndexOf("{", s);
-      if (start === -1) { pos = s + 1; continue; }
-      const end = matchBrace(text, start); // string-aware brace matching
-      if (end === -1) { pos = s + 1; continue; }
-      try {
-        const call = normalizeCall(parseLoose(text.slice(start, end + 1)));
-        if (call) return call;
-      } catch {}
-      pos = s + 1;
-    }
+// Every {"command": ...} / {"tool": ...} object in the text, in the order written. Once an object is taken, scanning
+// resumes AFTER it: a "command" key inside its params (run_command's own "command") is not another call.
+function extractToolsAnywhere(text) {
+  const keyRe = /"(?:command|tool)"\s*:/g;
+  const out = [];
+  let pos = 0;
+  while (true) {
+    keyRe.lastIndex = pos;
+    const hit = keyRe.exec(text);
+    if (!hit) break;
+    const start = text.lastIndexOf("{", hit.index);
+    if (start === -1 || start < pos) { pos = hit.index + 1; continue; }
+    const end = matchBrace(text, start); // string-aware brace matching
+    if (end === -1) { pos = hit.index + 1; continue; }
+    let call = null;
+    try { call = normalizeCall(parseLoose(text.slice(start, end + 1))); } catch { /* not JSON: keep looking */ }
+    if (call) { out.push(call); pos = end + 1; } else pos = hit.index + 1;
   }
-  return null;
+  return out;
 }
 
 export function parseToolCalls(r) {
@@ -65,8 +66,7 @@ export function parseToolCalls(r) {
     from = em + END_M.length;
   }
   if (out.length === 0) {
-    const f = extractToolAnywhere(r);
-    if (f) out.push(f);
+    out.push(...extractToolsAnywhere(r));
   }
   return out;
 }

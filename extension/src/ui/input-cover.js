@@ -8,12 +8,22 @@ import { opaqueBg } from "./cover-color.js";
 
 /**
  * @param {{ document: Document, provider: object }} deps  the window comes from `document.defaultView`
- * @returns {{ set: (on: boolean) => void }}
+ * @returns {{ set: (on: boolean) => void, setLabel: (text: string) => void }}
  */
+const DEFAULT_LABEL = "Agent is working…";
+
 export function createInputCover({ document, provider }) {
   const win = document.defaultView;
   let cover = null;
   let coverRaf = 0;
+  let label = DEFAULT_LABEL;
+
+  /** What the cover says; an empty text goes back to the plain "working" label. */
+  function setLabel(text) {
+    label = text ? `Running ${text}` : DEFAULT_LABEL;
+    const span = cover && cover.querySelector("span");
+    if (span) span.textContent = label;
+  }
 
   function set(on) {
     const ed = provider.getEditor();
@@ -28,7 +38,8 @@ export function createInputCover({ document, provider }) {
     if (!cover) {
       cover = document.createElement("div");
       cover.id = "zs-input-cover";
-      cover.innerHTML = `<span>Agent is working…</span>`;
+      cover.innerHTML = "<span></span>";
+      cover.firstChild.textContent = label;
       document.documentElement.appendChild(cover);
     }
     cover.dataset.on = "1"; // intent flag: keep the place() loop alive while set
@@ -92,5 +103,5 @@ export function createInputCover({ document, provider }) {
     place();
   }
 
-  return { set };
+  return { set, setLabel };
 }

@@ -481,6 +481,8 @@
     banner: (level, title, text) => ui.banner(level, title, text),
     toast: (text) => ui.toast(text),
     keepCover: () => ui.inputCover(true),
+    // Which command is running now, on the composer cover.
+    progress: (text) => ui.inputCoverLabel(text),
     // The command turn ended in a parse error and NEVER ran: paint its chip as an error
     // (owned, so the sweep will not repaint it with the green check it stamps on any command turn).
     parseErrorChip: ({ item, name, detail, category }) => decorate.toolBox(item, name, "err", detail, true, "", category),
@@ -535,6 +537,7 @@
       A.toolSettle = null;
       A.loopKey = null;
       ui.showStop(false);
+      ui.inputCoverLabel("");
       ui.inputCover(false); // lift the "Agent is working" cover when the loop ends
       P.setInputLock(false); // always unlock, even on error or stop
     },
@@ -552,7 +555,62 @@
     reminderText: () => ZS.toolsReminder(activeTools(), ui.getTargetName(), selectedTargetId),
   };
 
+  // ── How big ONE message into the chat may be ─────────────────────────────
+  // The slider in the toolbar popup (zsMaxPromptChars) sets it; a site's own cap (P.sendCharBudget) and what this
+  // host once refused as "too long" can only lower it. The loop splits it between the results of one reply.
+  let promptSetting = ZS.DEFAULT_PROMPT_CHARS;
+  let learnedCap = Infinity;
+  const capKey = `zsLearnedCap:${location.hostname}`;
+  try {
+    chrome.storage.local.get(["zsMaxPromptChars", capKey], (r) => {
+      if (!r) return;
+      promptSetting = ZS.clampPromptChars(r.zsMaxPromptChars);
+      if (r[capKey] > 0) learnedCap = r[capKey];
+    });
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== "local") return;
+      if (changes.zsMaxPromptChars) { promptSetting = ZS.clampPromptChars(changes.zsMaxPromptChars.newValue); learnedCap = Infinity; try { chrome.storage.local.remove(capKey); } catch {} }
+    });
+  } catch {}
+  const messageLimit = () => ZS.effectiveLimit(promptSetting, Math.min(P.sendCharBudget || Infinity, learnedCap));
+  // Characters sent so far in this conversation (history counts against the context as well); kept per conversation.
+  const volume = { key: "", total: 0 };
+  const VOLUMES_KEY = "zsVolumes";
+  const sentVolume = (chars) => {
+    const key = P.conversationKey() || "new";
+    if (volume.key !== key) {
+      volume.key = key;
+      volume.total = 0;
+      try {
+        chrome.storage.local.get(VOLUMES_KEY, (r) => { const saved = r && r[VOLUMES_KEY] && r[VOLUMES_KEY][key]; if (volume.key === key && saved > 0) volume.total += saved; });
+      } catch {}
+    }
+    volume.total += chars;
+    try {
+      chrome.storage.local.get(VOLUMES_KEY, (r) => {
+        const all = { ...((r && r[VOLUMES_KEY]) || {}) };
+        delete all[key];
+        all[key] = volume.total;
+        const keep = Object.keys(all).slice(-200);
+        chrome.storage.local.set({ [VOLUMES_KEY]: Object.fromEntries(keep.map((k) => [k, all[k]])) });
+      });
+    } catch {}
+    return volume.total;
+  };
+  const messageBudget = {
+    limit: messageLimit,
+    sent: sentVolume,
+    // The site refused a message of this size as too long: stay well under it from now on (until the slider moves).
+    tooLong: (chars) => {
+      if (!(chars > 0)) return;
+      learnedCap = Math.max(ZS.MIN_PROMPT_CHARS, Math.floor(chars * 0.6));
+      try { chrome.storage.local.set({ [capKey]: learnedCap }); } catch {}
+      diag("budget.learned", { chars, cap: learnedCap });
+    },
+  };
+
   const loop = new AgentLoop({
+    budget: messageBudget,
     chat: loopChat,
     view: loopView,
     lifecycle: loopLifecycle,
@@ -561,7 +619,10 @@
     tools: loopTools,
     memory: { executed: (item) => executedTurns.remember(item) },
     // A result becomes a turn, so it counts toward the system-prompt re-statement budget and may carry it.
-    outbox: { prepare: (text) => { promptResender.bump("results"); return promptResender.attach(text); } },
+    outbox: {
+      prepare: (text) => { promptResender.bump("results"); return promptResender.attach(text); },
+      reserve: () => promptResender.reserve(),
+    },
     reminder: toolReminder,
     // Nothing observable changing while the tab is visible and no tool runs means the loop is stuck.
     activity: {
@@ -572,7 +633,10 @@
     displayName: () => P.displayName,
     diag,
   });
-  const agentLoop = (base) => (A.running ? undefined : loop.run(base));
+  const agentLoop = (base) => (A.running ? undefined : loop.run(base).catch((e) => {
+    // loop.run reports its own failures; this only catches what happens before its try block.
+    diag("loop.crash", { msg: String((e && e.message) || e), stack: String((e && e.stack) || "").slice(0, 300) });
+  }));
 
   // Mark the current assistant turn as user-halted so the sweep classifier shows
   // its command chip as "stopped" instead of repainting it ✓ done when
@@ -718,7 +782,7 @@
         isUser: P.isUserItem(items[i]),
       }));
     },
-    charBudget: () => P.sendCharBudget || Infinity,
+    charBudget: () => messageLimit(),
     onResent: (at) => { A.sysResendAt = at; },
     diag,
   });
@@ -786,6 +850,7 @@
     systemPrompt: () => systemPrompt(),
     chat: loopChat,
     runner: toolRunner,
+    initialContext: { limit: messageLimit },
     view: {
       toast: (text) => ui.toast(text),
       banner: (level, title, text) => ui.banner(level, title, text),
@@ -1765,9 +1830,10 @@
     // The cover itself (kept on the live editor frame by frame): src/ui/input-cover.js
     const inputCoverView = ZSUi.createInputCover({ document, provider: P });
     const inputCover = (on) => inputCoverView.set(on);
+    const inputCoverLabel = (text) => inputCoverView.setLabel(text);
 
     build();
-    return { setStatus, setTarget, getTargetName, staleExtensionAlert, setStarted, setStarting, showStop, markStopping, inputCover, toast: (m) => notifications.toast(m), banner: (kind, title, msg) => notifications.banner(kind, title, msg), showImages: (images, name) => notifications.showImages(images, name), nudgeStart, updateStartGate, refreshSetup, openMenu: (toSupport) => openMenuFn && openMenuFn(toSupport) };
+    return { setStatus, setTarget, getTargetName, staleExtensionAlert, setStarted, setStarting, showStop, markStopping, inputCover, inputCoverLabel, toast: (m) => notifications.toast(m), banner: (kind, title, msg) => notifications.banner(kind, title, msg), showImages: (images, name) => notifications.showImages(images, name), nudgeStart, updateStartGate, refreshSetup, openMenu: (toSupport) => openMenuFn && openMenuFn(toSupport) };
   })();
 
   // ── Live token + timer, shown ONLY on a tool call's chip detail. The
@@ -2161,19 +2227,31 @@
   // User-send interception: the provider wires the site's composer events to
   // these callbacks.
   P.installSendHooks({
-    isBlocked: () => A.injecting || A.running || A.starting,
-    isStarted: () => A.started,
+    // Every refusal to treat a typed message as an agent turn is logged: it is silent otherwise.
+    isBlocked: () => {
+      const blocked = A.injecting || A.running || A.starting;
+      if (blocked) diag("send.blocked", { injecting: A.injecting, running: A.running, starting: A.starting });
+      return blocked;
+    },
+    isStarted: () => {
+      if (!A.started) diag("send.notStarted", { empty: P.chatIsEmpty() });
+      return A.started;
+    },
     onBlockedAttempt: () => ui.nudgeStart(),
     onUserMessage: (base) => {
       // A fresh user message = fresh intent: clear any previous manual stop so
       // the loop is allowed to run again.
       A.userStopped = false;
+      diag("send.user", { base });
       promptResender.bump("users");
       captureSendToken(); // identity of the assistant turn before this reply
       // A Stop clicked during this 300ms window sets A.userStopped → honor it and
       // do NOT start the loop (otherwise the stop is silently ignored and the
       // freshly-started loop strands the "Stopping…" flag).
-      setTimeout(() => { if (!A.running && !A.userStopped) agentLoop(base); }, 300);
+      setTimeout(() => {
+        if (!A.running && !A.userStopped) agentLoop(base);
+        else diag("loop.notStarted", { running: A.running, userStopped: A.userStopped });
+      }, 300);
     },
     onNativeStop: () => {
       // A click on the site's own stop = a deliberate manual stop → suppress
@@ -2229,19 +2307,22 @@
   // kept, rather than removed, so a tab left open for hours still never
   // spontaneously fires a command on some later unrelated DOM churn.
   const RESUME_FRESH_MS = 180000;
+  // Why the watchdog did NOT resume, logged only when the reason changes (it runs every second).
+  let lastResumeSkip = "";
+  const skip = (reason) => { if (reason !== lastResumeSkip) { lastResumeSkip = reason; diag("resume.skip", { reason }); } };
   setInterval(() => {
-    if (!A.started || A.running || A.starting || A.injecting) return;
-    if (document.hidden) return;                         // AI tab not foreground → don't parse/exec off-screen (agentLoop gates too)
-    if (A.userStopped) return;                          // user halted → never relaunch
-    if (P.isGenerating()) return;
-    if (Date.now() - A.lastGenAt > RESUME_FRESH_MS) return; // not a fresh live turn
+    if (!A.started || A.running || A.starting || A.injecting) return skip(`state started=${A.started} running=${A.running} starting=${A.starting} injecting=${A.injecting}`);
+    if (document.hidden) return skip("hidden");                         // AI tab not foreground → don't parse/exec off-screen (agentLoop gates too)
+    if (A.userStopped) return skip("userStopped");                          // user halted → never relaunch
+    if (P.isGenerating()) return skip("generating");
+    if (Date.now() - A.lastGenAt > RESUME_FRESH_MS) return skip("stale"); // not a fresh live turn
     const item = P.lastAssistant();
-    if (!item || item.dataset.zloop) return;
+    if (!item || item.dataset.zloop) return skip(item ? "zloop" : "noItem");
     // Never resume the turn that already existed when this session started - it is
     // a reload-restored generation, not a reply to one of our sends (see
     // A.bootBaselineId). Guards the "command leaked into the new chat" bug.
-    if (A.bootBaselineId && P.lastAssistantId && P.lastAssistantId() === A.bootBaselineId) return;
-    if (P.turnHalted(item)) return;                     // this turn was stopped → leave it
+    if (A.bootBaselineId && P.lastAssistantId && P.lastAssistantId() === A.bootBaselineId) return skip("bootBaseline");
+    if (P.turnHalted(item)) return skip("halted");                     // this turn was stopped → leave it
     // Scrolled-back OLD turn guard (virtualization). lastAssistant() is the last
     // RENDERED turn; scrolling up makes it an old command whose id is below the
     // session's high-water mark. Its result row may be off-screen (unrendered), so
@@ -2251,7 +2332,7 @@
     if (Number.isFinite(curId) && A.maxTurnId != null && curId < A.maxTurnId) {
       // Log once per distinct turn, not every 1s tick while the user stays up.
       if (A._skipOldId !== curId) { A._skipOldId = curId; diag("resume.skipOld", { curId, maxTurnId: A.maxTurnId }); }
-      return;
+      return skip("oldTurn");
     }
     // Settled-history guard (survives a page reload, unlike the executed map).
     // A genuine resume target is a command whose tool NEVER produced a result;
@@ -2267,19 +2348,19 @@
     const all = P.allItems();
     const after = all[all.indexOf(item) + 1];
     if (after && P.isUserItem(after) &&
-        ZSParse.isInjectedFeedback(P.classifyText(after, ".zs-chip"))) return;
+        ZSParse.isInjectedFeedback(P.classifyText(after, ".zs-chip"))) return skip("resultBelow");
     const txt = P.itemText(item);
-    if (!ZSParse.hasToolSignature(txt)) return;
+    if (!ZSParse.hasToolSignature(txt)) return skip("noSignature");
     // Node-independent dedupe: this turn's command was already dispatched (by the
     // loop or a prior resume). The dataset guards below are wiped when the site
     // recreates the node on scroll, so without this off-DOM check the watchdog
     // re-runs a historical tool with no live generation. See the `executed` map.
-    if (executedTurns.has(item, txt)) return;
+    if (executedTurns.has(item, txt)) return skip("alreadyExecuted");
     // Resume only when a COMPLETE, parseable command is present - and re-attempt
     // if the turn has GROWN since our last try.
-    if (!ZSParse.parseToolCalls(txt).length) return;
+    if (!ZSParse.parseToolCalls(txt).length) return skip("unparseable");
     const len = txt.length;
-    if (item.dataset.zResume && Number(item.dataset.zResumeLen || 0) >= len) return;
+    if (item.dataset.zResume && Number(item.dataset.zResumeLen || 0) >= len) return skip("resumedOnce");
     item.dataset.zResume = "1";
     item.dataset.zResumeLen = String(len);
     executedTurns.remember(item);

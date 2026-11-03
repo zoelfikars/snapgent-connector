@@ -31,7 +31,7 @@ const banner = (level, title, text) => ({ level, title, text });
  *   | { type: "resume-truncated" }
  *   | { type: "parse-error", chip: {item:object,name:string,detail:string}|null, feedback: string }
  *   | { type: "feedback", feedback: string }
- *   | { type: "run", call: {tool:string,arguments?:object}, category: string }
+ *   | { type: "run", call: {tool:string,arguments?:object}, calls: {tool:string,arguments?:object}[], category: string }
  *   | { type: "skip" }} Plan
  *
  * @param {object} res  A response from the chat watcher (`kind` plus kind-specific fields).
@@ -71,13 +71,12 @@ export function planTurn(res, { displayName, truncCount, isHalted, maxResumes = 
       return { ...end(), truncCount: 0 }; // final answer
 
     case "tool": {
-      if (res.calls.length > 1) {
-        return { type: "feedback", feedback: FEEDBACK.multiTool(res.calls.map((c) => c.tool || "?")), truncCount: 0 };
-      }
-      const call = res.calls[0];
+      // Several commands in one reply are all run, in order, and answered with ONE message (see AgentLoop).
+      const calls = res.calls;
+      const call = calls[0];
       // A tool already seen to return an image gets the "screen" chip optimistically.
       const category = isLearnedImageTool(call.tool) ? "screen" : toolCategory(call.tool);
-      return { type: "run", call, category, truncCount: 0 };
+      return { type: "run", call, calls, category, truncCount: 0 };
     }
 
     default:

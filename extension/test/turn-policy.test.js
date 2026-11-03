@@ -70,9 +70,9 @@ describe("planTurn: commands", () => {
     assert.equal(plan.category, "screen");
   });
 
-  test("several calls in one reply are rejected with the offending names", () => {
-    const plan = planTurn({ kind: "tool", calls: [{ tool: "a" }, {}] }, ctx({ truncCount: 4 }));
-    assert.deepEqual([plan.type, plan.feedback, plan.truncCount], ["feedback", FEEDBACK.multiTool(["a", "?"]), 0]);
+  test("several calls in one reply are all planned to run", () => {
+    const plan = planTurn({ kind: "tool", calls: [{ tool: "a" }, { tool: "b" }] }, ctx({ truncCount: 4 }));
+    assert.deepEqual([plan.type, plan.calls.map((c) => c.tool), plan.truncCount], ["run", ["a", "b"], 0]);
   });
 
   test("parse errors name the command, label the chip and ask for a rewrite", () => {

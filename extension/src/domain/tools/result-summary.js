@@ -76,6 +76,12 @@ export function outSummary(feedback) {
   return lines > 1 ? `${first} · ${lines} lines` : first;
 }
 
+/** What the composer cover says while a command runs: its place in a batch, its name, its first argument. */
+export function runningLabel(call, step) {
+  const arg = argSummary(call);
+  return `${step && step.total > 1 ? `${step.index + 1}/${step.total} · ` : ""}${call.tool}${arg ? ` · ${arg}` : ""}`;
+}
+
 /** Full arguments, shown in a tool chip's expandable body. */
 export function callBody(call) {
   const args = call.arguments || {};

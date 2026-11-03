@@ -15,9 +15,12 @@ import { MODE_ARGUMENT, RESERVED_ARGUMENT, declinedFeedback, needsApproval, unav
 import { isolationError } from "../domain/tools/isolation.js";
 import { toFeedback } from "../domain/tools/result-feedback.js";
 import { LIST_SERVERS, isListCommands, renderCommandList, renderServerList } from "../domain/tools/virtual-commands.js";
+import { bareToolName } from "../domain/tools/names.js";
 import { callWithGuards } from "./call-guard.js";
 
 const DEFAULT_TIMEOUT_MS = 120000;
+// The size parameters a tool may advertise (read_files, run_command / run_project_script / run_tests, get_command_output).
+const OUTPUT_LIMIT_ARGUMENTS = ["max_total_chars", "max_output_chars", "max_chars"];
 const STOPPED_BEFORE_RUN = "ERROR: the command was not run - stopped by the user.";
 
 export class ToolRunner {
@@ -44,8 +47,11 @@ export class ToolRunner {
     this._timeoutMs = timeoutMs;
   }
 
-  /** @param {{ tool: string, arguments?: object }} call */
-  async run(call) {
+  /**
+   * @param {{ tool: string, arguments?: object }} call
+   * @param {{ budgetChars?: number }} [options]  the most output the model may be sent for this call
+   */
+  async run(call, { budgetChars } = {}) {
     const name = call.tool;
     const args = call.arguments || {};
     if (!name) return FEEDBACK.parseError("malformed");
@@ -66,7 +72,24 @@ export class ToolRunner {
     if (!this._catalogue.names().size) await this._catalogue.ensure();
     if (!this._catalogue.knows(name)) return FEEDBACK.unknownTool(name, [...this._catalogue.names()]);
 
-    return this._execute(name, withoutReserved(args), target);
+    return this._execute(name, this._withBudget(name, withoutReserved(args), budgetChars), target);
+  }
+
+  /**
+   * Hand the call's share of the message to the tool, when the tool can limit its own output (it then reads or keeps
+   * only what fits, and says what it left out). A smaller limit the model chose itself is kept.
+   */
+  _withBudget(name, args, budgetChars) {
+    if (!Number.isFinite(budgetChars) || budgetChars <= 0) return args;
+    const advertised = this._catalogue.all.find((tool) => bareToolName(tool.name) === bareToolName(name));
+    const properties = (advertised && advertised.inputSchema && advertised.inputSchema.properties) || {};
+    const limited = { ...args };
+    for (const key of OUTPUT_LIMIT_ARGUMENTS) {
+      if (!(key in properties)) continue;
+      const own = Number(limited[key]);
+      limited[key] = Number.isFinite(own) && own > 0 ? Math.min(own, budgetChars) : budgetChars;
+    }
+    return limited;
   }
 
   async _listServers(target) {

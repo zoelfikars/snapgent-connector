@@ -32,18 +32,20 @@ export function buildSystemPrompt(opts = {}) {
 
   const prompt = `CONTEXT: snapgentV3 is a browser extension that sends your plain-text JSON commands to the user's selected MCP server through their local bridge. The selected target is ${targetName} (server id: ${targetServer}).
 
-The extension reads commands from your normal reply text and runs them on that MCP server. Your own built-in tools, connectors, or code execution do not access the user's machine. For work on the selected target, write exactly one command per reply as a fenced JSON block:
+The extension reads commands from your normal reply text and runs them on that MCP server. Your own built-in tools, connectors, or code execution do not access the user's machine. For work on the selected target, write each command as its own fenced JSON block:
 \`\`\`json
 {"command":"exact_tool_name","params":{"key":"value"}}
 \`\`\`
 
-At the start of the session, call \`list_commands\` with server "${targetServer}" to get the exact available tools and parameter schemas. Use only names and parameters from that result. Do not assume tools are available. If the needed tool is missing or the server is offline, explain that clearly and do not claim the task is complete. Do not call tools on another server unless the user asks to switch targets.
+At the start of the session, call \`list_commands\` with server "${targetServer}" (on its own, as your first reply) to get the exact available tools and parameter schemas. Use only names and parameters from that result. Do not assume tools are available. If the needed tool is missing or the server is offline, explain that clearly and do not claim the task is complete. Do not call tools on another server unless the user asks to switch targets.
 
 Rules:
-- Execute one command at a time and wait for its result before writing another.
+- You may write several commands in one reply, each in its own fenced JSON block. They run in order and you get ONE message back with every result. Group commands that do not depend on each other (for example \`tree\` and a \`read_files\` of the files you already know you need). If a command needs the result of an earlier one, wait for that result instead. A failing command stops the rest of the group.
+- Everything sent back to you shares one size limit. Output that is too long is cut in the middle (the start and the end are kept); files or commands that do not fit are listed as not read / not run, so ask for them in your next reply. Prefer fewer, targeted commands over reading everything.
+- A command's cut output has a run_id: use \`get_command_output\` with it to read more, rather than running the command again.
 - Put every command in a fenced JSON code block; do not use native function calls.
 - Respect the user's requested workspace and file scope. Never perform broad or destructive changes without explicit confirmation.
-- For project exploration, call \`tree\` first (junk folders are excluded by default), then \`read_files\` with several related files in one call. Do not read files one at a time when a bulk read is possible.
+- For project exploration, use the project tree given at the start of the session (or call \`tree\` for a folder, junk folders are excluded by default), then \`read_files\` with several related files in one call. Do not read files one at a time when a bulk read is possible.
 - On errors, use the returned error to adjust the next command; do not silently claim success.
 - When finished, summarize the completed work briefly.
 - You are ${siteName}; snapgentV3 carries out the commands on the selected target.`;

@@ -58,6 +58,7 @@
  * @property {() => void} keepCover   Keep the "agent is working" cover up (e.g. while parked).
  * @property {(chip: {item: object, name: string, detail: string, category: string}) => void} parseErrorChip
  * @property {(item: object, call: object, category: string, text: {arg: string, body: string}) => void} toolRunning
+ * @property {(text: string) => void} [progress]  which command is running now (empty: none), for the composer cover
  * @property {() => void} toolFinished
  * @property {(item: object, call: object, category: string) => void} toolStopped
  * @property {(item: object, call: object, outcome: object) => void} toolSettled

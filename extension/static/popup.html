@@ -149,6 +149,21 @@
     button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
     /* Footer */
+    .limit-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    #limit-value { color: var(--accent); font-variant-numeric: tabular-nums; }
+    #limit { width: 100%; margin: 10px 0 4px; accent-color: var(--accent); }
+    .limit-note {
+      margin: 0;
+      font-size: 10.5px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
     .hint {
       margin: 0;
       font-size: 11px;
@@ -180,6 +195,12 @@
         </div>
       </div>
       <div id="servers"></div>
+    </section>
+
+    <section class="card">
+      <div class="limit-head"><span>Max message size</span><span id="limit-value"></span></div>
+      <input type="range" id="limit" aria-label="Maximum characters in one message sent to the chat" />
+      <p class="limit-note">One message to the chat (command results, with any reminder) never goes past this. Longer output is cut in the middle, and files that do not fit are listed as not read. About 4 characters per token.</p>
     </section>
 
     <div class="actions">

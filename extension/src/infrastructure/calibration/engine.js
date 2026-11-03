@@ -48,7 +48,13 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   const assistantCount = () => assistantTurns().length;
   const userCount = () => userTurns().length;
   const lastAssistant = () => assistantTurns().pop() || null;
-  const bodyOf = (item) => (profile.assistant.body && item.querySelector(profile.assistant.body)) || item;
+  // Where the reply's words are. A turn with a "thinking" section holds the body selector TWICE (the thoughts, then the
+  // answer): the answer is the LAST one. Taking the first read only the thoughts, so a command in the answer was never seen.
+  const bodyOf = (item) => {
+    if (!profile.assistant.body) return item;
+    const matches = outermost([...item.querySelectorAll(profile.assistant.body)]);
+    return matches.length ? matches[matches.length - 1] : item;
+  };
   const itemText = (item) => (item ? readText(isAssistantItem(item) ? bodyOf(item) : item) : "");
   const classifyText = (item, exclude) => (item ? readText(isAssistantItem(item) ? bodyOf(item) : item, exclude) : "");
   const readAssistant = () => {

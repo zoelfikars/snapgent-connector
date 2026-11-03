@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { allHostnames } from "../sites/registry.js";
+import { MAX_PROMPT_CHARS, MIN_PROMPT_CHARS, clampPromptChars } from "../domain/prompt/budget.js";
 
 const SUPPORTED_HOSTS = allHostnames();
 // const DEFAULT_AI_URL = "https://chat.deepseek.com/"; // DeepSeek hidden (disabled, not deleted)
@@ -29,6 +30,22 @@ function render(s) {
     ? list.map((x) => `${x.alive ? "●" : "○"} ${x.id} (${x.alive ? x.tools + " tools" : "down"})`).join("\n")
     : "";
 }
+
+// The most one message into the chat may hold (read by the page; see messageBudget in legacy/main.js).
+const LIMIT_STEP = 10000;
+const limitInput = document.getElementById("limit");
+const limitValue = document.getElementById("limit-value");
+const showLimit = (chars) => { limitValue.textContent = `${Math.round(chars / 1000)}k chars (~${Math.round(chars / 4000)}k tokens)`; };
+limitInput.min = String(MIN_PROMPT_CHARS);
+limitInput.max = String(MAX_PROMPT_CHARS);
+limitInput.step = String(LIMIT_STEP);
+chrome.storage.local.get("zsMaxPromptChars", (r) => {
+  const chars = clampPromptChars(r && r.zsMaxPromptChars);
+  limitInput.value = String(chars);
+  showLimit(chars);
+});
+limitInput.addEventListener("input", () => showLimit(Number(limitInput.value)));
+limitInput.addEventListener("change", () => chrome.storage.local.set({ zsMaxPromptChars: clampPromptChars(limitInput.value) }));
 
 function refresh() {
   chrome.runtime.sendMessage({ type: "status" }, (s) => s && render(s));

@@ -45,6 +45,9 @@ export class PromptResender {
     return spent;
   }
 
+  /** Room the re-statement will need on the next message, so results leave it free (0 when none is due). */
+  reserve() { return this.due() ? buildResendRider(this._systemPrompt()).length : 0; }
+
   /** Attach the prompt to `text` if one is due and it fits. */
   attach(text) {
     if (!this.due()) return text;

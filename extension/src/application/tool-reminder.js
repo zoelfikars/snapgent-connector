@@ -14,6 +14,9 @@ export class ToolReminder {
   /** A fresh session starts a fresh cadence. */
   reset() { this._count = 0; }
 
+  /** Would the next successful result make a reminder due? Lets the sender keep room for it. */
+  willBeDue({ hasCatalogue }) { return !!hasCatalogue && this._count + 1 >= this._every; }
+
   /**
    * Record one finished call; returns true when a reminder is due now.
    * Errors do not count (they already restate what is wrong) and neither does
