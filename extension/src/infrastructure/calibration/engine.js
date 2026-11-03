@@ -6,7 +6,7 @@
 import { setNativeValue } from "../chat/dom-helpers.js";
 import { StreamSampler } from "../chat/stream-sampler.js";
 import { waitFor } from "../chat/wait.js";
-import { visible } from "./dom-signals.js";
+import { alternativeSelectors, visible } from "./dom-signals.js";
 import { readText } from "./page-text.js";
 import { profileProblems } from "./profile.js";
 
@@ -31,7 +31,18 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   const find = (selector) => {
     try { return [...document.querySelectorAll(selector)].filter((el) => !el.closest("#zs-root")); } catch { return []; }
   };
-  const firstVisible = (selector) => find(selector).find(visible) || null;
+  // A selector learned while the page was in one state can name things that change (a role, a placeholder, a state class). The controls
+  // around the text box are looked up with it first and, when it finds nothing at all, with its other forms (see alternativeSelectors).
+  const findLoose = (selector) => {
+    const strict = find(selector);
+    if (strict.length) return strict;
+    for (const form of alternativeSelectors(selector)) {
+      const found = find(form);
+      if (found.length) return found;
+    }
+    return strict;
+  };
+  const firstVisible = (selector) => findLoose(selector).find(visible) || null;
 
   // ── turns ─────────────────────────────────────────────────────────────────
   // A turn is something laid out on the page: a template, a script or a collapsed copy that happens to carry the same attributes is
@@ -75,12 +86,32 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   }
 
   // ── composer ──────────────────────────────────────────────────────────────
-  const getEditor = () => firstVisible(profile.composer.selector);
+  // The text box: by its selector; else by that selector's other forms; else the page's ONLY visible text box outside the turns (a new chat
+  // and an open one often draw it differently). What was found that way is noted once in the log.
+  const editable = (el) => isValueEditor(el) || (el.hasAttribute("contenteditable") && el.getAttribute("contenteditable") !== "false");
+  let healed = "";
+  const healedWith = (how, el) => { if (healed !== how) { healed = how; diag("composer.healed", { how, element: el.localName }); } return el; };
+  function onlyTextBox() {
+    const turns = [...assistantTurns(), ...userTurns()];
+    const boxes = outermost(find("textarea, input:not([type]), input[type=text], [contenteditable]").filter(editable).filter(visible)).filter((box) => !turns.some((turn) => turn.contains(box)));
+    return boxes.length === 1 ? boxes[0] : null;
+  }
+  const getEditor = () => {
+    const named = find(profile.composer.selector).find(visible);
+    if (named) { healed = ""; return named; }
+    for (const form of alternativeSelectors(profile.composer.selector)) {
+      const found = find(form).filter(editable).find(visible);
+      if (found) return healedWith(`selector ${form}`, found);
+    }
+    const only = onlyTextBox();
+    return only ? healedWith("the only text box", only) : null;
+  };
   const editorText = () => {
     const editor = getEditor();
     if (!editor) return "";
     return isValueEditor(editor) ? editor.value || "" : editor.textContent || "";
   };
+  const isSendControl = (target) => target.closest(profile.send.selector) || alternativeSelectors(profile.send.selector).some((form) => target.closest(form));
   const sendButton = () => (profile.send.selector ? firstVisible(profile.send.selector) : null);
   const sendReady = () => {
     const button = sendButton();
@@ -93,7 +124,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     const editor = getEditor();
     if (!editor) return null;
     if (profile.card && profile.card.selector) {
-      const chosen = find(profile.card.selector).find((box) => box.contains(editor));
+      const chosen = findLoose(profile.card.selector).find((box) => box.contains(editor));
       if (chosen) return chosen;
     }
     // A box no bigger than the text field is the field's own wrapper, not the card it sits in.
@@ -247,7 +278,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     };
     const onClick = (e) => {
       const button = sendButton();
-      if (!button || !(e.target.closest && e.target.closest(profile.send.selector)) || editorText().trim() === "" || handlers.isBlocked()) return;
+      if (!button || !(e.target.closest && isSendControl(e.target)) || editorText().trim() === "" || handlers.isBlocked()) return;
       sending(e);
     };
     document.addEventListener("keydown", onKey, true);

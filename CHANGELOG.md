@@ -15,6 +15,11 @@ All notable changes to snapgentV3 Free are documented here.
 - `scripts/package_release.py` assembles the release zip (tested).
 
 ### Fixed
+- **A calibration made in a new chat did not work in an open one (and the reverse).** The selectors learned for the text box named things that change
+  with the page's state: Grok's text box is a `combobox` in a new chat and a `textbox` in an open one, Mistral's placeholder exists only in a new chat.
+  Calibrating now ignores roles, placeholders, `aria-expanded`-style states and state classes (`is-empty`, `ProseMirror-focused`, ...). A profile that
+  already names them heals itself: when its selector finds nothing, the page is searched with the selector's relaxed form, with the text box's role
+  swapped for its sibling roles, and finally for the page's only text box outside the turns (noted in the log as `composer.healed`).
 - **A message typed into a calibrated site never reached the agent directly.** The send hooks were made once at page load, while the
   provider was still the "not calibrated" one (the stored profile is read a moment later), so they were empty; only the one-second resume
   watchdog started the loop. The hooks are now made again whenever the provider changes, so a typed message starts the agent at once.

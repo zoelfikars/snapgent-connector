@@ -10,8 +10,14 @@ import { pageWith } from "./support/jsdom-provider.js";
 
 const root = new URL("../", import.meta.url).pathname;
 
+// The calibrations shipped in profiles/ are the maintainer's to change; these tests must not depend on which sites they cover.
+const withoutShippedCalibrations = (base) => ({
+  name: "no-shipped-calibrations",
+  setup: (b) => b.onResolve({ filter: /default-calibrations\.json$/ }, () => ({ path: base + "test/fixtures/no-default-calibrations.json" })),
+});
+
 async function bundledContentScript() {
-  const result = await build({ entryPoints: [root + "src/entry/content.js"], bundle: true, format: "iife", write: false, logLevel: "silent" });
+  const result = await build({ entryPoints: [root + "src/entry/content.js"], bundle: true, format: "iife", write: false, logLevel: "silent", plugins: [withoutShippedCalibrations(root)] });
   return result.outputFiles[0].text;
 }
 

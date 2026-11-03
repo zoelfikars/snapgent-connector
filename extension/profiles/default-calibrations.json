@@ -2,31 +2,6 @@
   "format": "snapgent-calibrations",
   "version": 1,
   "sites": {
-    "deepseek": {
-      "name": "DeepSeek",
-      "profiles": {
-        "chat.deepseek.com": {
-          "version": 1,
-          "site": "chat.deepseek.com",
-          "name": "DeepSeek",
-          "composer": {
-            "selector": "[placeholder=\"Message DeepSeek\"]"
-          },
-          "send": {
-            "selector": ".ds-button--primary"
-          },
-          "assistant": {
-            "turn": ".ds-markdown",
-            "body": null
-          },
-          "user": {
-            "turn": "._9663006"
-          },
-          "stop": null,
-          "card": null
-        }
-      }
-    },
     "chatgpt": {
       "name": "ChatGPT",
       "profiles": {
@@ -227,6 +202,31 @@
         }
       }
     },
+    "grok": {
+      "name": "Grok",
+      "profiles": {
+        "grok.com": {
+          "version": 1,
+          "site": "grok.com",
+          "name": "Grok",
+          "composer": {
+            "selector": "[role=\"textbox\"]"
+          },
+          "send": {
+            "enter": true
+          },
+          "assistant": {
+            "turn": ".items-start",
+            "body": null
+          },
+          "user": {
+            "turn": "div.relative.group.flex.flex-col.justify-center.w-full.max-w-\\(--content-max-width\\).mx-auto.items-end"
+          },
+          "stop": null,
+          "card": null
+        }
+      }
+    },
     "mistral": {
       "name": "Mistral",
       "profiles": {
@@ -252,25 +252,25 @@
         }
       }
     },
-    "grok": {
-      "name": "Grok",
+    "deepseek": {
+      "name": "DeepSeek",
       "profiles": {
-        "grok.com": {
+        "chat.deepseek.com": {
           "version": 1,
-          "site": "grok.com",
-          "name": "Grok",
+          "site": "chat.deepseek.com",
+          "name": "DeepSeek",
           "composer": {
-            "selector": "[role=\"textbox\"]"
+            "selector": "[placeholder=\"Message DeepSeek\"]"
           },
           "send": {
-            "enter": true
+            "selector": ".ds-button--primary"
           },
           "assistant": {
-            "turn": ".items-start",
+            "turn": ".ds-markdown",
             "body": null
           },
           "user": {
-            "turn": "div.relative.group.flex.flex-col.justify-center.w-full.max-w-\\(--content-max-width\\).mx-auto.items-end"
+            "turn": "._9663006"
           },
           "stop": null,
           "card": null
