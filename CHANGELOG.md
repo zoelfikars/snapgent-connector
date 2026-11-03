@@ -32,6 +32,9 @@ All notable changes to snapgentV3 Free are documented here.
 - The bridge's terminal shows only where it listens, the approval question and fatal errors; everything else is in `logs/bridge_debug.log`.
 
 ### Added
+- **Calibrations that ship with the extension.** `extension/profiles/default-calibrations.json` (the file "Export all calibrations" writes) is built into the
+  content script, and a site the user has not calibrated is read with the profile shipped for it, so a new user starts without calibrating. The user's own
+  calibration always wins, and an own profile that is not usable falls back to the shipped one. "Copy diagnostics" says whose calibration is in use.
 - **Export and import every calibration at once.** The "switch AI" menu has **Export all calibrations** (one file, `snapgent-calibrations.json`, kept apart
   per AI: `sites.<id>.profiles.<host>`) and **Import calibrations…**: choose one or more files (that file, or single-site files from "Export calibration"),
   see what they hold per AI, in the order of the menu, untick the ones you do not want (an AI you already calibrated is marked as replaced) and

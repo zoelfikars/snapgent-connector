@@ -3,6 +3,7 @@
 // reaches the others through the objects passed to it. Anything that reads the site goes through `provider`.
 
 import { ServerDirectory } from "../application/index.js";
+import defaultCalibrations from "../../profiles/default-calibrations.json";
 import { createAttachments } from "../page/attachments.js";
 import { createAtPopup } from "../page/at-popup.js";
 import { createAutoResume } from "../page/auto-resume.js";
@@ -32,7 +33,7 @@ const storage = createStorage();
 const state = createState();
 let record = () => {};
 const diag = (event, data) => record(event, data);
-const provider = createProvider({ document, location, storage, diag });
+const provider = createProvider({ document, location, storage, diag, defaults: defaultCalibrations });
 record = createDiagnostics({ provider, state, document, window });
 watchForStalls({ diag, state, setInterval });
 

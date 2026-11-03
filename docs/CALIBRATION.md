@@ -223,3 +223,13 @@ the leftovers listed under phase 3.
 - **Text box**: a click on or around the field resolves to the real field (the field, or the one visible field inside the box that was clicked, looked for a few levels up). Only when there is none, or several, is the click refused.
 - **Review overlays**: after the clicks, every turn of the chat is marked on the page ("You" green, "AI reply" blue), the part read is marked "Read from here", and the box the bar will sit in is yellow. Warnings are listed when nothing was found or when the part read leaves out code blocks of the reply (where commands are).
 - **Pick the bar's box**: from the review the user can click the box around the text box (must contain it); it is stored as `card` in the profile.
+
+## Shipping default calibrations
+
+The extension carries calibrations of its own so that a new user does not have to teach every site. They live in
+`extension/profiles/default-calibrations.json` and are compiled into the content script (no extra file to fetch at run time).
+
+To update them: calibrate the sites by hand, choose **Export all calibrations** in the "switch AI" menu, and save the file over
+`extension/profiles/default-calibrations.json`. A site the user has not calibrated is read with the profile in that file; a calibration the
+user made always wins, and a user's profile that has stopped matching the page falls back to the shipped one. The file is data about page
+layouts only, never about a conversation: look through it before committing it.
