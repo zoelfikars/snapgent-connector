@@ -704,3 +704,7 @@ html.zs-light #zs-at-popup { background: #ffffff; color: #1f2937; border-color: 
 html.zs-light .zs-at-head { border-bottom-color: rgba(0, 0, 0, 0.08); }
 html.zs-light .zs-at-off:hover, html.zs-light .zs-at-x:hover { background: rgba(0, 0, 0, 0.06); }
 html.zs-light .zs-file-active { background: rgba(234, 179, 8, 0.28); }
+
+.zs-cal-import-foot { display: flex; justify-content: flex-end; padding: 0 14px 12px; }
+.zs-cal-import-go { height: 30px; padding: 0 16px; border-radius: 8px; border: 0; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: #111; background: #eab308; }
+.zs-cal-import-go:disabled { opacity: 0.4; cursor: default; }

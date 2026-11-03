@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import { openMcpSettings } from "../src/ui/mcp-settings.js";
 import { openSkillsSettings } from "../src/ui/skills-settings.js";
+import { openCalibrationImport } from "../src/ui/calibration-import.js";
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 const newPage = () => new JSDOM("<!doctype html><body></body>").window;
@@ -198,5 +199,38 @@ describe("Skills settings popup", () => {
     Object.defineProperty(again, "files", { value: [{ size: 100, content: SKILL }], configurable: true });
     again.dispatchEvent(new w.Event("change"));
     assert.equal($("#zs-skill-text").value, SKILL);
+  });
+});
+
+describe("Import calibrations popup", () => {
+  const groups = [
+    { id: "chatgpt", name: "ChatGPT", profiles: [{ site: "chatgpt.com" }, { site: "chat.openai.com" }], replaces: true },
+    { id: "claude", name: "<b>Claude</b>", profiles: [{ site: "claude.ai" }], replaces: false },
+  ];
+
+  test("one row per AI with its own tick, a note for the ones it would replace, and nothing a name says becomes markup", () => {
+    const w = newPage();
+    openCalibrationImport({ document: w.document, groups, onImport() {} });
+    const rows = [...w.document.querySelectorAll(".zs-mcp-row")];
+    assert.deepEqual(rows.map((r) => r.querySelector(".zs-mcp-row-meta").textContent), ["2 sites · replaces its current calibration", "1 site"]);
+    assert.equal(w.document.querySelector("b"), null);
+    assert.ok([...w.document.querySelectorAll(".zs-mcp-check")].every((box) => box.checked));
+  });
+
+  test("Import hands over only the AIs left ticked, and closes", () => {
+    const w = newPage();
+    const taken = [];
+    openCalibrationImport({ document: w.document, groups, onImport: (ids) => taken.push(ids) });
+    w.document.querySelector('.zs-mcp-check[data-id="chatgpt"]').checked = false;
+    click(w.document.querySelector(".zs-cal-import-go"));
+    assert.deepEqual(taken, [["claude"]]);
+    assert.equal(w.document.getElementById("zs-mcp-pop"), null);
+  });
+
+  test("files with nothing usable say so, and cannot be imported", () => {
+    const w = newPage();
+    openCalibrationImport({ document: w.document, groups: [], skipped: ["a file that is not valid JSON"], onImport() {} });
+    assert.match(w.document.querySelector(".zs-mcp-pop-note").textContent, /Left out: a file that is not valid JSON/);
+    assert.ok(w.document.querySelector(".zs-cal-import-go").disabled);
   });
 });

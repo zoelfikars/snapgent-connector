@@ -54,6 +54,8 @@ export function createSiteMenu({ document, window, menu, button, group, provider
     on("#zs-cal-import", calibration.importProfile);
     on("#zs-cal-diag", calibration.copyDiagnostics);
     on("#zs-cal-remove", calibration.remove);
+    on("#zs-cal-export-all", calibration.exportAll);
+    on("#zs-cal-import-all", calibration.importAll);
   }
 
   /** `toSupport` scrolls the panel to its last section (the support links); otherwise it opens at the top. */

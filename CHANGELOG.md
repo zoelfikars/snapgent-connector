@@ -32,6 +32,10 @@ All notable changes to snapgentV3 Free are documented here.
 - The bridge's terminal shows only where it listens, the approval question and fatal errors; everything else is in `logs/bridge_debug.log`.
 
 ### Added
+- **Export and import every calibration at once.** The "switch AI" menu has **Export all calibrations** (one file, `snapgent-calibrations.json`, kept apart
+  per AI: `sites.<id>.profiles.<host>`) and **Import calibrations…**: choose one or more files (that file, or single-site files from "Export calibration"),
+  see what they hold per AI, in the order of the menu, untick the ones you do not want (an AI you already calibrated is marked as replaced) and
+  import. A profile that is not usable is left out and named.
 - **Typing `@` in the message opens the file list** beside the composer: what follows the `@` is the search, ↑↓ Enter/Tab choose (the `@word`
   is replaced by `@path/to/file`, the same tag the Files menu inserts), Esc, ✕ or a click elsewhere closes it, and **Turn off** (also a
   checkbox in the Files menu) stops it for good. A name with spaces is written `@"docs/My Notes.md"`; single quotes and backticks are read too, and

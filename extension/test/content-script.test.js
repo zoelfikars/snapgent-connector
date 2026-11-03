@@ -95,7 +95,7 @@ describe("content script on a supported site that is not calibrated yet", () => 
       page.document.getElementById("zs-switch").click();
       await new Promise((resolve) => setTimeout(resolve, 100));
       const menu = page.document.getElementById("zs-menu");
-      for (const id of ["zs-cal-start", "zs-cal-export", "zs-cal-import", "zs-cal-remove"]) assert.ok(menu.querySelector(`#${id}`), id);
+      for (const id of ["zs-cal-start", "zs-cal-export", "zs-cal-import", "zs-cal-remove", "zs-cal-export-all", "zs-cal-import-all"]) assert.ok(menu.querySelector(`#${id}`), id);
     } finally {
       page.window.close();
     }

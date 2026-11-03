@@ -95,6 +95,11 @@ const CALIBRATION_SECTION = `
            <button class="zs-site-opt" id="zs-cal-import" type="button"><span class="zs-site-name"><span>Import calibration</span></span></button>
            <button class="zs-site-opt" id="zs-cal-diag" type="button"><span class="zs-site-name"><span>Copy diagnostics</span><span class="zs-site-host">what it finds on this page, no text of the chat</span></span></button>
            <button class="zs-site-opt" id="zs-cal-remove" type="button"><span class="zs-site-name"><span>Remove calibration</span></span></button>
+         </section>
+         <section class="zs-menu-sec">
+           <div class="zs-sec-label"><span>All sites</span></div>
+           <button class="zs-site-opt" id="zs-cal-export-all" type="button"><span class="zs-site-name"><span>Export all calibrations</span><span class="zs-site-host">one file, kept apart per AI</span></span></button>
+           <button class="zs-site-opt" id="zs-cal-import-all" type="button"><span class="zs-site-name"><span>Import calibrations…</span><span class="zs-site-host">choose which AIs to take from the files</span></span></button>
          </section>`;
 
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; } };

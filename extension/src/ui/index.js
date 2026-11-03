@@ -4,6 +4,7 @@ export { computeBarView } from "./bar-view.js";
 export { createConfirmDialog } from "./confirm-dialog.js";
 export { createNotifications } from "./notifications.js";
 export { openMcpSettings } from "./mcp-settings.js";
+export { openCalibrationImport } from "./calibration-import.js";
 export { openSkillsSettings } from "./skills-settings.js";
 export { applyTheme } from "./page-theme.js";
 export { computeMenuPlacement, applyMenuPlacement, viewportOf } from "./menu-position.js";
