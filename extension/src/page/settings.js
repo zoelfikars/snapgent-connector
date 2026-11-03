@@ -4,7 +4,7 @@
 
 import { APPROVAL_MODES } from "../ui/index.js";
 
-const KEYS = { target: "zsSelectedMcpTarget", mode: "zsApprovalMode", setupSeen: "zsSetupSeen" };
+const KEYS = { target: "zsSelectedMcpTarget", mode: "zsApprovalMode", setupSeen: "zsSetupSeen", atPopup: "zsAtPopup" };
 const isMode = (id) => APPROVAL_MODES.some((mode) => mode.id === id);
 
 /** @param {{ storage: object, location: Location, onChange: () => void }} deps `onChange` is called whenever a loaded or changed value should be redrawn */
@@ -12,13 +12,16 @@ export function createSettings({ storage, location, onChange }) {
   let target = "vscode";
   let approvalMode = "manual"; // plan (read only) / manual (asks first) / auto (never asks); sent with each call, the model cannot set it
   let setupSeen = false;
+  let atPopup = true; // the file list that opens when the user types @ in the composer
 
   const loaded = [
     storage.get(KEYS.target).then((saved) => { if (typeof saved === "string" && saved) { target = saved; onChange(); } }),
     storage.get(KEYS.mode).then((saved) => { if (isMode(saved)) { approvalMode = saved; onChange(); } }),
     storage.get(KEYS.setupSeen).then((saved) => { setupSeen = !!saved; }),
+    storage.get(KEYS.atPopup).then((saved) => { atPopup = saved !== false; }),
   ];
   storage.watch(KEYS.mode, (saved) => { if (isMode(saved)) { approvalMode = saved; onChange(); } });
+  storage.watch(KEYS.atPopup, (saved) => { atPopup = saved !== false; });
 
   return {
     /** Resolves once the saved choices are loaded (the first bridge status must be read against the saved target). */
@@ -37,6 +40,8 @@ export function createSettings({ storage, location, onChange }) {
       storage.set(KEYS.mode, id);
       onChange();
     },
+    atPopup: () => atPopup,
+    setAtPopup(on) { atPopup = !!on; storage.set(KEYS.atPopup, atPopup); },
     setupSeen: () => setupSeen,
     markSetupSeen() { setupSeen = true; storage.set(KEYS.setupSeen, true); },
   };

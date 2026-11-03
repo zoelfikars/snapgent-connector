@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The "Files" pill of the bar: search the workspace's files, tick some, and tag them in the composer (see attachments.js).
 
+import { matchPaths } from "../domain/prompt/file-tags.js";
 import { fileRowsHtml, filesMenuHtml } from "../ui/index.js";
 import { createPillMenu } from "./pill-menu.js";
 import { MAX_TAGGED } from "./attachments.js";
@@ -13,13 +14,9 @@ export function createFilesMenu({ document, root, group, state, settings, files,
   let paths = [];
   let query = "";
 
-  const matching = () => {
-    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-    return words.length ? paths.filter((path) => words.every((word) => path.toLowerCase().includes(word))) : paths;
-  };
   const list = () => menu.querySelector(".zs-files-list");
   const redraw = () => {
-    list().innerHTML = fileRowsHtml(matching(), chosen);
+    list().innerHTML = fileRowsHtml(matchPaths(paths, query), chosen);
     menu.querySelector(".zs-files-count").textContent = chosen.size ? `${chosen.size} chosen` : "none chosen";
     menu.querySelector(".zs-files-insert").disabled = !chosen.size;
     root.querySelector("#zs-files-name").textContent = chosen.size ? `Files (${chosen.size})` : "Files";
@@ -44,6 +41,9 @@ export function createFilesMenu({ document, root, group, state, settings, files,
         else chosen.add(path);
         redraw();
       });
+      const toggle = menu.querySelector(".zs-files-at");
+      toggle.checked = settings.atPopup();
+      toggle.addEventListener("change", () => settings.setAtPopup(toggle.checked));
       menu.querySelector(".zs-files-insert").addEventListener("click", async () => {
         try { await files.insert([...chosen]); } catch (error) { toast(String((error && error.message) || error)); return; }
         chosen.clear();

@@ -57,7 +57,8 @@ export const filesMenuHtml = () =>
   `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Attach files</span></div>` +
   `<input class="zs-files-search" type="search" placeholder="Search files…" autocomplete="off" spellcheck="false" aria-label="Search files">` +
   `<div class="zs-files-list"></div>` +
-  `<div class="zs-files-foot"><span class="zs-files-count"></span><button type="button" class="zs-files-insert">Insert</button></div></section>`;
+  `<div class="zs-files-foot"><span class="zs-files-count"></span><button type="button" class="zs-files-insert">Insert</button></div>` +
+  `<label class="zs-files-toggle"><input type="checkbox" class="zs-files-at"> Open this list when I type @ in the message</label></section>`;
 
 /** The rows for the files that match, the chosen ones marked. At most `max` are drawn; the rest is a hint to narrow the search. */
 export function fileRowsHtml(paths, chosen, max = 200) {
@@ -69,6 +70,23 @@ export function fileRowsHtml(paths, chosen, max = 200) {
   });
   if (paths.length > max) rows.push(`<div class="zs-files-more">${paths.length - max} more: type to narrow the search</div>`);
   return rows.join("") || `<div class="zs-files-more">No file matches</div>`;
+}
+
+/** The popup that opens beside the composer when the user types @: its header (with the ways to close it) and an empty list. */
+export const atPopupHtml = () =>
+  `<div class="zs-at-head"><span class="zs-at-title">Attach a file</span>` +
+  `<span class="zs-at-hint">↑↓ choose · Enter insert · Esc close</span>` +
+  `<button type="button" class="zs-at-off" title="Stop opening this list when I type @">Turn off</button>` +
+  `<button type="button" class="zs-at-x" aria-label="Close">✕</button></div><div class="zs-at-list"></div>`;
+
+/** The rows of that popup, the highlighted one marked. At most `max` are drawn. */
+export function atRowsHtml(paths, active, max = 60) {
+  if (!paths.length) return `<div class="zs-files-more">No file matches</div>`;
+  return paths.slice(0, max).map((path, index) => {
+    const slash = path.lastIndexOf("/");
+    return `<div class="zs-at-row${index === active ? " zs-at-active" : ""}" data-path="${escapeHtml(path)}" role="option" aria-selected="${index === active}">` +
+      `<span class="zs-file-path"><span class="zs-file-dir">${escapeHtml(path.slice(0, slash + 1))}</span>${escapeHtml(path.slice(slash + 1))}</span></div>`;
+  }).join("");
 }
 
 /** What the workspace pill shows. */

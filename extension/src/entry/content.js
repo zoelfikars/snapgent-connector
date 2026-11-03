@@ -4,6 +4,7 @@
 
 import { ServerDirectory } from "../application/index.js";
 import { createAttachments } from "../page/attachments.js";
+import { createAtPopup } from "../page/at-popup.js";
 import { createAutoResume } from "../page/auto-resume.js";
 import { createBar } from "../page/bar.js";
 import { createBatchJobs } from "../page/batch-jobs.js";
@@ -69,6 +70,7 @@ stop = createStop({ document, state, provider, bar, diag });
 let userInput;
 attachments = createAttachments({ provider, state, tools, chat, bar, budget, startTurn: (base) => userInput.startTurn(base), diag });
 userInput = installUserInput({ document, state, provider, bar, resend, loop, takeOver: attachments.takeOver, diag });
+createAtPopup({ document, window, root: bar.root, state, settings, provider, attachments, toast: bar.toast, diag });
 createAutoResume({ document, state, provider, executed, loop, diag });
 startPageWatch({ document, window, provider, session, bar });
 resend.hydrate();

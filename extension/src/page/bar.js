@@ -122,6 +122,7 @@ export function createBar({ document, window, provider, state, settings, serverD
   let nudged = false;
   return {
     render,
+    root,
     cover: cover.set,
     coverLabel: cover.setLabel,
     toast: (text) => notifications.toast(text),

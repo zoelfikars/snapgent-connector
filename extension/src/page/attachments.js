@@ -4,6 +4,7 @@
 // approval for a file that may hold secrets), and sends the message with the contents under it. That saves the model a turn
 // that would only read them. The message is sent through the same path the agent's own messages use, so every site is handled the same.
 
+import { findTags, tagText } from "../domain/prompt/file-tags.js";
 import { feedbackIsError } from "../domain/tools/result-summary.js";
 import { withoutResultHeader } from "../domain/tools/result-marker.js";
 import { bareToolName } from "../domain/tools/names.js";
@@ -12,8 +13,6 @@ export const MAX_TAGGED = 20;
 const LIST_TTL_MS = 30000;
 const MIN_FILES_CHARS = 4000;
 const MESSAGE_OVERHEAD = 200; // the line that introduces the files, and spacing
-const TOKEN = /@(\S+)/g;
-const TRAILING = /[,;:!?)\]}"'`]+$/;
 
 /** @param {{ provider: object, state: object, tools: object, chat: object, bar: object, budget: object, startTurn: (base: *) => void, diag: Function }} deps */
 export function createAttachments({ provider, state, tools, chat, bar, budget, startTurn, diag }) {
@@ -32,22 +31,23 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, s
     return { ok: true, paths };
   }
 
-  /** Write `@path` for each file at the end of what the user has typed. */
+  /** Tag each file at the end of what the user has typed. */
   async function insert(paths) {
     const current = (provider.editorText() || "").replace(/\s+$/, "");
-    await provider.writeText(`${current ? `${current} ` : ""}${paths.map((path) => `@${path}`).join(" ")} `);
+    await provider.writeText(`${current ? `${current} ` : ""}${paths.map((path) => tagText(path).trim()).join(" ")} `);
     paths.forEach((path) => tagged.add(path));
   }
 
-  /** The files this message tags: what the menu inserted, and any `@path` typed by hand that is a file of the workspace. */
-  function referenced(text) {
-    const found = [];
-    for (const [, raw] of text.matchAll(TOKEN)) {
-      const path = [raw, raw.replace(TRAILING, "")].find((candidate) => tagged.has(candidate) || (files && files.known.has(candidate)));
-      if (path && !found.includes(path)) found.push(path);
-    }
-    return found.slice(0, MAX_TAGGED);
+  /** Tag a file in place of the `@query` being typed from `start` on. */
+  async function replaceTag(text, start, path) {
+    await provider.writeText(text.slice(0, start) + tagText(path));
+    tagged.add(path);
   }
+
+  const isFile = (path) => tagged.has(path) || !!(files && files.known.has(path));
+
+  /** The files this message tags: what the menus inserted, and any tag typed by hand that names a file of the workspace. */
+  const referenced = (text) => findTags(text, isFile).slice(0, MAX_TAGGED);
 
   async function sendWithFiles(text, paths) {
     bar.cover(true);
@@ -90,5 +90,5 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, s
   /** The tool the menu needs is advertised by this server. */
   const canList = () => tools.catalogue.active().some((tool) => bareToolName(tool.name) === "find_files");
 
-  return { listFiles, insert, takeOver, canList };
+  return { listFiles, insert, replaceTag, takeOver, canList };
 }

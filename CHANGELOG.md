@@ -32,6 +32,10 @@ All notable changes to snapgentV3 Free are documented here.
 - The bridge's terminal shows only where it listens, the approval question and fatal errors; everything else is in `logs/bridge_debug.log`.
 
 ### Added
+- **Typing `@` in the message opens the file list** beside the composer: what follows the `@` is the search, ↑↓ Enter/Tab choose (the `@word`
+  is replaced by `@path/to/file`, the same tag the Files menu inserts), Esc, ✕ or a click elsewhere closes it, and **Turn off** (also a
+  checkbox in the Files menu) stops it for good. A name with spaces is written `@"docs/My Notes.md"`; single quotes and backticks are read too, and
+  an unquoted name that runs into spaces is still attached when it names a file. Only the tag at the end of the text opens the list.
 - **Files menu in the bar** (while a VS Code session is on): search the workspace's files, tick up to 20 and **Insert** them as `@path` in the
   composer. When the message is sent, the page holds it back, reads the tagged files with `read_files` (line numbers, the message size limit and
   the same approval for a file that may hold secrets) and sends the message with the contents under it, so the model does not spend a turn
