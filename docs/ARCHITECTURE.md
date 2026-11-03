@@ -63,7 +63,7 @@ extension/
     page/                    state · storage · settings · diagnostics · extension-bridge · provider (stored profile or "not calibrated")
                              visibility · chat (watcher + sender) · tools · loop · session · stop · user-input · auto-resume
                              prompt-resend · message-budget · batch-jobs · turns · page-watch · bridge-status
-                             bar · bar-menus · pill-menu · site-menu · calibration-actions
+                             bar · bar-menus · pill-menu · site-menu · calibration-actions · files-menu · attachments
     entry/                   content.js (composition root) · background.js · popup.js
   manifests/base.json        shared manifest; per-browser deltas live in build/manifest.mjs
   build/                     manifest generation + esbuild bundling -> dist/{chrome,firefox}

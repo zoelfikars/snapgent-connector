@@ -52,6 +52,25 @@ export function workspaceMenuHtml({ active, open, pinned }) {
     `<button type="submit" class="zs-ws-use">Use</button></form><div class="zs-ws-error" hidden></div></section>`;
 }
 
+/** The files menu: a search box over the workspace's files, the list, and the button that tags the chosen ones. */
+export const filesMenuHtml = () =>
+  `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Attach files</span></div>` +
+  `<input class="zs-files-search" type="search" placeholder="Search files…" autocomplete="off" spellcheck="false" aria-label="Search files">` +
+  `<div class="zs-files-list"></div>` +
+  `<div class="zs-files-foot"><span class="zs-files-count"></span><button type="button" class="zs-files-insert">Insert</button></div></section>`;
+
+/** The rows for the files that match, the chosen ones marked. At most `max` are drawn; the rest is a hint to narrow the search. */
+export function fileRowsHtml(paths, chosen, max = 200) {
+  const rows = paths.slice(0, max).map((path) => {
+    const slash = path.lastIndexOf("/");
+    const dir = slash >= 0 ? path.slice(0, slash + 1) : "";
+    return `<button type="button" class="zs-file-row${chosen.has(path) ? " zs-file-chosen" : ""}" data-path="${escapeHtml(path)}" role="checkbox" aria-checked="${chosen.has(path)}">` +
+      `<span class="zs-file-tick">${chosen.has(path) ? "✓" : ""}</span><span class="zs-file-path"><span class="zs-file-dir">${escapeHtml(dir)}</span>${escapeHtml(path.slice(slash + 1))}</span></button>`;
+  });
+  if (paths.length > max) rows.push(`<div class="zs-files-more">${paths.length - max} more: type to narrow the search</div>`);
+  return rows.join("") || `<div class="zs-files-more">No file matches</div>`;
+}
+
 /** What the workspace pill shows. */
 export const workspaceLabel = (pinned) => (pinned ? folderName(pinned) : "Auto");
 

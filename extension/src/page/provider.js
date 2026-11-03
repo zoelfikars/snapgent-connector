@@ -37,6 +37,7 @@ function uncalibrated(location) {
     getEditor: none, editorText: empty, composerFrame: none, setInputLock() {}, installSendHooks() {},
     enforceComposer: () => ({ ready: false }), ensureComposerReady: async () => ({ ready: false }),
     typeAndSend: async () => { throw new Error("This site is not calibrated yet."); },
+    writeText: async () => { throw new Error("This site is not calibrated yet."); },
 
     scanError: none, isTooLongMsg: no, findContinueBtn: none, clickContinueBtn: no,
   };

@@ -110,7 +110,7 @@ html.zs-light .zs-pill { background: rgba(0, 0, 0, 0.05); color: #4b5563; border
 html.zs-light .zs-pill:hover { background: rgba(0, 0, 0, 0.09); color: #1f2430; }
 
 /* MCP target dropdown: same shell as the Switch AI menu */
-#zs-target-menu, #zs-mode-menu, #zs-ws-menu {
+#zs-target-menu, #zs-mode-menu, #zs-ws-menu, #zs-files-menu {
   position: fixed; z-index: 2147483647;
   box-sizing: border-box;
   width: min(220px, calc(100vw - 16px)); min-width: 0; overflow-y: auto;
@@ -121,10 +121,10 @@ html.zs-light .zs-pill:hover { background: rgba(0, 0, 0, 0.09); color: #1f2430; 
   font-size: 12px; animation: zs-pop 0.16s ease-out;
   scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent;
 }
-#zs-target-menu[hidden], #zs-mode-menu[hidden], #zs-ws-menu[hidden] { display: none; }
+#zs-target-menu[hidden], #zs-mode-menu[hidden], #zs-ws-menu[hidden], #zs-files-menu[hidden] { display: none; }
 #zs-target-menu .zs-target-opt, #zs-mode-menu .zs-mode-opt, #zs-ws-menu .zs-ws-opt { width: 100%; }
 #zs-target-menu .zs-target-cur, #zs-mode-menu .zs-target-cur, #zs-ws-menu .zs-target-cur { cursor: default; }
-html.zs-light #zs-target-menu, html.zs-light #zs-mode-menu, html.zs-light #zs-ws-menu {
+html.zs-light #zs-target-menu, html.zs-light #zs-mode-menu, html.zs-light #zs-ws-menu, html.zs-light #zs-files-menu {
   background: #ffffff; color: #1f2937; border-color: rgba(0, 0, 0, 0.1);
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.18); scrollbar-color: rgba(0,0,0,0.25) transparent;
 }
@@ -661,3 +661,27 @@ html.zs-light #zs-mode-btn[data-mode="auto"] { color: #b91c1c; }
 .zs-ws-error { padding: 0 12px 8px; font-size: 11.5px; color: #fca5a5; }
 html.zs-light .zs-ws-input { background: rgba(0, 0, 0, 0.04); border-color: rgba(0, 0, 0, 0.2); }
 html.zs-light .zs-ws-error { color: #b91c1c; }
+
+/* The Files menu: a search box over the workspace's files, ticked rows, and the Insert button. */
+#zs-files-menu { width: min(340px, calc(100vw - 16px)); overflow: hidden; display: flex; flex-direction: column; max-height: min(420px, calc(100vh - 32px)); }
+#zs-files-menu[hidden] { display: none; }
+#zs-files-menu .zs-menu-sec { display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 6px; }
+.zs-files-search { box-sizing: border-box; width: 100%; height: 30px; padding: 0 9px; margin-bottom: 8px; border-radius: 8px; font: inherit; font-size: 12px;
+  color: inherit; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.18); outline: none; }
+.zs-files-search:focus { border-color: rgba(234, 179, 8, 0.8); }
+.zs-files-list { overflow-y: auto; min-height: 60px; max-height: 280px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
+.zs-file-row { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 6px; border: 0; border-radius: 6px; background: transparent; color: inherit;
+  font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.zs-file-row:hover { background: rgba(255, 255, 255, 0.07); }
+.zs-file-tick { flex: none; width: 14px; height: 14px; line-height: 13px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 4px; font-size: 10px; }
+.zs-file-chosen .zs-file-tick { background: #eab308; border-color: #eab308; color: #111; }
+.zs-file-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.zs-file-dir { opacity: 0.55; }
+.zs-files-more { padding: 8px 6px; opacity: 0.65; }
+.zs-files-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0 4px; }
+.zs-files-count { opacity: 0.7; }
+.zs-files-insert { height: 28px; padding: 0 14px; border-radius: 8px; border: 0; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: #111; background: #eab308; }
+.zs-files-insert:disabled { opacity: 0.4; cursor: default; }
+html.zs-light .zs-files-search { background: rgba(0, 0, 0, 0.04); border-color: rgba(0, 0, 0, 0.2); }
+html.zs-light .zs-file-row:hover { background: rgba(0, 0, 0, 0.06); }
+html.zs-light .zs-file-tick { border-color: rgba(0, 0, 0, 0.35); }

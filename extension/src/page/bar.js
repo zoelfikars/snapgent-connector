@@ -9,6 +9,7 @@ import {
   computeMenuPlacement, applyMenuPlacement, viewportOf,
 } from "../ui/index.js";
 import { createBarMenus } from "./bar-menus.js";
+import { createFilesMenu } from "./files-menu.js";
 import { createMenuGroup } from "./pill-menu.js";
 import { createSiteMenu } from "./site-menu.js";
 
@@ -22,18 +23,19 @@ const TEMPLATE = `
     <button id="zs-stop" hidden>■ Stop</button>
     ${pill("zs-mode-btn", "zs-mode-name", "Choose how risky actions are approved", "Plan: read only. Manual: asks first. Auto: never asks.")}
     ${pill("zs-ws-btn", "zs-ws-name", "Choose the workspace folder", "Which folder the agent works in")}
+    ${pill("zs-files-btn", "zs-files-name", "Tag files in your message", "Pick files: their contents go with your next message")}
     ${pill("zs-target-btn", "zs-target-name", "Choose MCP target", "Choose which MCP server receives commands", "listbox")}
     ${pill("zs-switch", "zs-switch-name", "Switch AI and options", "Switch AI and options")}
   </div>
   <button id="zs-stop-float" type="button" hidden>■ Stop</button>
   <button id="zs-toggle" type="button" aria-label="Show or hide snapgent">${BOLT}</button>
-  <div id="zs-menu" hidden></div><div id="zs-target-menu" hidden></div><div id="zs-mode-menu" hidden></div><div id="zs-ws-menu" hidden></div>`;
+  <div id="zs-menu" hidden></div><div id="zs-target-menu" hidden></div><div id="zs-mode-menu" hidden></div><div id="zs-ws-menu" hidden></div><div id="zs-files-menu" hidden></div>`;
 
 /**
  * @param {{ document: Document, window: Window, provider: object, state: object, settings: object, serverDirectory: object, tools: object,
- *           monitor: object, storage: object, send: Function, calibration: object, onStart: () => void, onStop: () => void }} deps
+ *           monitor: object, storage: object, send: Function, calibration: object, files: object, onStart: () => void, onStop: () => void }} deps
  */
-export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, send, calibration, onStart, onStop }) {
+export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, send, calibration, files, onStart, onStop }) {
   const root = document.createElement("div");
   root.id = "zs-root";
   const notifications = createNotifications({ root });
@@ -51,6 +53,7 @@ export function createBar({ document, window, provider, state, settings, serverD
 
   const group = createMenuGroup();
   const menus = createBarMenus({ document, root, group, settings, serverDirectory, send, confirm: tools.confirm, catalogue: tools.catalogue, monitor, toast: notifications.toast });
+  const filesMenu = createFilesMenu({ document, root, group, state, settings, files, toast: notifications.toast });
   const siteMenu = createSiteMenu({
     document, window, menu: el.menu, button: $("#zs-switch"), group, provider, settings, serverDirectory, skills: tools.skills, calibration, barPrefs,
     refreshTarget: () => menus.sync(),
@@ -74,6 +77,7 @@ export function createBar({ document, window, provider, state, settings, serverD
   let lastSignature = "";
   function render() {
     menus.sync();
+    filesMenu.sync();
     const view = computeBarView({
       staleExtension: state.staleExtension, starting: state.starting, started: state.started, running: state.running, parked: state.parked,
       blankChat: !state.started && !state.starting && !state.staleExtension && (provider.isFreshChat() || provider.chatIsEmpty()),

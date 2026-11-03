@@ -229,20 +229,33 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     if (!sent) throw new Error(`The page did not confirm the message was sent (text box: ${editorText().length} characters). Check the text box and try again.`);
   }
 
+  /**
+   * The user sends a message (Enter, or the send button). `takeOver()` may claim it: the page then sends it itself, a moment later,
+   * so the site must not see this click or key press. Returns a function that removes the hooks again.
+   */
   function installSendHooks(handlers) {
-    document.addEventListener("keydown", (e) => {
+    const sending = (e) => {
+      if (!handlers.isStarted()) { if (chatIsEmpty()) handlers.onBlockedAttempt(); return; }
+      if (handlers.takeOver && handlers.takeOver()) { e.preventDefault(); e.stopPropagation(); return; }
+      handlers.onUserMessage(assistantCount());
+    };
+    const onKey = (e) => {
       if (e.key !== "Enter" || e.shiftKey || e.isComposing) return;
       const editor = getEditor();
       if (!editor || !editor.contains(e.target) || editorText().trim() === "" || handlers.isBlocked()) return;
-      if (!handlers.isStarted()) { if (chatIsEmpty()) handlers.onBlockedAttempt(); return; }
-      handlers.onUserMessage(assistantCount());
-    }, true);
-    document.addEventListener("click", (e) => {
+      sending(e);
+    };
+    const onClick = (e) => {
       const button = sendButton();
       if (!button || !(e.target.closest && e.target.closest(profile.send.selector)) || editorText().trim() === "" || handlers.isBlocked()) return;
-      if (!handlers.isStarted()) { if (chatIsEmpty()) handlers.onBlockedAttempt(); return; }
-      handlers.onUserMessage(assistantCount());
-    }, true);
+      sending(e);
+    };
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("click", onClick, true);
+    };
   }
 
   // ── generation ────────────────────────────────────────────────────────────
@@ -313,7 +326,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
 
     getEditor, editorText, composerFrame, barAnchor: composerFrame, setInputLock() {}, installSendHooks,
     enforceComposer: () => ({ ready: !!getEditor() }), ensureComposerReady: async () => ({ ready: !!getEditor() }),
-    typeAndSend, attachImages: () => false, clearAttachments() {},
+    typeAndSend, writeText: writeComposer,
 
     scanError: () => null, isTooLongMsg: () => false, isBusyMsg: () => false,
     findContinueBtn: () => null, clickContinueBtn: () => false,

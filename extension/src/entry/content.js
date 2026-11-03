@@ -3,6 +3,7 @@
 // reaches the others through the objects passed to it. Anything that reads the site goes through `provider`.
 
 import { ServerDirectory } from "../application/index.js";
+import { createAttachments } from "../page/attachments.js";
 import { createAutoResume } from "../page/auto-resume.js";
 import { createBar } from "../page/bar.js";
 import { createBatchJobs } from "../page/batch-jobs.js";
@@ -49,8 +50,10 @@ const calibration = createCalibrationActions({ document, location, provider, sta
 
 let stop;
 let session;
+let attachments;
 bar = createBar({
   document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, send, calibration,
+  files: { list: () => attachments.listFiles(), insert: (paths) => attachments.insert(paths), canList: () => attachments.canList() },
   onStart: () => session.start(),
   onStop: () => stop.stopLoop(),
 });
@@ -63,7 +66,9 @@ const loop = createLoop({ state, provider, tools, chat, bar, visibility, execute
 session = createSession({ state, provider, tools, chat, bar, reminder: loop.reminder, limit: budget.limit, storage, settings, serverDirectory, diag });
 stop = createStop({ document, state, provider, bar, diag });
 
-installUserInput({ state, provider, bar, resend, loop, diag });
+let userInput;
+attachments = createAttachments({ provider, state, tools, chat, bar, budget, startTurn: (base) => userInput.startTurn(base), diag });
+userInput = installUserInput({ document, state, provider, bar, resend, loop, takeOver: attachments.takeOver, diag });
 createAutoResume({ document, state, provider, executed, loop, diag });
 startPageWatch({ document, window, provider, session, bar });
 resend.hydrate();

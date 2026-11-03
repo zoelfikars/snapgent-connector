@@ -15,6 +15,9 @@ All notable changes to snapgentV3 Free are documented here.
 - `scripts/package_release.py` assembles the release zip (tested).
 
 ### Fixed
+- **A message typed into a calibrated site never reached the agent directly.** The send hooks were made once at page load, while the
+  provider was still the "not calibrated" one (the stored profile is read a moment later), so they were empty; only the one-second resume
+  watchdog started the loop. The hooks are now made again whenever the provider changes, so a typed message starts the agent at once.
 - **A command's output kept its start and lost its end.** Output beyond the limit is now cut in the middle (head + tail) with a note of
   how much was left out, because a failing build says why at the end. stderr is kept next to stdout (it was dropped whenever stdout
   had anything), and `read_files` cuts even its first file to the budget it is given.
@@ -29,6 +32,11 @@ All notable changes to snapgentV3 Free are documented here.
 - The bridge's terminal shows only where it listens, the approval question and fatal errors; everything else is in `logs/bridge_debug.log`.
 
 ### Added
+- **Files menu in the bar** (while a VS Code session is on): search the workspace's files, tick up to 20 and **Insert** them as `@path` in the
+  composer. When the message is sent, the page holds it back, reads the tagged files with `read_files` (line numbers, the message size limit and
+  the same approval for a file that may hold secrets) and sends the message with the contents under it, so the model does not spend a turn
+  reading them. An `@path` typed by hand that names a file of the workspace is attached the same way. The system prompt tells the model the
+  attached files are current.
 - **Several commands in one reply.** They run in order and are answered with ONE message (fewer turns, so fewer requests). A failure, an
   image result or a stop ends the batch and the rest is listed as `NOT RUN` so the model can send it again. The composer cover says
   which command is running (`Running 2/4 · run_command · command: sleep`).
