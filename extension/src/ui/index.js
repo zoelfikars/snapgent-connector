@@ -8,7 +8,7 @@ export { openSkillsSettings } from "./skills-settings.js";
 export { applyTheme } from "./page-theme.js";
 export { computeMenuPlacement, applyMenuPlacement, viewportOf } from "./menu-position.js";
 export { createSetupCard, shouldShowSetup } from "./setup-card.js";
-export { APPROVAL_MODES, atPopupHtml, atRowsHtml, fileRowsHtml, filesMenuHtml, modeMenuHtml, switchMenuHtml, targetMenuHtml, workspaceLabel, workspaceMenuHtml } from "./menu-html.js";
+export { APPROVAL_MODES, atPopupHtml, fileRowsHtml, filesMenuHtml, modeMenuHtml, switchMenuHtml, targetMenuHtml, workspaceLabel, workspaceMenuHtml } from "./menu-html.js";
 export { createBarPlacer } from "./bar-placer.js";
 export { createInputCover } from "./input-cover.js";
 export { createCalibrationWizard } from "./calibration-wizard.js";

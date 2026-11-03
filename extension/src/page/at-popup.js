@@ -6,7 +6,8 @@
 // Only the tag at the END of the text is looked at: the caret position inside a site's editor cannot be read reliably.
 
 import { matchPaths, trailingTag } from "../domain/prompt/file-tags.js";
-import { applyMenuPlacement, atPopupHtml, atRowsHtml, computeMenuPlacement, viewportOf } from "../ui/index.js";
+import { applyMenuPlacement, atPopupHtml, computeMenuPlacement, viewportOf } from "../ui/index.js";
+import { createFileList } from "./file-list.js";
 
 const SHOWN = 60;
 const PREFETCH_MS = 2500;
@@ -18,11 +19,9 @@ export function createAtPopup({ document, window, root, state, settings, provide
   el.hidden = true;
   el.innerHTML = atPopupHtml();
   root.appendChild(el);
-  const list = el.querySelector(".zs-at-list");
+  const list = createFileList({ element: el.querySelector(".zs-at-list"), max: SHOWN, onPick: (path) => pick(path) });
 
   let paths = [];
-  let shown = [];
-  let active = 0;
   let tag = null;
   let text = "";
   let dismissed = null; // the tag the user closed the list for: it stays closed until that tag is gone
@@ -39,11 +38,6 @@ export function createAtPopup({ document, window, root, state, settings, provide
     }));
     window.requestAnimationFrame(place);
   }
-  function draw() {
-    list.innerHTML = atRowsHtml(shown, active, SHOWN);
-    const row = list.querySelector(".zs-at-active");
-    if (row && row.scrollIntoView) row.scrollIntoView({ block: "nearest" });
-  }
   function close(forThisTag) {
     if (forThisTag && tag) dismissed = { start: tag.start, before: text.slice(0, tag.start) };
     el.hidden = true;
@@ -58,7 +52,7 @@ export function createAtPopup({ document, window, root, state, settings, provide
     const opening = el.hidden;
     tag = found;
     if (!paths.length) {
-      list.innerHTML = `<div class="zs-files-more">Loading files…</div>`;
+      list.message("Loading files…");
       el.hidden = false;
       const listing = await attachments.listFiles();
       if (!listing.ok) { el.hidden = true; toast(listing.error); return; }
@@ -67,10 +61,8 @@ export function createAtPopup({ document, window, root, state, settings, provide
     } else {
       attachments.listFiles().then((listing) => { if (listing.ok) paths = listing.paths; }); // refreshed in the background when stale
     }
-    shown = matchPaths(paths, tag.query);
-    active = 0;
+    list.set(matchPaths(paths, tag.query));
     el.hidden = false;
-    draw();
     if (opening) window.requestAnimationFrame(place);
   }
 
@@ -88,14 +80,13 @@ export function createAtPopup({ document, window, root, state, settings, provide
     if (el.hidden || event.isComposing || !inEditor(event.target)) return;
     const take = () => { event.preventDefault(); event.stopPropagation(); };
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      if (!shown.length) return;
+      if (!list.count()) return;
       take();
-      active = (active + (event.key === "ArrowDown" ? 1 : -1) + Math.min(shown.length, SHOWN)) % Math.min(shown.length, SHOWN);
-      draw();
+      list.move(event.key === "ArrowDown" ? 1 : -1);
     } else if (event.key === "Enter" || event.key === "Tab") {
-      if (!shown.length) { close(true); return; } // nothing to insert: Enter is the user's own (send), Tab leaves the box
+      if (!list.count()) { close(true); return; } // nothing to insert: Enter is the user's own (send), Tab leaves the box
       take();
-      pick(shown[active]);
+      pick(list.activePath());
     } else if (event.key === "Escape") {
       take();
       close(true);
@@ -107,10 +98,6 @@ export function createAtPopup({ document, window, root, state, settings, provide
   document.addEventListener("click", (event) => { if (!el.hidden && !el.contains(event.target) && !inEditor(event.target)) close(false); }, true);
 
   el.addEventListener("mousedown", (event) => event.preventDefault()); // the composer keeps the focus
-  list.addEventListener("click", (event) => {
-    const row = event.target.closest && event.target.closest(".zs-at-row");
-    if (row) pick(row.dataset.path);
-  });
   el.querySelector(".zs-at-x").addEventListener("click", () => close(true));
   el.querySelector(".zs-at-off").addEventListener("click", () => {
     close(false);

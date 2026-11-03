@@ -60,16 +60,21 @@ export const filesMenuHtml = () =>
   `<div class="zs-files-foot"><span class="zs-files-count"></span><button type="button" class="zs-files-insert">Insert</button></div>` +
   `<label class="zs-files-toggle"><input type="checkbox" class="zs-files-at"> Open this list when I type @ in the message</label></section>`;
 
-/** The rows for the files that match, the chosen ones marked. At most `max` are drawn; the rest is a hint to narrow the search. */
-export function fileRowsHtml(paths, chosen, max = 200) {
-  const rows = paths.slice(0, max).map((path) => {
+/**
+ * The rows of a file list, the one markup behind both the Files menu and the popup beside the composer. With `chosen` (a Set) every row
+ * has a tick and the chosen ones are marked; with `active` the row at that index is highlighted. At most `max` rows are drawn.
+ */
+export function fileRowsHtml(paths, { chosen = null, active = -1, max = 200 } = {}) {
+  if (!paths.length) return `<div class="zs-files-more">No file matches</div>`;
+  const rows = paths.slice(0, max).map((path, index) => {
     const slash = path.lastIndexOf("/");
-    const dir = slash >= 0 ? path.slice(0, slash + 1) : "";
-    return `<button type="button" class="zs-file-row${chosen.has(path) ? " zs-file-chosen" : ""}" data-path="${escapeHtml(path)}" role="checkbox" aria-checked="${chosen.has(path)}">` +
-      `<span class="zs-file-tick">${chosen.has(path) ? "✓" : ""}</span><span class="zs-file-path"><span class="zs-file-dir">${escapeHtml(dir)}</span>${escapeHtml(path.slice(slash + 1))}</span></button>`;
+    const on = chosen ? chosen.has(path) : index === active;
+    return `<div class="zs-file-row${chosen && on ? " zs-file-chosen" : ""}${index === active ? " zs-file-active" : ""}" data-path="${escapeHtml(path)}" role="option" aria-selected="${on}">` +
+      `${chosen ? `<span class="zs-file-tick">${on ? "✓" : ""}</span>` : ""}` +
+      `<span class="zs-file-path"><span class="zs-file-dir">${escapeHtml(path.slice(0, slash + 1))}</span>${escapeHtml(path.slice(slash + 1))}</span></div>`;
   });
   if (paths.length > max) rows.push(`<div class="zs-files-more">${paths.length - max} more: type to narrow the search</div>`);
-  return rows.join("") || `<div class="zs-files-more">No file matches</div>`;
+  return rows.join("");
 }
 
 /** The popup that opens beside the composer when the user types @: its header (with the ways to close it) and an empty list. */
@@ -78,16 +83,6 @@ export const atPopupHtml = () =>
   `<span class="zs-at-hint">↑↓ choose · Enter insert · Esc close</span>` +
   `<button type="button" class="zs-at-off" title="Stop opening this list when I type @">Turn off</button>` +
   `<button type="button" class="zs-at-x" aria-label="Close">✕</button></div><div class="zs-at-list"></div>`;
-
-/** The rows of that popup, the highlighted one marked. At most `max` are drawn. */
-export function atRowsHtml(paths, active, max = 60) {
-  if (!paths.length) return `<div class="zs-files-more">No file matches</div>`;
-  return paths.slice(0, max).map((path, index) => {
-    const slash = path.lastIndexOf("/");
-    return `<div class="zs-at-row${index === active ? " zs-at-active" : ""}" data-path="${escapeHtml(path)}" role="option" aria-selected="${index === active}">` +
-      `<span class="zs-file-path"><span class="zs-file-dir">${escapeHtml(path.slice(0, slash + 1))}</span>${escapeHtml(path.slice(slash + 1))}</span></div>`;
-  }).join("");
-}
 
 /** What the workspace pill shows. */
 export const workspaceLabel = (pinned) => (pinned ? folderName(pinned) : "Auto");

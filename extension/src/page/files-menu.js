@@ -2,7 +2,8 @@
 // The "Files" pill of the bar: search the workspace's files, tick some, and tag them in the composer (see attachments.js).
 
 import { matchPaths } from "../domain/prompt/file-tags.js";
-import { fileRowsHtml, filesMenuHtml } from "../ui/index.js";
+import { filesMenuHtml } from "../ui/index.js";
+import { createFileList } from "./file-list.js";
 import { createPillMenu } from "./pill-menu.js";
 import { MAX_TAGGED } from "./attachments.js";
 
@@ -13,37 +14,34 @@ export function createFilesMenu({ document, root, group, state, settings, files,
   const chosen = new Set();
   let paths = [];
   let query = "";
-
-  const list = () => menu.querySelector(".zs-files-list");
-  const redraw = () => {
-    list().innerHTML = fileRowsHtml(matchPaths(paths, query), chosen);
+  let list = null;
+  function toggle(path) {
+    if (chosen.has(path)) chosen.delete(path);
+    else if (chosen.size >= MAX_TAGGED) toast(`Up to ${MAX_TAGGED} files at a time.`);
+    else chosen.add(path);
+    redraw();
+  }
+  function redraw() {
+    list.set(matchPaths(paths, query));
     menu.querySelector(".zs-files-count").textContent = chosen.size ? `${chosen.size} chosen` : "none chosen";
     menu.querySelector(".zs-files-insert").disabled = !chosen.size;
     root.querySelector("#zs-files-name").textContent = chosen.size ? `Files (${chosen.size})` : "Files";
-  };
+  }
 
   const pill = createPillMenu({
     document, button, menu, group, width: 340, align: "right", roomAbove: 300,
     async render() {
       menu.innerHTML = filesMenuHtml();
       query = "";
-      list().innerHTML = `<div class="zs-files-more">Loading files…</div>`;
+      list = createFileList({ element: menu.querySelector(".zs-files-list"), chosen, onPick: toggle });
+      list.message("Loading files…");
       const search = menu.querySelector(".zs-files-search");
       // Typing here must not trigger the site's own keyboard shortcuts.
       for (const type of ["keydown", "keyup", "keypress"]) search.addEventListener(type, (event) => event.stopPropagation());
       search.addEventListener("input", () => { query = search.value; redraw(); });
-      list().addEventListener("click", (event) => {
-        const row = event.target.closest && event.target.closest(".zs-file-row");
-        if (!row) return;
-        const path = row.dataset.path;
-        if (chosen.has(path)) chosen.delete(path);
-        else if (chosen.size >= MAX_TAGGED) toast(`Up to ${MAX_TAGGED} files at a time.`);
-        else chosen.add(path);
-        redraw();
-      });
-      const toggle = menu.querySelector(".zs-files-at");
-      toggle.checked = settings.atPopup();
-      toggle.addEventListener("change", () => settings.setAtPopup(toggle.checked));
+      const atToggle = menu.querySelector(".zs-files-at");
+      atToggle.checked = settings.atPopup();
+      atToggle.addEventListener("change", () => settings.setAtPopup(atToggle.checked));
       menu.querySelector(".zs-files-insert").addEventListener("click", async () => {
         try { await files.insert([...chosen]); } catch (error) { toast(String((error && error.message) || error)); return; }
         chosen.clear();
