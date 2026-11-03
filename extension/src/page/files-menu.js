@@ -25,8 +25,11 @@ export function createFilesMenu({ document, root, group, state, settings, files,
     list.set(matchPaths(paths, query));
     menu.querySelector(".zs-files-count").textContent = chosen.size ? `${chosen.size} chosen` : "none chosen";
     menu.querySelector(".zs-files-insert").disabled = !chosen.size;
-    root.querySelector("#zs-files-name").textContent = chosen.size ? `Files (${chosen.size})` : "Files";
+    showName();
   }
+  // The pill's own text: set when it is made, not only when the menu is opened.
+  function showName() { root.querySelector("#zs-files-name").textContent = chosen.size ? `Files (${chosen.size})` : "Files"; }
+  showName();
 
   const pill = createPillMenu({
     document, button, menu, group, width: 340, align: "right", roomAbove: 300,
