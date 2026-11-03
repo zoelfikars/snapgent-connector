@@ -6,6 +6,10 @@ IGNORED_DIRECTORIES = frozenset({
 })
 MAX_RESULTS = 2000
 MAX_FILE_CHARS = 200_000
+MAX_OUTPUT_CHARS = 1_000_000          # hard ceiling for any size the extension asks for
+COMMAND_OUTPUT_CHARS = 40_000         # a command's output is shortened to head + tail beyond this unless told otherwise
+OUTPUT_CACHE_MAX_RUNS = 20
+OUTPUT_CACHE_MAX_CHARS = 20_000_000
 MAX_FILES_PER_READ = 50
 MAX_LINES_PER_READ = 1000
 MAX_TREE_DEPTH = 8

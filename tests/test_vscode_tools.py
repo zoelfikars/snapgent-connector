@@ -9,10 +9,10 @@ from tests.vscode_support import WorkspaceCase, git
 
 
 class CatalogueTests(WorkspaceCase):
-    def test_23_unique_tools_each_with_a_description_schema_and_risk(self):
+    def test_24_unique_tools_each_with_a_description_schema_and_risk(self):
         tools = all_tools()
-        self.assertEqual(len(tools), 23)
-        self.assertEqual(len({t.name for t in tools}), 23)
+        self.assertEqual(len(tools), 24)
+        self.assertEqual(len({t.name for t in tools}), 24)
         for tool in tools:
             self.assertTrue(tool.description, tool.name)
             self.assertIn(tool.risk, {registry.READ, registry.WRITE, registry.DESTRUCTIVE, registry.EXECUTE, registry.VCS}, tool.name)

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from ..context import Context
-from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, MAX_RESULTS, MAX_TREE_DEPTH
+from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, MAX_OUTPUT_CHARS, MAX_RESULTS, MAX_TREE_DEPTH
 from ..paths import iter_files, relative, resolve_inside
 from ..security import TRUSTED
 from ..security.files import is_sensitive
@@ -142,11 +142,11 @@ def _read(ctx: Context, path: str) -> str:
 
 @tool("read_files", f"Read up to {MAX_FILES_PER_READ} workspace files as bulk text with line numbers. "
                    f"Total output is capped; files that do not fit are listed as remaining instead of being truncated.",
-      {"paths": STR_LIST, "max_total_chars": integer(1)}, ["paths"], risk=READ)
+      {"paths": STR_LIST, "max_total_chars": integer(1, MAX_OUTPUT_CHARS)}, ["paths"], risk=READ)
 def read_files(ctx: Context, paths: List[str], max_total_chars: int = None) -> str:
     if len(paths) > MAX_FILES_PER_READ:
         raise ValueError(f"Read at most {MAX_FILES_PER_READ} files per request.")
-    budget = MAX_FILE_CHARS if max_total_chars is None else max(1, int(max_total_chars))
+    budget = MAX_FILE_CHARS if max_total_chars is None else max(1, min(int(max_total_chars), MAX_OUTPUT_CHARS))
     chunks: List[str] = []
     remaining: List[str] = []
     used = 0
@@ -158,7 +158,12 @@ def read_files(ctx: Context, paths: List[str], max_total_chars: int = None) -> s
             continue
         numbered = "\n".join(f"{number}: {line}" for number, line in enumerate(content.splitlines(), start=1))
         block = f"===== {path} =====\n{numbered}\n"
-        if not chunks or used + len(block) <= budget:
+        if not chunks and len(block) > budget:
+            # Even the first file would overflow the budget: keep its start rather than blow the limit.
+            block = block[:budget] + f"\n[cut at {budget:,} characters: this file is larger than the space left]\n"
+            chunks.append(block)
+            used += len(block)
+        elif not chunks or used + len(block) <= budget:
             chunks.append(block)
             used += len(block)
         else:

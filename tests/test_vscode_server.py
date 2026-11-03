@@ -42,7 +42,7 @@ class ServerTests(WorkspaceCase):
         self.assertEqual(self.ask("ping")["result"], {})
 
     def test_tools_list_is_empty_when_no_workspace_is_open(self):
-        self.assertEqual(len(self.ask("tools/list")["result"]["tools"]), 23)
+        self.assertEqual(len(self.ask("tools/list")["result"]["tools"]), 24)
         self.assertEqual(self.ask("tools/list", open_workspace=False)["result"]["tools"], [])
 
     def test_notifications_get_no_reply(self):
