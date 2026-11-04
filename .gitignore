@@ -31,3 +31,6 @@ extension/dist/
 
 # Extensions the user approved to control the bridge (per machine)
 trusted_origins.json
+
+# local tool link, not part of the project
+/supertool
