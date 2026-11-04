@@ -31,8 +31,10 @@ DEFAULT_EXCLUDED = frozenset({
 ALWAYS_LISTED = ".snapgent"
 
 
-def _excluded_names(exclude) -> set:
-    names = set(IGNORED_DIRECTORIES) | set(DEFAULT_EXCLUDED)
+def _excluded_names(exclude, only: bool = False) -> set:
+    """Folder names to skip: the built-in lists plus `exclude`; with `only`, just `exclude` (the user's own list replaces the built-in one).
+    `.git` is never entered either way."""
+    names = {".git"} if only else set(IGNORED_DIRECTORIES) | set(DEFAULT_EXCLUDED)
     if exclude:
         for item in exclude:
             if isinstance(item, str) and item.strip():
@@ -130,14 +132,15 @@ def tree(ctx: Context, path: str = ".", max_depth: int = None, exclude: List[str
     return _tree(ctx, target, max_depth, _excluded_names(exclude))
 
 
-@tool("find_files", "Find workspace files by glob pattern.", {"path": STR, "pattern": STR, "exclude": STR_LIST, "max_results": integer(1, MAX_LISTED_FILES)}, risk=READ)
-def find_files(ctx: Context, path: str = ".", pattern: str = "*", exclude: List[str] = None, max_results: int = None) -> List[str]:
+@tool("find_files", "Find workspace files by glob pattern.", {"path": STR, "pattern": STR, "exclude": STR_LIST, "max_results": integer(1, MAX_LISTED_FILES), "exclude_only": BOOL}, risk=READ)
+def find_files(ctx: Context, path: str = ".", pattern: str = "*", exclude: List[str] = None, max_results: int = None,
+               exclude_only: bool = False) -> List[str]:
     base = resolve_inside(path, ctx.root)
     if not base.exists():
         raise FileNotFoundError(f"Path not found: {path}")
     if not base.is_dir():
         raise NotADirectoryError(f"Not a directory: {path}")
-    excluded = _excluded_names(exclude)
+    excluded = _excluded_names(exclude, exclude_only)
     limit = MAX_RESULTS if max_results is None else max(1, min(int(max_results), MAX_LISTED_FILES))
     start = relative(base, ctx.root)
     cut = 0 if start == "." else len(start) + 1

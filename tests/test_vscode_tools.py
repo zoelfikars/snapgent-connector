@@ -97,6 +97,16 @@ class ReadingTests(WorkspaceCase):
         self.assertEqual(len(reading.find_files(self.ctx, "many", "*", max_results=limits.MAX_RESULTS + 30)), limits.MAX_RESULTS + 30)
         self.assertEqual(len(reading.find_files(self.ctx, "many", "*", max_results=5)), 5)
 
+    def test_the_users_own_list_of_excluded_folders_replaces_the_built_in_one(self):
+        self.write("build/out.txt", "x")        # skipped by the built-in list
+        self.write("scratch/tmp.txt", "x")
+        self.write("src/main.go", "x")
+        self.assertNotIn("build/out.txt", reading.find_files(self.ctx, "."))
+        own = reading.find_files(self.ctx, ".", exclude=["scratch"], exclude_only=True)
+        self.assertIn("build/out.txt", own)
+        self.assertNotIn("scratch/tmp.txt", own)
+        self.assertIn("src/main.go", own)
+
     def test_a_hidden_folder_like_snapgent_plans_is_listed(self):
         self.write(".snapgent/plans/add-login.md", "# plan")
         self.assertIn(".snapgent/plans/add-login.md", reading.find_files(self.ctx, "."))

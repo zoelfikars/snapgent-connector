@@ -18,6 +18,7 @@ import { createLoop } from "../page/loop.js";
 import { createMessageBudget } from "../page/message-budget.js";
 import { startPageWatch } from "../page/page-watch.js";
 import { createPromptResend } from "../page/prompt-resend.js";
+import { createPreferences } from "../page/preferences.js";
 import { createProvider } from "../page/provider.js";
 import { createSession } from "../page/session.js";
 import { createSettings } from "../page/settings.js";
@@ -50,11 +51,12 @@ const tools = createTools({ send, provider, state, settings, serverDirectory, vi
 const bridgeStatus = createBridgeStatus({ state, settings, tools, send, bar: () => bar, diag });
 const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, toast: (text) => bar.toast(text) });
 
+const preferences = createPreferences({ storage, state });
 let stop;
 let session;
 let attachments;
 bar = createBar({
-  document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, send, calibration,
+  document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, preferences, send, calibration,
   files: { list: () => attachments.listFiles(), insert: (paths) => attachments.insert(paths), canList: () => attachments.canList() },
   onStart: () => session.start(),
   onStop: () => stop.stopLoop(),
@@ -70,7 +72,7 @@ session = createSession({ state, provider, tools, chat, bar, reminder: loop.remi
 stop = createStop({ document, state, provider, bar, diag });
 
 let userInput;
-attachments = createAttachments({ provider, state, tools, chat, bar, budget, parts, startTurn: (base) => userInput.startTurn(base), diag });
+attachments = createAttachments({ provider, state, tools, chat, bar, budget, parts, preferences, startTurn: (base) => userInput.startTurn(base), diag });
 userInput = installUserInput({ document, state, provider, bar, resend, loop, takeOver: attachments.takeOver, diag });
 createAtPopup({ document, window, root: bar.root, state, settings, provider, attachments, toast: bar.toast, diag });
 createAutoResume({ document, state, provider, executed, loop, diag });

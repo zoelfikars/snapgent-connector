@@ -33,9 +33,9 @@ const TEMPLATE = `
 
 /**
  * @param {{ document: Document, window: Window, provider: object, state: object, settings: object, serverDirectory: object, tools: object,
- *           monitor: object, storage: object, send: Function, calibration: object, files: object, onStart: () => void, onStop: () => void }} deps
+ *           monitor: object, storage: object, preferences: object, send: Function, calibration: object, files: object, onStart: () => void, onStop: () => void }} deps
  */
-export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, send, calibration, files, onStart, onStop }) {
+export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, preferences, send, calibration, files, onStart, onStop }) {
   const root = document.createElement("div");
   root.id = "zs-root";
   const notifications = createNotifications({ root });
@@ -55,7 +55,7 @@ export function createBar({ document, window, provider, state, settings, serverD
   const menus = createBarMenus({ document, root, group, settings, serverDirectory, send, confirm: tools.confirm, catalogue: tools.catalogue, workspace: tools.workspace, monitor, toast: notifications.toast });
   const filesMenu = createFilesMenu({ document, root, group, state, settings, files, toast: notifications.toast });
   const siteMenu = createSiteMenu({
-    document, window, menu: el.menu, button: $("#zs-switch"), group, provider, settings, serverDirectory, skills: tools.skills, calibration, barPrefs,
+    document, window, menu: el.menu, button: $("#zs-switch"), group, provider, settings, serverDirectory, skills: tools.skills, calibration, barPrefs, preferences,
     refreshTarget: () => menus.sync(),
   });
   $("#zs-switch-name").textContent = provider.displayName || provider.id;

@@ -4,15 +4,15 @@
 
 import { SKILL_MAX_BYTES } from "../domain/skills/skill-text.js";
 import { SITE_LINKS } from "../sites/registry.js";
-import { openMcpSettings, openSkillsSettings, switchMenuHtml } from "../ui/index.js";
+import { openMcpSettings, openPreferences, openSkillsSettings, switchMenuHtml } from "../ui/index.js";
 
 /**
  * @param {{ document: Document, window: Window, menu: HTMLElement, button: HTMLElement, group: object,
  *           provider: object, settings: object, serverDirectory: object, skills: object, calibration: object,
- *           barPrefs: { get: () => object, set: (change: object) => void }, refreshTarget: () => void }} deps
+ *           barPrefs: { get: () => object, set: (change: object) => void }, preferences: object, refreshTarget: () => void }} deps
  * @returns {{ toggle: (toSupport: boolean) => void, close: () => void, isOpen: () => boolean }}
  */
-export function createSiteMenu({ document, window, menu, button, group, provider, settings, serverDirectory, skills, calibration, barPrefs, refreshTarget }) {
+export function createSiteMenu({ document, window, menu, button, group, provider, settings, serverDirectory, skills, calibration, barPrefs, preferences, refreshTarget }) {
   const close = () => { menu.hidden = true; };
   group.add({ close });
 
@@ -46,6 +46,10 @@ export function createSiteMenu({ document, window, menu, button, group, provider
       if (el) el.addEventListener("click", (event) => { event.stopPropagation(); close(); action(); });
     };
     on("#zs-mcp-settings", openMcp);
+    on("#zs-prefs", async () => openPreferences({
+      document, values: await preferences.read(), defaults: { folders: preferences.defaultFolders() },
+      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders },
+    }));
     on("#zs-skills-settings", () => openSkillsSettings({ document, skills, maxFileBytes: SKILL_MAX_BYTES, loadOnOpen: settings.target() === "vscode" }));
     on("#zs-bar-corner", () => barPrefs.set({ corner: barPrefs.get().corner === "top" ? "bottom" : "top" }));
     on("#zs-bar-hide", () => barPrefs.set({ hidden: true }));

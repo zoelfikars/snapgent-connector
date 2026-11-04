@@ -5,3 +5,4 @@ export { buildStartMessage } from "./start-message.js";
 export { compactTools, toolsReminder } from "./reminder.js";
 export * from "./budget.js";
 export * from "./parts.js";
+export * from "./excluded-folders.js";

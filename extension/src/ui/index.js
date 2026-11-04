@@ -6,6 +6,7 @@ export { createNotifications } from "./notifications.js";
 export { openMcpSettings } from "./mcp-settings.js";
 export { openCalibrationImport } from "./calibration-import.js";
 export { openSkillsSettings } from "./skills-settings.js";
+export { openPreferences } from "./preferences-popup.js";
 export { applyTheme } from "./page-theme.js";
 export { computeMenuPlacement, applyMenuPlacement, viewportOf } from "./menu-position.js";
 export { createSetupCard, shouldShowSetup } from "./setup-card.js";

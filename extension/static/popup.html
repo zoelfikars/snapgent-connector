@@ -156,8 +156,8 @@
       font-size: 12px;
       font-weight: 600;
     }
-    #limit-value, #calls-value { color: var(--accent); font-variant-numeric: tabular-nums; }
-    #limit, #calls { width: 100%; margin: 10px 0 4px; accent-color: var(--accent); }
+    #limit-value { color: var(--accent); font-variant-numeric: tabular-nums; }
+    #limit { width: 100%; margin: 10px 0 4px; accent-color: var(--accent); }
     .limit-note {
       margin: 0;
       font-size: 10.5px;
@@ -201,12 +201,6 @@
       <div class="limit-head"><span>Max message size</span><span id="limit-value"></span></div>
       <input type="range" id="limit" aria-label="Maximum characters in one message sent to the chat" />
       <p class="limit-note">One message to the chat (command results, with any reminder) never goes past this. Longer output is cut in the middle, and files that do not fit are listed as not read. About 4 characters per token.</p>
-    </section>
-
-    <section class="card">
-      <div class="limit-head"><span>Commands per reply</span><span id="calls-value"></span></div>
-      <input type="range" id="calls" aria-label="Most commands the AI may send in one reply" />
-      <p class="limit-note">The AI may send this many commands in one reply; they run in order and are answered in one message. Any beyond it are reported as not run. When the output does not fit in one message, the rest follows in the next messages (up to 5) and the AI only acknowledges in between.</p>
     </section>
 
     <div class="actions">

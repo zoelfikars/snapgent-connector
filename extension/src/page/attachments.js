@@ -20,8 +20,8 @@ const LIST_TTL_MS = 10000;
 const MIN_FILES_CHARS = 4000;
 const MESSAGE_OVERHEAD = 400;        // the line that introduces the files, and spacing
 
-/** @param {{ provider: object, state: object, tools: object, chat: object, bar: object, budget: object, parts: object, startTurn: (base: *) => void, diag: Function }} deps */
-export function createAttachments({ provider, state, tools, chat, bar, budget, parts, startTurn, diag }) {
+/** @param {{ provider: object, state: object, tools: object, chat: object, bar: object, budget: object, parts: object, preferences: object, startTurn: (base: *) => void, diag: Function }} deps */
+export function createAttachments({ provider, state, tools, chat, bar, budget, parts, preferences, startTurn, diag }) {
   let files = null; // { paths: string[] (folders and files), known: Set<string>, files: string[], folders: Set<string>, at: number }
   const tagged = new Set();
 
@@ -30,7 +30,7 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, p
     if (files && Date.now() - files.at < LIST_TTL_MS && files.at >= state.filesChangedAt) return { ok: true, paths: files.paths };
     const startedAt = Date.now();
     // The whole project (not the first 2000 files the model gets by default): every file must be taggable.
-    const feedback = await tools.runner.run({ tool: "find_files", arguments: { path: ".", max_results: MAX_LISTED } });
+    const feedback = await tools.runner.run({ tool: "find_files", arguments: { path: ".", max_results: MAX_LISTED, exclude: preferences.excludedFolders(), exclude_only: true } });
     let paths = null;
     try { paths = JSON.parse(withoutResultHeader(feedback)); } catch { /* an error text, not a list */ }
     if (!Array.isArray(paths)) return { ok: false, error: feedbackIsError(feedback) ? withoutResultHeader(feedback).split("\n")[0] : "The file list could not be read." };
