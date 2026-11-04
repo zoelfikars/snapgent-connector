@@ -22,7 +22,7 @@ export function createInputCover({ document, provider }) {
   function setLabel(text) {
     label = text ? `Running ${text}` : DEFAULT_LABEL;
     const span = cover && cover.querySelector("span");
-    if (span) span.textContent = label;
+    if (span) { span.textContent = label; span.title = label; }
   }
 
   function set(on) {
@@ -40,6 +40,7 @@ export function createInputCover({ document, provider }) {
       cover.id = "zs-input-cover";
       cover.innerHTML = "<span></span>";
       cover.firstChild.textContent = label;
+      cover.firstChild.title = label;
       document.documentElement.appendChild(cover);
     }
     cover.dataset.on = "1"; // intent flag: keep the place() loop alive while set

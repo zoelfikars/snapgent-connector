@@ -51,6 +51,13 @@ describe("result summary", () => {
     assert.equal(runningLabel({ tool: "read_files", arguments: { paths: ["a"] } }), "read_files · paths: a");
     assert.equal(runningLabel({ tool: "tree" }, { index: 1, total: 3 }), "2/3 · tree");
   });
+
+  test("runningLabel shows a command with all its arguments, and long values are clipped only far out", () => {
+    const run = { tool: "run_command", arguments: { command: "go", args: ["test", "./...", "-run", "Test Login"] } };
+    assert.equal(runningLabel(run, { index: 0, total: 4 }), '1/4 · run_command · go test ./... -run "Test Login"');
+    assert.equal(runningLabel({ tool: "read_files", arguments: { paths: ["a.go", "b.go"] } }), "read_files · paths: a.go, b.go");
+    assert.ok(runningLabel({ tool: "x", arguments: { text: "y".repeat(1000) } }).length < 430);
+  });
 });
 
 describe("result marker", () => {

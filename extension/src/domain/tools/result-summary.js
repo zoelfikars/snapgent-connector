@@ -3,6 +3,11 @@
 
 import { withoutResultHeader } from "./result-marker.js";
 
+const FULL_CHARS = 400;
+
+const clip = (text) => (text.length > FULL_CHARS ? `${text.slice(0, FULL_CHARS - 1)}…` : text);
+const shellWord = (word) => (/\s/.test(word) ? JSON.stringify(word) : word);
+
 /** The first argument of a call, shortened: "path: src/a.js". */
 export function argSummary(call) {
   const args = (call && call.arguments) || {};
@@ -12,10 +17,22 @@ export function argSummary(call) {
   return `${key}: ${value.length > 34 ? `${value.slice(0, 31)}…` : value}`;
 }
 
-/** What the composer cover says while a command runs: its place in a batch, its name, its first argument. */
+/** What is being run, in full: a command with all its arguments (`go test ./... -run TestX`), otherwise the first argument. */
+export function runningDetail(call) {
+  const args = (call && call.arguments) || {};
+  if (typeof args.command === "string") {
+    const rest = Array.isArray(args.args) ? args.args.map((word) => shellWord(String(word))) : [];
+    return clip([args.command, ...rest].join(" "));
+  }
+  const key = Object.keys(args)[0];
+  if (!key) return "";
+  return clip(`${key}: ${Array.isArray(args[key]) ? args[key].join(", ") : String(args[key])}`);
+}
+
+/** What the composer cover says while a command runs: its place in a batch, its name, and what it is running. */
 export function runningLabel(call, step) {
-  const arg = argSummary(call);
-  return `${step && step.total > 1 ? `${step.index + 1}/${step.total} · ` : ""}${call.tool}${arg ? ` · ${arg}` : ""}`;
+  const detail = runningDetail(call);
+  return `${step && step.total > 1 ? `${step.index + 1}/${step.total} · ` : ""}${call.tool}${detail ? ` · ${detail}` : ""}`;
 }
 
 // A tool can report its own failure as a NORMAL result ("Error executing code: …"). Judged by the phrase that opens the

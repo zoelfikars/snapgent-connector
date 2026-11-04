@@ -39,6 +39,7 @@ All notable changes to snapgentV3 Free are documented here.
 ### Added
 - **Plan mode can save the plan.** Besides reading, the AI may now create and edit Markdown files (any name, any depth) under `.snapgent/plans/`
   (for example `.snapgent/plans/add-login.md`); every other change is still refused in Plan mode, and the refusal message tells it where it may write.
+- **The composer says exactly what is running**: `1/4 · run_command · go test ./... -run TestLogin` (the command with all its arguments, other tools with their first argument in full), up to three lines, and the full text on hover.
 - **Attach a folder.** Tag a folder like a file (`@src/` or `@"my folder/"`, from the `@` list or the Files menu, where folders are listed with a closing
   slash): every text file under it is read and attached (images, archives and lock files are skipped; up to 200 files).
 - **Commands per reply is a slider** in the popup (1 to 30, 8 by default), next to the message size.

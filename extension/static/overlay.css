@@ -304,6 +304,11 @@ html.zs-light .zs-mcp-toggle { background: rgba(0, 0, 0, 0.18); }
 /* ── input cover: fully hides the text the extension types + sends ──
    background colour is set inline at runtime to match the input box,
    so the masked input simply looks empty. */
+/* The label may run to three lines, so a whole command with its arguments can be read. */
+#zs-input-cover span {
+  min-width: 0; padding-right: 16px; line-height: 1.35;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere;
+}
 #zs-input-cover {
   position: fixed; z-index: 2147483500;
   display: flex; align-items: center; gap: 8px;
@@ -312,7 +317,7 @@ html.zs-light .zs-mcp-toggle { background: rgba(0, 0, 0, 0.18); }
   background: #ffffff;
   color: rgba(140, 140, 150, 0.9);
   font-size: 12px; font-family: ui-sans-serif, "Segoe UI", sans-serif;
-  white-space: nowrap; overflow: hidden;
+  overflow: hidden;
   /* Capture pointer events: the cover sits over the composer while the agent
      works, so eating clicks/focus stops the user from clicking THROUGH it into
      the input box and typing (contenteditable=false alone leaks - Vue/Angular
