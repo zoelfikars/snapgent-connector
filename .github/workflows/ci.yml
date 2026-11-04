@@ -14,7 +14,9 @@ concurrency:
 jobs:
   extension:
     name: Extension (lint, test, build)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
+    # A pull request from a fork never runs on the self-hosted machine; the jobs on GitHub's own runners still do.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     defaults:
       run:
         working-directory: extension
@@ -33,19 +35,34 @@ jobs:
         run: test -f dist/chrome/manifest.json && test -f dist/firefox/manifest.json
 
   python:
-    name: Python ${{ matrix.python }} on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    name: Python ${{ matrix.python }} on Linux
+    runs-on: [self-hosted, linux]
+    # A pull request from a fork never runs on the self-hosted machine; the jobs on GitHub's own runners still do.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ["3.9", "3.12", "3.14"]
-        exclude:
-          # Keep the matrix small: the oldest and newest on the other systems are enough.
-          - os: windows-latest
-            python: "3.12"
-          - os: macos-latest
-            python: "3.12"
+        # The oldest version the README promises and the newest: a feature missing in 3.9 fails here, one removed in 3.14 too.
+        python: ["3.9", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install websockets
+      - name: Configure git identity for the tests that make commits
+        run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+      - run: python -m unittest discover -s tests -t . -v
+
+  python-windows:
+    name: Python ${{ matrix.python }} on Windows
+    runs-on: windows-latest   # GitHub's own runner: there is no Windows machine of ours
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -115,7 +132,9 @@ jobs:
 
   frozen-linux:
     name: Linux program builds and starts
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, linux]
+    # A pull request from a fork never runs on the self-hosted machine; the jobs on GitHub's own runners still do.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     defaults:
       run:
         working-directory: server

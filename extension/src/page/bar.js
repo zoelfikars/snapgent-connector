@@ -13,7 +13,7 @@ import { createFilesMenu } from "./files-menu.js";
 import { createMenuGroup } from "./pill-menu.js";
 import { createSiteMenu } from "./site-menu.js";
 
-const GITHUB_URL = "https://github.com/herdodp/snapgent-connector";
+const GITHUB_URL = "https://github.com/zoelfikarshomelab/snapgent-connector";
 const BOLT = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>`;
 const pill = (id, nameId, label, title = "", popup) => pillHtml({ id, nameId, label, title, popup });
 const TEMPLATE = `

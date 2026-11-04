@@ -5,6 +5,7 @@ All notable changes to snapgentV3 Free are documented here.
 ## [Unreleased]
 
 ### Build and release
+- The project now lives at `github.com/zoelfikarshomelab/snapgent-connector`; links in the README, the project page and the extension point there, and credit to the original project (`herdodp/snapgent-connector`) is kept. The Firefox add-on id is unchanged, so existing installs keep working.
 - **Tidy repository root**: the bridge, the VS Code server, their launchers and PyInstaller specs moved
   into `server/` (same layout as the release zip); tests moved into `tests/`. Release zips are unchanged.
   From a clone, run the launchers from `server/`.

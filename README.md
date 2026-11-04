@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="https://github.com/herdodp/snapgent-connector">
+<a href="https://github.com/zoelfikarshomelab/snapgent-connector">
 <img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=800&size=52&duration=3000&pause=1000&color=FACC15&center=true&vCenter=true&width=700&height=90&lines=snapgentV3;+Connector+agent+MCP" alt="snapgentV3: Connector agent for VS Code" />
 </a>
 
@@ -10,7 +10,7 @@
 
 [![License](https://img.shields.io/badge/LICENSE-GPL--3.0-FACC15?style=flat-square&labelColor=111111&logo=opensourceinitiative&logoColor=FACC15)](LICENSE)
 [![Manifest](https://img.shields.io/badge/MANIFEST-V3-FACC15?style=flat-square&labelColor=111111&logo=googlechrome&logoColor=FACC15)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3/)
-[![Release](https://img.shields.io/badge/RELEASE-V3.9.3-FACC15?style=flat-square&labelColor=111111&logo=semanticrelease&logoColor=FACC15)](https://github.com/herdodp/snapgent-connector/releases/tag/V3.9.3)
+[![Release](https://img.shields.io/badge/RELEASE-V3.9.3-FACC15?style=flat-square&labelColor=111111&logo=semanticrelease&logoColor=FACC15)](https://github.com/zoelfikarshomelab/snapgent-connector/releases/tag/V3.9.3)
 [![MCP](https://img.shields.io/badge/PROTOCOL-MCP-FACC15?style=flat-square&labelColor=111111&logo=modelcontextprotocol&logoColor=FACC15)](https://modelcontextprotocol.io/)
 
 </div>
@@ -113,7 +113,7 @@ VS Code's MCP server is configured by `snapgent` itself; it detects the open VS 
 
 **① Load the extension**
 
-1. Download and extract the [latest SnapgentV3 release](https://github.com/herdodp/snapgent-connector/releases/tag/V3.9.3).
+1. Download and extract the [latest SnapgentV3 release](https://github.com/zoelfikarshomelab/snapgent-connector/releases/tag/V3.9.3).
 2. Open `edge://extensions` (Edge) or `chrome://extensions` (Chrome).
 3. Enable **Developer mode**.
 4. Click **Load unpacked** and select the `chrome` folder of the release (or `extension/dist/chrome` if you built from source).
@@ -182,7 +182,7 @@ It then appears in the MCP target selector on the chat bar.
 
 The extension and the bridge are two separate parts, and each one has to be updated. Reloading only the extension does not update the bridge, and the **Restart** button in the extension popup only restarts the MCP servers, it does not load new bridge code.
 
-1. Get the new version: run `git pull` in the project folder (the program is `server/snapgent.py`), or download and extract the [latest release](https://github.com/herdodp/snapgent-connector/releases/latest).
+1. Get the new version: run `git pull` in the project folder (the program is `server/snapgent.py`), or download and extract the [latest release](https://github.com/zoelfikarshomelab/snapgent-connector/releases/latest).
 2. Stop the old bridge: close the window or terminal that is running `snapgent`.
 3. Start `snapgent` again. It replaces an old bridge still holding port 17613. On Linux it first checks that the process on the port is a Snapgent bridge, and stops with an error if it belongs to another program.
 4. Reload the extension at `chrome://extensions` (or `edge://extensions`), then refresh open chat tabs (F5).
@@ -306,6 +306,8 @@ The dialog keeps the dangerous one-liners visible to you.
 
 **Built for creators who want to spend more time making.**
 
-[Latest release V3.9.3](https://github.com/herdodp/snapgent-connector/releases/tag/V3.9.3) · [Issues](https://github.com/herdodp/snapgent-connector/issues) · [License](LICENSE)
+[Latest release V3.9.3](https://github.com/zoelfikarshomelab/snapgent-connector/releases/tag/V3.9.3) · [Issues](https://github.com/zoelfikarshomelab/snapgent-connector/issues) · [License](LICENSE)
+
+Based on [snapgent-connector](https://github.com/herdodp/snapgent-connector) by [herdodp](https://github.com/herdodp), the original project. Released under the same GPL-3.0 license.
 
 </div>
