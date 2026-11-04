@@ -156,6 +156,14 @@ class HardRuleTests(FlowCase):
         self.write("b.txt", "visible")
         self.assertIn("visible", self.call(self.server(Policy(READONLY)), "read_files", {"paths": ["b.txt"]})["result"]["content"][0]["text"])
 
+    def test_plan_mode_saves_a_plan_file_but_still_refuses_other_writes(self):
+        server = self.server(Policy(READONLY))
+        saved = self.call(server, "write_file", {"path": ".snapgent/plans/refactor.md", "content": "# Plan\n1. step\n"})
+        self.assertIn("Saved .snapgent/plans/refactor.md", saved["result"]["content"][0]["text"])
+        self.assertEqual((self.root / ".snapgent" / "plans" / "refactor.md").read_text(encoding="utf-8"), "# Plan\n1. step\n")
+        self.assertIn("Plan mode", self.call(server, "write_file", {"path": "src.go", "content": "x"})["error"]["message"])
+        self.assertFalse((self.root / "src.go").exists())
+
     def test_unknown_tools_are_rejected_before_any_policy_logic(self):
         self.assertIn("Unknown tool", self.call(self.server(), "format_disk")["error"]["message"])
 

@@ -190,6 +190,19 @@ class DecisionMatrixTests(unittest.TestCase):
         self.assertEqual(self.verdict("read_files", risk.READ, {"paths": ["a.js"]}, p), ALLOW)
         self.assertEqual(self.verdict("read_files", risk.READ, {"paths": [".env"]}, p), CONFIRM, "secrets still need approval")
 
+    def test_plan_mode_lets_the_agent_save_its_plan_as_markdown_under_snapgent_plans_and_nowhere_else(self):
+        p = Policy(READONLY)
+        for name in ("create_file", "write_file", "edit_file", "apply_patch"):
+            self.assertEqual(self.verdict(name, risk.WRITE, {"path": ".snapgent/plans/add-login.md"}, p), ALLOW, name)
+        self.assertEqual(self.verdict("write_file", risk.WRITE, {"path": ".snapgent/plans/api/v2/auth.MD"}, p), ALLOW)
+        for path in (".snapgent/plans/x.txt", ".snapgent/plans/.md", ".snapgent/skills/x.md", "plans/x.md", "src/main.go", ".snapgent/plans",
+                     ".snapgent/plans/../config.md", ".snapgent/plans/../../x.md", "docs/.snapgent/plans/x.md"):
+            self.assertEqual(self.verdict("write_file", risk.WRITE, {"path": path}, p), DENY, path)
+        # only the editing tools, and only when every path is a plan file
+        self.assertEqual(self.verdict("delete_file", risk.DESTRUCTIVE, {"path": ".snapgent/plans/x.md"}, p), DENY)
+        self.assertEqual(self.verdict("copy_file", risk.WRITE, {"source": "a.md", "destination": ".snapgent/plans/x.md"}, p), DENY)
+        self.assertEqual(self.verdict("run_command", risk.EXECUTE, {"command": "ls"}, p), DENY)
+
     def test_trusted_mode_never_asks(self):
         p = Policy(TRUSTED)
         for name, tool_risk, args in (("delete_file", risk.DESTRUCTIVE, {"path": "a"}), ("git_commit", risk.VCS, {"message": "m"}),

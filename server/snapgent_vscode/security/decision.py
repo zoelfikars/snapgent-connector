@@ -16,6 +16,8 @@ from .session import SessionState
 ALLOW, CONFIRM, DENY = "allow", "confirm", "deny"
 # Tools that return file CONTENT, which would be sent to a third-party website.
 CONTENT_TOOLS = frozenset({"read_files", "git_diff", "get_command_output"})
+# What Plan mode lets through besides reading: saving the plan itself as a Markdown file under .snapgent/plans/.
+PLAN_WRITE_TOOLS = frozenset({"create_file", "write_file", "edit_file", "apply_patch"})
 SCRIPT_TOOLS = frozenset({"run_project_script", "run_tests"})
 
 
@@ -92,8 +94,11 @@ def decide(policy: Policy, name: str, tool_risk: str, arguments: Dict[str, Any],
     if not hard.allowed:
         return hard
     if policy.mode == READONLY and tool_risk != risk.READ:
+        if name in PLAN_WRITE_TOOLS and paths and all(files.is_plan_file(p) for p in paths):
+            return _ALLOW
         return _deny(f"Plan mode: the user allows reading only, so '{name}' was not run. Keep to reading the workspace, then describe the plan "
-                     "(what you would change and why) and wait for the user to switch the bar to Manual or Auto.")
+                     "(what you would change and why); you may save it as a Markdown file of any name under .snapgent/plans/ (for example "
+                     ".snapgent/plans/add-login.md), nothing else. Then wait for the user to switch the bar to Manual or Auto.")
     if policy.mode == TRUSTED:
         return _ALLOW
     return _standard(name, tool_risk, arguments, paths, policy, session)

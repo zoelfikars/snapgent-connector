@@ -15,7 +15,7 @@ export function targetMenuHtml(options, currentId) {
 
 /** What the bar offers for approvals; `id` is what the VS Code server understands (see server/snapgent_vscode/security/modes.py). */
 export const APPROVAL_MODES = [
-  { id: "plan", name: "Plan", note: "Read only: it can look around but changes nothing" },
+  { id: "plan", name: "Plan", note: "Read only; it may save its plan to .snapgent/plans/" },
   { id: "manual", name: "Manual", note: "Asks before deleting, committing or running commands" },
   { id: "auto", name: "Auto", note: "Does everything without asking" },
 ];
@@ -69,9 +69,9 @@ export function fileRowsHtml(paths, { chosen = null, active = -1, max = 200 } = 
   const rows = paths.slice(0, max).map((path, index) => {
     const slash = path.lastIndexOf("/", path.length - 2); // a folder ends with a slash that belongs to its name
     const on = chosen ? chosen.has(path) : index === active;
-    return `<div class="zs-file-row${chosen && on ? " zs-file-chosen" : ""}${index === active ? " zs-file-active" : ""}" data-path="${escapeHtml(path)}" role="option" aria-selected="${on}">` +
+    return `<div class="zs-file-row${path.endsWith("/") ? " zs-file-folder" : ""}${chosen && on ? " zs-file-chosen" : ""}${index === active ? " zs-file-active" : ""}" data-path="${escapeHtml(path)}" role="option" aria-selected="${on}">` +
       `${chosen ? `<span class="zs-file-tick">${on ? "✓" : ""}</span>` : ""}` +
-      `<span class="zs-file-path"><span class="zs-file-dir">${escapeHtml(path.slice(0, slash + 1))}</span>${escapeHtml(path.slice(slash + 1))}</span></div>`;
+      `<span class="zs-file-path"><span class="zs-file-dir">${escapeHtml(path.slice(0, slash + 1))}</span>${escapeHtml(path.slice(slash + 1))}</span>${path.endsWith("/") ? `<span class="zs-file-kind">folder</span>` : ""}</div>`;
   });
   if (paths.length > max) rows.push(`<div class="zs-files-more">${paths.length - max} more: type to narrow the search</div>`);
   return rows.join("");
@@ -79,7 +79,7 @@ export function fileRowsHtml(paths, { chosen = null, active = -1, max = 200 } = 
 
 /** The popup that opens beside the composer when the user types @: its header (with the ways to close it) and an empty list. */
 export const atPopupHtml = () =>
-  `<div class="zs-at-head"><span class="zs-at-title">Attach a file</span>` +
+  `<div class="zs-at-head"><span class="zs-at-title">Attach a file or folder</span>` +
   `<span class="zs-at-hint">↑↓ choose · Enter insert · Esc close</span>` +
   `<button type="button" class="zs-at-off" title="Stop opening this list when I type @">Turn off</button>` +
   `<button type="button" class="zs-at-x" aria-label="Close">✕</button></div><div class="zs-at-list"></div>`;

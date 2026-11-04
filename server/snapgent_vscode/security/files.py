@@ -51,3 +51,13 @@ def is_execution_config(relative_path: str) -> bool:
     if not parts:
         return False
     return _matches(parts[-1], EXECUTION_CONFIG_NAMES) or ".husky" in parts or "scripts" in parts[:-1]
+
+
+PLAN_FOLDER = (".snapgent", "plans")
+
+
+def is_plan_file(relative_path: str) -> bool:
+    """A Markdown file inside `.snapgent/plans/` (any depth, any name): the one place Plan mode lets the agent write, to keep its plan."""
+    parts = _parts(relative_path)
+    return (len(parts) > len(PLAN_FOLDER) and tuple(parts[:len(PLAN_FOLDER)]) == PLAN_FOLDER
+            and ".." not in parts and parts[-1].lower().endswith(".md") and len(parts[-1]) > len(".md"))
