@@ -46,15 +46,13 @@ jobs:
         python: ["3.9", "3.14"]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - run: python -m pip install websockets
+      # uv fetches the interpreter itself, so any version runs on any distribution (setup-python has no builds for the newest Ubuntu).
+      - uses: astral-sh/setup-uv@v5
       - name: Configure git identity for the tests that make commits
         run: |
           git config --global user.name "CI"
           git config --global user.email "ci@example.invalid"
-      - run: python -m unittest discover -s tests -t . -v
+      - run: uv run --python ${{ matrix.python }} --no-project --with websockets python -m unittest discover -s tests -t . -v
 
   python-windows:
     name: Python ${{ matrix.python }} on Windows
@@ -140,11 +138,9 @@ jobs:
         working-directory: server
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install pyinstaller websockets
-      - run: pyinstaller --noconfirm snapgent.spec
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv --python 3.12 "$RUNNER_TEMP/venv" && uv pip install --python "$RUNNER_TEMP/venv/bin/python" pyinstaller websockets
+      - run: $RUNNER_TEMP/venv/bin/pyinstaller --noconfirm snapgent.spec
       - name: It answers as the VS Code MCP server
         run: |
           echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
