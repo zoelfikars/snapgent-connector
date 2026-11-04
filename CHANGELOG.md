@@ -45,6 +45,9 @@ All notable changes to snapgentV3 Free are documented here.
   though only 2000 files were returned); it is now about a tenth of a second for 2000 files and under a second for 50,000, and the list for tagging covers the whole
   project instead of its first 2000 files. The list is read again after any command ran and when the workspace changes (a plan saved in `.snapgent/plans/` is found
   at once), and an open `@` list follows when it changes.
+- **The file list no longer drowns in generated folders** (`.rustup`, `.cargo`, `target`, ... differ per framework). In a git project the list is what git counts as
+  the project (tracked files, and new files `.gitignore` does not hide), so it follows each project's own `.gitignore`; `.snapgent/` (plans) is listed even if ignored.
+  Without git, a longer list of toolchain and cache folders is skipped. `search_files` uses the same list.
 - **The workspace check no longer lists the whole project every 5 seconds**: it asks for the root folder only, so it cannot time out on a big project.
 
 ### Added

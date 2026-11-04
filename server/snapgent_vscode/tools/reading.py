@@ -2,13 +2,15 @@
 
 import fnmatch
 import os
+import subprocess
 import time
 from pathlib import Path
 from typing import Any, Dict, List
 
 from ..context import Context
-from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, MAX_LISTED_FILES, MAX_OUTPUT_CHARS, MAX_RESULTS, MAX_SEARCH_FILE_BYTES, MAX_TREE_DEPTH, SEARCH_TIME_SECONDS
+from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, GIT_LIST_SECONDS, MAX_LISTED_FILES, MAX_OUTPUT_CHARS, MAX_RESULTS, MAX_SEARCH_FILE_BYTES, MAX_TREE_DEPTH, SEARCH_TIME_SECONDS
 from ..paths import relative, resolve_inside, walk_files
+from ..process import child_environment
 from ..security import TRUSTED
 from ..security.files import is_sensitive
 from .registry import READ, tool
@@ -20,7 +22,13 @@ DEFAULT_EXCLUDED = frozenset({
     "vendor", "node_modules", ".git", "dist", "build", "target", ".next", ".nuxt",
     "__pycache__", ".venv", "venv", ".pytest_cache", ".mypy_cache", ".tox",
     ".idea", ".vscode", ".cache", "coverage", ".turbo", ".svelte-kit",
+    # Toolchains and package caches that live inside a project folder in some setups, whatever the framework.
+    ".rustup", ".cargo", ".gradle", ".m2", ".npm", ".pnpm-store", ".yarn", ".nuget", ".pub-cache", ".dart_tool", ".terraform",
+    ".parcel-cache", ".angular", ".nx", ".expo", ".sass-cache", ".bundle", ".stack-work", ".eggs", "__pypackages__", "site-packages",
+    "bower_components", "Pods", "DerivedData", "elm-stuff",
 })
+# Never hidden by .gitignore: where Plan mode keeps its plans.
+ALWAYS_LISTED = ".snapgent"
 
 
 def _excluded_names(exclude) -> set:
@@ -32,16 +40,47 @@ def _excluded_names(exclude) -> set:
     return names
 
 
+def _git_listing(ctx: Context, base: Path):
+    """The files git itself counts as the project's: tracked ones, and new ones that .gitignore does not hide. None when this is not a
+    git checkout (or git is missing or slow): the caller then walks the folder. .gitignore is what every framework already uses to say
+    which folders are generated, so it replaces a list of names that could never be complete."""
+    start = relative(base, ctx.root)
+    command = ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"] + ([] if start == "." else ["--", start])
+    try:
+        done = subprocess.run(command, cwd=str(ctx.root), capture_output=True, timeout=GIT_LIST_SECONDS, env=child_environment())
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if done.returncode != 0:
+        return None
+    return sorted({path for path in done.stdout.decode("utf-8", errors="replace").split("\0") if path})
+
+
 def _visible_files(ctx: Context, base: Path, excluded: set):
     """`(path, relative path)` of every file under `base` the agent may see. A base that is itself inside an excluded folder has none."""
     hide = ctx.policy.mode != TRUSTED
     start = relative(base, ctx.root)
     if start != "." and any(part in excluded for part in start.split("/")):
         return
-    for file_path, rel in walk_files(base, ctx.root, excluded):
+    listed = _git_listing(ctx, base)
+    if listed is None:
+        candidates = walk_files(base, ctx.root, excluded)
+    else:
+        seen = set(listed)
+        extra = [(path, rel) for path, rel in walk_files(ctx.root / ALWAYS_LISTED, ctx.root, excluded)
+                 if rel not in seen and (start == "." or rel.startswith(f"{start}/"))] if (ctx.root / ALWAYS_LISTED).is_dir() else []
+        candidates = ((ctx.root / rel, rel) for rel in listed if not any(part in excluded for part in rel.split("/")))
+        candidates = _then(candidates, extra)
+    for file_path, rel in candidates:
+        if listed is not None and not file_path.is_file():  # removed since it was committed, or a submodule
+            continue
         if hide and is_sensitive(rel):
             continue
         yield file_path, rel
+
+
+def _then(first, second):
+    yield from first
+    yield from second
 
 
 def _tree(ctx: Context, base: Path, max_depth, excluded: set) -> str:

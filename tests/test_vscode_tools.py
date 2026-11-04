@@ -1,7 +1,8 @@
-from unittest import mock
 import json
+import subprocess
 import sys
 import unittest
+from unittest import mock
 
 from snapgent_vscode import limits
 from snapgent_vscode.tools import all_tools, call, get, registry, schemas
@@ -99,6 +100,31 @@ class ReadingTests(WorkspaceCase):
     def test_a_hidden_folder_like_snapgent_plans_is_listed(self):
         self.write(".snapgent/plans/add-login.md", "# plan")
         self.assertIn(".snapgent/plans/add-login.md", reading.find_files(self.ctx, "."))
+
+    def test_in_a_git_project_the_list_is_what_git_counts_as_the_project(self):
+        try:
+            git(self.root, "init", "-q")
+        except (OSError, subprocess.CalledProcessError):
+            self.skipTest("git is not available")
+        self.write(".gitignore", "generated/\n.snapgent/\n")
+        self.write("main.go", "package main")
+        self.write("generated/huge.go", "x")           # ignored by the project itself, a name no list could know
+        self.write(".snapgent/plans/p.md", "# plan")   # ignored too, but where Plan mode keeps its plans
+        git(self.root, "add", ".")
+        self.write("new.go", "untracked but not ignored")
+        found = reading.find_files(self.ctx, ".")
+        self.assertIn("main.go", found)
+        self.assertIn("new.go", found)
+        self.assertIn(".snapgent/plans/p.md", found)
+        self.assertNotIn("generated/huge.go", found)
+
+    def test_toolchain_folders_are_left_out_even_without_git(self):
+        self.write(".rustup/toolchains/x/lib.rs", "x")
+        self.write(".cargo/registry/y.rs", "x")
+        self.write("src/main.rs", "x")
+        found = reading.find_files(self.ctx, ".")
+        self.assertIn("src/main.rs", found)
+        self.assertFalse([path for path in found if path.startswith((".rustup", ".cargo"))])
 
     def test_search_skips_binary_and_oversized_files_and_excluded_folders(self):
         (self.root / "blob.bin").write_bytes(b"NEEDLE\0\1\2")

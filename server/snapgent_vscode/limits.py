@@ -11,6 +11,7 @@ MAX_OUTPUT_CHARS = 1_000_000          # hard ceiling for any size the extension 
 COMMAND_OUTPUT_CHARS = 40_000         # a command's output is shortened to head + tail beyond this unless told otherwise
 OUTPUT_CACHE_MAX_RUNS = 20
 OUTPUT_CACHE_MAX_CHARS = 20_000_000
+GIT_LIST_SECONDS = 15                 # how long to wait for git to list a project before walking the folder instead
 MAX_FILES_PER_READ = 50
 MAX_SEARCH_FILE_BYTES = 1_000_000     # search_files skips bigger files (bundles, dumps, logs)
 SEARCH_TIME_SECONDS = 20              # search_files returns what it has found by then, and says so
