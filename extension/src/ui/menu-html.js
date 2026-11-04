@@ -67,7 +67,7 @@ export const filesMenuHtml = () =>
 export function fileRowsHtml(paths, { chosen = null, active = -1, max = 200 } = {}) {
   if (!paths.length) return `<div class="zs-files-more">No file matches</div>`;
   const rows = paths.slice(0, max).map((path, index) => {
-    const slash = path.lastIndexOf("/");
+    const slash = path.lastIndexOf("/", path.length - 2); // a folder ends with a slash that belongs to its name
     const on = chosen ? chosen.has(path) : index === active;
     return `<div class="zs-file-row${chosen && on ? " zs-file-chosen" : ""}${index === active ? " zs-file-active" : ""}" data-path="${escapeHtml(path)}" role="option" aria-selected="${on}">` +
       `${chosen ? `<span class="zs-file-tick">${on ? "✓" : ""}</span>` : ""}` +

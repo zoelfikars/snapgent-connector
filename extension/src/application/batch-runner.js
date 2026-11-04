@@ -2,13 +2,14 @@
 // Runs the commands of ONE reply and answers with ONE message (see AgentLoop, which decides when to).
 //
 // The message has a size limit: each command gets an even share of what is left, tools that can limit their own
-// output do, and a command that would only get a sliver is not run. Nothing after a failure, an image or a stop runs
-// either. Every command carries a job key (batch id + place + content), so when the page is reloaded mid-batch and the
+// output do, and a command that would only get a sliver is not run. What does not fit in one message goes in the next
+// ones (PartQueue; the model is told to acknowledge briefly meanwhile). Nothing after a failure, an image or a stop runs. Every command carries a job key (batch id + place + content), so when the page is reloaded mid-batch and the
 // reply is run again, commands that already ran are answered from the server's record instead of running twice.
 
 import { feedbackIsError, runningLabel } from "../domain/tools/result-summary.js";
 import { jobKey } from "../domain/tools/job-key.js";
-import { MAX_BATCH_CALLS, MIN_CALL_CHARS, callShare, composeBatch, sessionIsLarge, trimMiddle } from "../domain/prompt/budget.js";
+import { DEFAULT_BATCH_CALLS, MAX_RESULT_PARTS, MIN_CALL_CHARS, callShare, composeBatch, sessionIsLarge, trimMiddle } from "../domain/prompt/budget.js";
+import { partMessages } from "../domain/prompt/parts.js";
 
 export class BatchRunner {
   /** @param {object} deps  the AgentLoop's deps, plus `park(scope, extra)` (wait while the tab is hidden) and `diag` */
@@ -35,10 +36,13 @@ export class BatchRunner {
    */
   async run(item, calls) {
     const { tools, reminder } = this._d;
-    const batch = calls.slice(0, MAX_BATCH_CALLS);
-    const notRun = calls.slice(MAX_BATCH_CALLS).map((call) => ({ tool: call.tool, why: `at most ${MAX_BATCH_CALLS} commands per reply` }));
+    const maxCalls = this._budget.calls ? this._budget.calls() : DEFAULT_BATCH_CALLS;
+    const batch = calls.slice(0, maxCalls);
+    const notRun = calls.slice(maxCalls).map((call) => ({ tool: call.tool, why: `at most ${maxCalls} commands per reply` }));
     const results = [];
-    const room = Math.max(MIN_CALL_CHARS, this._budget.limit() - this._reserved());
+    const messageRoom = Math.max(MIN_CALL_CHARS, this._budget.limit() - this._reserved());
+    // All the messages together may hold this much; the output of one command may run over from one message into the next.
+    const room = this._d.parts ? messageRoom * MAX_RESULT_PARTS : messageRoom;
     const batchId = this._d.jobs ? await this._d.jobs.begin(item) : null;
     let used = 0;
     let failed = false;
@@ -66,17 +70,18 @@ export class BatchRunner {
     }
 
     if (this._d.view.progress) this._d.view.progress(""); // back to the plain "working" label while the AI answers
-    let toSend = composeBatch(results, notRun);
-    if (toSend.length > room) toSend = trimMiddle(toSend, room, "the results");
+    const composed = composeBatch(results, notRun);
+    const messages = this._d.parts ? partMessages(composed, messageRoom, MAX_RESULT_PARTS) : [composed.length > room ? trimMiddle(composed, room, "the results") : composed];
     if (reminder.onResult({ isErr: failed, tool: last.tool, hasCatalogue: tools.hasCatalogue() })) {
-      toSend += tools.reminderText();
+      messages[messages.length - 1] += tools.reminderText();
       this._diag("tools.reminder");
     }
     // The result becomes a turn: it counts toward the system-prompt re-statement budget and may carry it.
-    toSend = this._d.outbox.prepare(toSend);
-    this.lastSentChars = toSend.length;
-    if (this._budget.sent && sessionIsLarge(this._budget.sent(toSend.length), this._budget.limit())) this._d.view.toast("This chat is getting large. A new chat will be cheaper.");
-    const base = await this._d.chat.submit(toSend);
+    messages[0] = this._d.outbox.prepare(messages[0]);
+    if (messages.length > 1) { this._d.parts.hold(messages); this._diag("batch.parts", { parts: messages.length, chars: composed.length }); }
+    this.lastSentChars = messages[0].length;
+    if (this._budget.sent && sessionIsLarge(this._budget.sent(composed.length), this._budget.limit())) this._d.view.toast("This chat is getting large. A new chat will be cheaper.");
+    const base = await this._d.chat.submit(messages[0]);
     this._end(item);
     return { base };
   }

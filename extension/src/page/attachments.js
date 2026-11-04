@@ -1,33 +1,40 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Tagging files in the message. The Files menu puts `@path` in the composer; when the user sends, the page holds the message back,
-// reads the tagged files with `read_files` (the same text, line numbers and size limit the model would have got, and the same
-// approval for a file that may hold secrets), and sends the message with the contents under it. That saves the model a turn
-// that would only read them. The message is sent through the same path the agent's own messages use, so every site is handled the same.
+// Tagging files and folders in the message. The Files menu puts `@path` (a folder: `@dir/`) in the composer; when the user sends, the
+// page holds the message back, reads the tagged files (a folder is every text file under it) with `read_files` (the same text, line
+// numbers and size limit the model would have got, and the same approval for a file that may hold secrets), and sends the message with
+// the contents under it. That saves the model a turn that would only read them. What does not fit in one message goes in the next
+// ones (PartQueue). The message is sent through the same path the agent's own messages use, so every site is handled the same.
 
-import { findTags, tagText } from "../domain/prompt/file-tags.js";
+import { findTags, foldersOf, isFolder, isTextFile, tagText } from "../domain/prompt/file-tags.js";
+import { MAX_RESULT_PARTS } from "../domain/prompt/budget.js";
+import { partMessages } from "../domain/prompt/parts.js";
 import { feedbackIsError } from "../domain/tools/result-summary.js";
 import { withoutResultHeader } from "../domain/tools/result-marker.js";
 import { bareToolName } from "../domain/tools/names.js";
 
-export const MAX_TAGGED = 20;
+export const MAX_TAGGED = 20;        // tags in one message
+const MAX_FILES = 200;               // files in one message, folders included
+const FILES_PER_CALL = 25;
 const LIST_TTL_MS = 30000;
 const MIN_FILES_CHARS = 4000;
-const MESSAGE_OVERHEAD = 200; // the line that introduces the files, and spacing
+const MESSAGE_OVERHEAD = 400;        // the line that introduces the files, and spacing
 
-/** @param {{ provider: object, state: object, tools: object, chat: object, bar: object, budget: object, startTurn: (base: *) => void, diag: Function }} deps */
-export function createAttachments({ provider, state, tools, chat, bar, budget, startTurn, diag }) {
-  let files = null; // { paths: string[], known: Set<string>, at: number }
+/** @param {{ provider: object, state: object, tools: object, chat: object, bar: object, budget: object, parts: object, startTurn: (base: *) => void, diag: Function }} deps */
+export function createAttachments({ provider, state, tools, chat, bar, budget, parts, startTurn, diag }) {
+  let files = null; // { paths: string[] (folders and files), known: Set<string>, files: string[], folders: Set<string>, at: number }
   const tagged = new Set();
 
-  /** Every file of the workspace (relative paths), cached briefly. */
+  /** Every file and folder of the workspace (relative paths, a folder with its closing slash), cached briefly. */
   async function listFiles() {
     if (files && Date.now() - files.at < LIST_TTL_MS) return { ok: true, paths: files.paths };
     const feedback = await tools.runner.run({ tool: "find_files", arguments: { path: "." } });
     let paths = null;
     try { paths = JSON.parse(withoutResultHeader(feedback)); } catch { /* an error text, not a list */ }
     if (!Array.isArray(paths)) return { ok: false, error: feedbackIsError(feedback) ? withoutResultHeader(feedback).split("\n")[0] : "The file list could not be read." };
-    paths = paths.filter((path) => typeof path === "string").sort((a, b) => a.localeCompare(b));
-    files = { paths, known: new Set(paths), at: Date.now() };
+    const only = paths.filter((path) => typeof path === "string");
+    const folders = foldersOf(only);
+    paths = [...only, ...folders].sort((a, b) => a.localeCompare(b));
+    files = { paths, known: new Set(paths), files: only, folders: new Set(folders), at: Date.now() };
     return { ok: true, paths };
   }
 
@@ -44,27 +51,70 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, s
     tagged.add(path);
   }
 
-  const isFile = (path) => tagged.has(path) || !!(files && files.known.has(path));
+  /** A tag names a file, or a folder (`src/page/`, or `src/page` without the slash). */
+  const folderOf = (tag) => (files ? [tag, `${tag}/`].find((name) => files.folders.has(name)) : (isFolder(tag) ? tag : null)) || null;
+  const isEntry = (path) => tagged.has(path) || !!(files && (files.known.has(path) || files.folders.has(`${path}/`)));
 
-  /** The files this message tags: what the menus inserted, and any tag typed by hand that names a file of the workspace. */
-  const referenced = (text) => findTags(text, isFile).slice(0, MAX_TAGGED);
+  /** The tags of this message: what the menus inserted, and any tag typed by hand that names a file or a folder of the workspace. */
+  const referenced = (text) => findTags(text, isEntry).slice(0, MAX_TAGGED);
 
-  async function sendWithFiles(text, paths) {
+  /** The files the tags stand for: a folder is every text file under it. */
+  function expand(tags) {
+    const found = new Set();
+    for (const tag of tags) {
+      const folder = folderOf(tag);
+      if (!folder) found.add(tag);
+      else if (files) files.files.filter((path) => path.startsWith(folder) && isTextFile(path)).forEach((path) => found.add(path));
+    }
+    const all = [...found];
+    return { paths: all.slice(0, MAX_FILES), left: Math.max(0, all.length - MAX_FILES) };
+  }
+
+  /** Read the files in turns of a few at a time with `total` characters to spend; what has no room is named, not dropped silently. */
+  async function readAll(paths, total) {
+    const bodies = [];
+    const unread = [];
+    const queue = [...paths];
+    let left = total;
+    while (queue.length) {
+      if (bodies.length && left < MIN_FILES_CHARS) { unread.push(...queue); break; }
+      const group = queue.splice(0, FILES_PER_CALL);
+      bar.coverLabel(`read_files · ${paths.length - queue.length - group.length + 1}-${paths.length - queue.length} of ${paths.length}`);
+      const feedback = await tools.runner.run({ tool: "read_files", arguments: { paths: group } }, { budgetChars: Math.max(MIN_FILES_CHARS, left) });
+      if (feedbackIsError(feedback)) return { error: withoutResultHeader(feedback).split("\n").slice(0, 3).join(" ") };
+      const body = withoutResultHeader(feedback).replace(/\n?\.\.\. \[\d+ more files remaining:[\s\S]*\]\s*$/, "").trim();
+      const missing = group.filter((path) => !body.includes(`===== ${path} =====`));
+      if (missing.length === group.length) { unread.push(...group, ...queue); break; } // no room even for one
+      bodies.push(body);
+      left -= body.length;
+      queue.unshift(...missing); // the server had no room for these in this turn: they go in the next
+    }
+    return { body: bodies.join("\n"), unread };
+  }
+
+  async function sendWithFiles(text, tags) {
     bar.cover(true);
-    bar.coverLabel(`read_files · ${paths.length} file${paths.length > 1 ? "s" : ""}`);
+    bar.coverLabel(`read_files · ${tags.length} tag${tags.length > 1 ? "s" : ""}`);
     let handedOver = false;
     try {
-      const room = Math.max(MIN_FILES_CHARS, budget.limit() - text.length - MESSAGE_OVERHEAD);
-      const feedback = await tools.runner.run({ tool: "read_files", arguments: { paths } }, { budgetChars: room });
-      if (feedbackIsError(feedback)) {
+      const { paths, left } = expand(tags);
+      // What does not fit in one message goes in the next ones, so the files may use all of them.
+      const total = Math.max(MIN_FILES_CHARS, budget.limit() * MAX_RESULT_PARTS - text.length - MESSAGE_OVERHEAD);
+      const read = await readAll(paths, total);
+      if (read.error) {
         // The message is still in the composer: nothing was lost, the user can fix it and send again.
-        bar.banner("warn", "Could not attach the files", withoutResultHeader(feedback).split("\n").slice(0, 3).join(" "));
+        bar.banner("warn", "Could not attach the files", read.error);
         return;
       }
-      const message = `${text.trimEnd()}\n\nAttached files (their current contents, with line numbers; no need to read them again):\n${withoutResultHeader(feedback).trim()}`;
+      const notes = [];
+      if (read.unread.length) notes.push(`Not attached, no room left: ${read.unread.join(", ")}`);
+      if (left) notes.push(`Only the first ${MAX_FILES} files of the folders were attached (${left} more).`);
+      const message = `${text.trimEnd()}\n\nAttached files (their current contents, with line numbers; no need to read them again):\n${read.body}${notes.length ? `\n\n${notes.join("\n")}` : ""}`;
+      const messages = partMessages(message, budget.limit(), MAX_RESULT_PARTS);
+      if (messages.length > 1) parts.hold(messages);
       handedOver = true; // the sender takes the flags from here
-      const base = await chat.submit(message);
-      paths.forEach((path) => tagged.delete(path));
+      const base = await chat.submit(messages[0]);
+      tags.forEach((tag) => tagged.delete(tag));
       startTurn(base);
     } finally {
       bar.coverLabel("");
@@ -75,10 +125,10 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, s
   /** Called when the user sends: true when the page takes the message over (the site must not send it). */
   function takeOver() {
     const text = provider.editorText() || "";
-    const paths = referenced(text);
-    if (!paths.length) return false;
+    const tags = referenced(text);
+    if (!tags.length) return false;
     state.injecting = true; // a second Enter while the files are read must not send the bare message
-    sendWithFiles(text, paths).catch((error) => {
+    sendWithFiles(text, tags).catch((error) => {
       state.injecting = false;
       bar.cover(false);
       diag("attach.failed", { msg: String((error && error.message) || error) });

@@ -2,7 +2,7 @@
 // The content script: turns a chat site into a VS Code agent. Only composes the page modules (src/page); each does one job and
 // reaches the others through the objects passed to it. Anything that reads the site goes through `provider`.
 
-import { ServerDirectory } from "../application/index.js";
+import { PartQueue, ServerDirectory } from "../application/index.js";
 import defaultCalibrations from "../../profiles/default-calibrations.json";
 import { createAttachments } from "../page/attachments.js";
 import { createAtPopup } from "../page/at-popup.js";
@@ -64,12 +64,13 @@ const chat = createChat({ document, provider, state, visibility, catalogue: tool
 const { turnKey, executed } = createTurns({ provider });
 const budget = createMessageBudget({ storage, hostname: location.hostname, provider, diag });
 const resend = createPromptResend({ provider, state, storage, systemPrompt: tools.systemPrompt, limit: budget.limit, chat, diag });
-const loop = createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs: createBatchJobs({ storage, provider, turnKey }), resend, diag });
+const parts = new PartQueue();
+const loop = createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs: createBatchJobs({ storage, provider, turnKey }), resend, parts, diag });
 session = createSession({ state, provider, tools, chat, bar, reminder: loop.reminder, limit: budget.limit, storage, settings, serverDirectory, diag });
 stop = createStop({ document, state, provider, bar, diag });
 
 let userInput;
-attachments = createAttachments({ provider, state, tools, chat, bar, budget, startTurn: (base) => userInput.startTurn(base), diag });
+attachments = createAttachments({ provider, state, tools, chat, bar, budget, parts, startTurn: (base) => userInput.startTurn(base), diag });
 userInput = installUserInput({ document, state, provider, bar, resend, loop, takeOver: attachments.takeOver, diag });
 createAtPopup({ document, window, root: bar.root, state, settings, provider, attachments, toast: bar.toast, diag });
 createAutoResume({ document, state, provider, executed, loop, diag });

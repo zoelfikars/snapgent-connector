@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Tagging files in a message: `@src/a.js`. A name with spaces is quoted, `@"docs/My Notes.md"` (single quotes and backticks are read
+// Tagging files (and folders, `@src/`) in a message: `@src/a.js`. A name with spaces is quoted, `@"docs/My Notes.md"` (single quotes and backticks are read
 // too). Reading is forgiving: an unquoted tag that runs on into spaces still counts when the whole thing names a file. Pure.
 
 const QUOTES = ['"', "'", "`"];
@@ -29,12 +29,30 @@ export function trailingTag(text) {
   return null;
 }
 
+/** A folder is written with a closing slash, `src/page/`; the same word without it still names it. */
+export const isFolder = (path) => path.endsWith("/");
+
+/** The folders that hold these files (every level), each with its closing slash. */
+export function foldersOf(paths) {
+  const folders = new Set();
+  for (const path of paths) {
+    for (let at = path.indexOf("/"); at >= 0; at = path.indexOf("/", at + 1)) folders.add(path.slice(0, at + 1));
+  }
+  return [...folders];
+}
+
+const BINARY = /\.(png|jpe?g|gif|webp|bmp|ico|icns|svgz|pdf|zip|gz|tgz|bz2|xz|7z|rar|jar|war|exe|dll|so|dylib|a|o|obj|class|pyc|wasm|bin|dat|db|sqlite3?|woff2?|ttf|otf|eot|mp[34]|mov|avi|mkv|webm|wav|ogg|flac|psd|ai|lock|sum)$/i;
+
+/** Worth reading as text when a whole folder is attached (images, archives, binaries and lock files are not). */
+export const isTextFile = (path) => !BINARY.test(path);
+
 /** The files whose path holds every word of `query` (any case), the ones whose NAME does first. */
 export function matchPaths(paths, query) {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return paths;
   const hits = paths.filter((path) => words.every((word) => path.toLowerCase().includes(word)));
-  const inName = (path) => words.every((word) => path.slice(path.lastIndexOf("/") + 1).toLowerCase().includes(word));
+  const nameOf = (path) => path.replace(/\/$/, "").slice(path.replace(/\/$/, "").lastIndexOf("/") + 1);
+  const inName = (path) => words.every((word) => nameOf(path).toLowerCase().includes(word));
   return [...hits.filter(inName), ...hits.filter((path) => !inName(path))];
 }
 

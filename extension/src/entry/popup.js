@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { allHostnames } from "../sites/registry.js";
-import { MAX_PROMPT_CHARS, MIN_PROMPT_CHARS, clampPromptChars } from "../domain/prompt/budget.js";
+import { MAX_BATCH_CALLS, MAX_PROMPT_CHARS, MIN_BATCH_CALLS, MIN_PROMPT_CHARS, clampBatchCalls, clampPromptChars } from "../domain/prompt/budget.js";
 
 const SUPPORTED_HOSTS = allHostnames();
 // const DEFAULT_AI_URL = "https://chat.deepseek.com/"; // DeepSeek hidden (disabled, not deleted)
@@ -46,6 +46,21 @@ chrome.storage.local.get("zsMaxPromptChars", (r) => {
 });
 limitInput.addEventListener("input", () => showLimit(Number(limitInput.value)));
 limitInput.addEventListener("change", () => chrome.storage.local.set({ zsMaxPromptChars: clampPromptChars(limitInput.value) }));
+
+// How many commands one reply of the AI may carry (read by the page; see src/page/message-budget.js).
+const callsInput = document.getElementById("calls");
+const callsValue = document.getElementById("calls-value");
+const showCalls = (count) => { callsValue.textContent = `${count} command${count === 1 ? "" : "s"}`; };
+callsInput.min = String(MIN_BATCH_CALLS);
+callsInput.max = String(MAX_BATCH_CALLS);
+callsInput.step = "1";
+chrome.storage.local.get("zsMaxBatchCalls", (r) => {
+  const count = clampBatchCalls(r && r.zsMaxBatchCalls);
+  callsInput.value = String(count);
+  showCalls(count);
+});
+callsInput.addEventListener("input", () => showCalls(Number(callsInput.value)));
+callsInput.addEventListener("change", () => chrome.storage.local.set({ zsMaxBatchCalls: clampBatchCalls(callsInput.value) }));
 
 function refresh() {
   chrome.runtime.sendMessage({ type: "status" }, (s) => s && render(s));

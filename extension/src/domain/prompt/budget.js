@@ -10,8 +10,12 @@ export const MAX_PROMPT_CHARS = 400000;
 export const MIN_CALL_CHARS = 2000;
 /** The name line and separators around each result. */
 export const CALL_OVERHEAD_CHARS = 200;
-/** One reply may carry this many commands; more are reported as not run. */
-export const MAX_BATCH_CALLS = 8;
+/** One reply may carry this many commands (the popup's slider sets it); more are reported as not run. */
+export const DEFAULT_BATCH_CALLS = 8;
+export const MIN_BATCH_CALLS = 1;
+export const MAX_BATCH_CALLS = 30;
+/** What does not fit in one message goes in the next ones, up to this many messages in all; the rest is cut out. */
+export const MAX_RESULT_PARTS = 5;
 /** A conversation this many messages' worth big is worth a warning (history counts against the context too). */
 export const SESSION_WARN_FACTOR = 6;
 
@@ -20,6 +24,13 @@ export function clampPromptChars(value) {
   const number = Math.round(Number(value));
   if (!Number.isFinite(number) || number <= 0) return DEFAULT_PROMPT_CHARS;
   return Math.min(MAX_PROMPT_CHARS, Math.max(MIN_PROMPT_CHARS, number));
+}
+
+/** The commands-per-reply setting, kept within what the slider allows. */
+export function clampBatchCalls(value) {
+  const number = Math.round(Number(value));
+  if (!Number.isFinite(number) || number <= 0) return DEFAULT_BATCH_CALLS;
+  return Math.min(MAX_BATCH_CALLS, Math.max(MIN_BATCH_CALLS, number));
 }
 
 /** The setting, lowered by what this site (or an earlier "too long" from it) is known to accept. */

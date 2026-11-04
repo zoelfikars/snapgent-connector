@@ -25,7 +25,8 @@ export class AgentLoop {
    *   tools: import("./ports.js").LoopToolsPort,
    *   memory: { executed: (item: object) => void },
    *   outbox: { prepare: (text: string) => string, reserve?: () => number },
-   *   budget?: { limit: () => number, sent?: (chars: number) => number, tooLong?: (chars: number) => void },
+   *   budget?: { limit: () => number, calls?: () => number, sent?: (chars: number) => number, tooLong?: (chars: number) => void },
+   *   parts?: import("./part-queue.js").PartQueue,   // the rest of an answer that did not fit in one message
    *   jobs?: { begin: (item: object) => Promise<string>, end: (item: object) => void },  // names a batch, so a reload can pick it up again
    *   reminder: import("./tool-reminder.js").ToolReminder,
    *   activity: { signature: () => string, isPaused: () => boolean },
@@ -59,6 +60,12 @@ export class AgentLoop {
         this._diag("response", { kind: res.kind, calls: res.calls ? res.calls.map((call) => call.tool) : undefined, text: res.kind === "text" ? String(res.text || "").slice(0, 200) : undefined });
         if (lifecycle.isStopped() || res.kind === "stopped") break;
 
+        // The model answered the first part of a longer message: its short reply is not the end, the next part is due.
+        if ((res.kind === "text" || res.kind === "tool") && this._d.parts && this._d.parts.pending()) {
+          base = await this._sendNextPart(res.kind === "tool");
+          continue;
+        }
+
         const plan = planTurn(res, {
           displayName: this._d.displayName(),
           truncCount,
@@ -91,6 +98,7 @@ export class AgentLoop {
       this._d.view.banner("warn", "Internal loop error", message);
     } finally {
       watchdog.stop();
+      if (this._d.parts) this._d.parts.clear();
       lifecycle.end();
       this._diag("loop.end");
     }
@@ -107,6 +115,16 @@ export class AgentLoop {
     if (!(await visibility.waitUntilVisible()) || lifecycle.isStopped()) return false;
     if (scope === "loop") this._diag("loop.visibleAgain");
     return true;
+  }
+
+  /** Send the next part of a message that was split. Commands the model sent meanwhile are not run: it was told to wait. */
+  async _sendNextPart(ignoredCommands) {
+    const { text, label } = this._d.parts.next();
+    this._diag("parts.next", { label, ignoredCommands });
+    if (this._d.view.progress) this._d.view.progress(label);
+    this._batch.lastSentChars = text.length;
+    const note = ignoredCommands ? "[The commands in your last reply were not run: wait for the last part, then send them again.]\n\n" : "";
+    return this._d.chat.submit(note + text);
   }
 
   _announce(plan) {

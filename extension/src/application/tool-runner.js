@@ -87,8 +87,10 @@ export class ToolRunner {
     const limited = { ...args };
     for (const key of OUTPUT_LIMIT_ARGUMENTS) {
       if (!(key in properties)) continue;
+      const ceiling = Number(properties[key] && properties[key].maximum); // a size the tool would refuse is lowered to its largest
+      const room = Number.isFinite(ceiling) && ceiling > 0 ? Math.min(budgetChars, ceiling) : budgetChars;
       const own = Number(limited[key]);
-      limited[key] = Number.isFinite(own) && own > 0 ? Math.min(own, budgetChars) : budgetChars;
+      limited[key] = Number.isFinite(own) && own > 0 ? Math.min(own, room) : room;
     }
     return limited;
   }

@@ -5,9 +5,9 @@ import { AgentLoop, ToolReminder } from "../application/index.js";
 
 /**
  * @param {{ state: object, provider: object, tools: object, chat: object, bar: object, visibility: object, executed: object,
- *           budget: object, jobs: object, resend: object, diag: Function }} deps
+ *           budget: object, jobs: object, resend: object, parts: object, diag: Function }} deps
  */
-export function createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs, resend, diag }) {
+export function createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs, resend, parts, diag }) {
   const reminder = new ToolReminder();
 
   const lifecycle = {
@@ -65,6 +65,7 @@ export function createLoop({ state, provider, tools, chat, bar, visibility, exec
     },
     budget,
     jobs,
+    parts,
     reminder,
     // Nothing observable changing while the tab is visible and no tool runs means the loop is stuck.
     activity: {

@@ -37,6 +37,13 @@ All notable changes to snapgentV3 Free are documented here.
 - The bridge's terminal shows only where it listens, the approval question and fatal errors; everything else is in `logs/bridge_debug.log`.
 
 ### Added
+- **Attach a folder.** Tag a folder like a file (`@src/` or `@"my folder/"`, from the `@` list or the Files menu, where folders are listed with a closing
+  slash): every text file under it is read and attached (images, archives and lock files are skipped; up to 200 files).
+- **Commands per reply is a slider** in the popup (1 to 30, 8 by default), next to the message size.
+- **Output that does not fit in one message continues in the next ones** (up to 5 messages) instead of being cut. The first message says "Part 1 of N",
+  the AI is told to answer only briefly (for example "received") and not to act yet, and the extension sends the next part when it has answered; the last part
+  says it is everything. The same goes for attached files and folders. Commands the AI sends between the parts are not run (it is told so). Stop, or an error,
+  drops the parts still waiting.
 - **One program on every system.** `snapgent.exe` (Windows) and `snapgent` (Linux) are the same program: it writes its own `config.json`, replaces an
   older Snapgent bridge on the port (on Windows found with `netstat`, ended with `taskkill`) and serves; when started by a double-click its window waits
   for Enter at the end so a message can be read. macOS runs the same program with `python3 server/snapgent.py` (`pip3 install websockets`); a ready-made
