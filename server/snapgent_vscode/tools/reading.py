@@ -120,7 +120,7 @@ def search_files(ctx: Context, path: str, query: str, file_pattern: str = "*", c
     matches: List[str] = []
     deadline = time.monotonic() + SEARCH_TIME_SECONDS
     for file_path in ([target] if target.is_file() else _visible_files(ctx, target, excluded)):
-        if time.monotonic() > deadline:
+        if time.monotonic() >= deadline:
             matches.append(f"[search stopped after {SEARCH_TIME_SECONDS} seconds; narrow it with a smaller path or file_pattern]")
             break
         if not fnmatch.fnmatch(file_path.name, file_pattern):
