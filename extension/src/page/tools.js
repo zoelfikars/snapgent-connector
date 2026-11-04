@@ -43,6 +43,7 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
   let workspaceInfo = null;
   const workspace = {
     async refresh() {
+      state.filesChangedAt = Date.now(); // another folder: the files listed before are not its files
       const feedback = await runner.run({ tool: "get_workspace_info" });
       try {
         const info = JSON.parse(withoutResultHeader(feedback));

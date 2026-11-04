@@ -47,7 +47,7 @@ export function createLoop({ state, provider, tools, chat, bar, visibility, exec
       state.toolRunning = true;
       if (item) item.dataset.zloop = "1"; // the loop owns this turn: the resume watchdog leaves it alone
     },
-    toolFinished: () => { state.toolRunning = false; },
+    toolFinished: () => { state.toolRunning = false; state.filesChangedAt = Date.now(); }, // a command may have made or removed files
   };
 
   const loop = new AgentLoop({

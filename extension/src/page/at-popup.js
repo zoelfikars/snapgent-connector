@@ -59,7 +59,12 @@ export function createAtPopup({ document, window, root, state, settings, provide
       paths = listing.paths;
       if (!tag) return; // the tag was gone while the list loaded
     } else {
-      attachments.listFiles().then((listing) => { if (listing.ok) paths = listing.paths; }); // refreshed in the background when stale
+      attachments.listFiles().then((listing) => { // refreshed in the background when stale; the open list follows when something changed
+        if (!listing.ok) return;
+        const changed = listing.paths.length !== paths.length || listing.paths.some((path, index) => path !== paths[index]);
+        paths = listing.paths;
+        if (changed && tag && !el.hidden) list.set(matchPaths(paths, tag.query));
+      });
     }
     list.set(matchPaths(paths, tag.query));
     el.hidden = false;

@@ -2,6 +2,8 @@
 // What the page knows about itself right now. One mutable object, shared by the page modules; nothing here is persisted.
 
 export const createState = () => ({
+  // When files may last have changed (a command ran, the workspace changed): a list of files read before is out of date.
+  filesChangedAt: 0,
   // The session in this conversation. `startGen` identifies one bootstrap, so a start the user abandoned can tell it is dead.
   started: false,
   starting: false,

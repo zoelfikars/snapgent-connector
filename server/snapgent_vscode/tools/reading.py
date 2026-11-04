@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from ..context import Context
-from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, MAX_OUTPUT_CHARS, MAX_RESULTS, MAX_SEARCH_FILE_BYTES, MAX_TREE_DEPTH, SEARCH_TIME_SECONDS
-from ..paths import iter_files, relative, resolve_inside
+from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, MAX_LISTED_FILES, MAX_OUTPUT_CHARS, MAX_RESULTS, MAX_SEARCH_FILE_BYTES, MAX_TREE_DEPTH, SEARCH_TIME_SECONDS
+from ..paths import relative, resolve_inside, walk_files
 from ..security import TRUSTED
 from ..security.files import is_sensitive
 from .registry import READ, tool
@@ -33,14 +33,15 @@ def _excluded_names(exclude) -> set:
 
 
 def _visible_files(ctx: Context, base: Path, excluded: set):
+    """`(path, relative path)` of every file under `base` the agent may see. A base that is itself inside an excluded folder has none."""
     hide = ctx.policy.mode != TRUSTED
-    for file_path in iter_files(base, excluded):
-        rel = relative(file_path, ctx.root)
-        if any(part in excluded for part in Path(rel).parts):
-            continue
+    start = relative(base, ctx.root)
+    if start != "." and any(part in excluded for part in start.split("/")):
+        return
+    for file_path, rel in walk_files(base, ctx.root, excluded):
         if hide and is_sensitive(rel):
             continue
-        yield file_path
+        yield file_path, rel
 
 
 def _tree(ctx: Context, base: Path, max_depth, excluded: set) -> str:
@@ -90,20 +91,25 @@ def tree(ctx: Context, path: str = ".", max_depth: int = None, exclude: List[str
     return _tree(ctx, target, max_depth, _excluded_names(exclude))
 
 
-@tool("find_files", "Find workspace files by glob pattern.", {"path": STR, "pattern": STR, "exclude": STR_LIST}, risk=READ)
-def find_files(ctx: Context, path: str = ".", pattern: str = "*", exclude: List[str] = None) -> List[str]:
+@tool("find_files", "Find workspace files by glob pattern.", {"path": STR, "pattern": STR, "exclude": STR_LIST, "max_results": integer(1, MAX_LISTED_FILES)}, risk=READ)
+def find_files(ctx: Context, path: str = ".", pattern: str = "*", exclude: List[str] = None, max_results: int = None) -> List[str]:
     base = resolve_inside(path, ctx.root)
     if not base.exists():
         raise FileNotFoundError(f"Path not found: {path}")
     if not base.is_dir():
         raise NotADirectoryError(f"Not a directory: {path}")
     excluded = _excluded_names(exclude)
-    matches = [
-        relative(file_path, ctx.root)
-        for file_path in _visible_files(ctx, base, excluded)
-        if fnmatch.fnmatch(file_path.name, pattern) or fnmatch.fnmatch(relative(file_path, base), pattern)
-    ]
-    return matches[:MAX_RESULTS]
+    limit = MAX_RESULTS if max_results is None else max(1, min(int(max_results), MAX_LISTED_FILES))
+    start = relative(base, ctx.root)
+    cut = 0 if start == "." else len(start) + 1
+    everything = pattern == "*"
+    matches: List[str] = []
+    for file_path, rel in _visible_files(ctx, base, excluded):  # stops walking the moment there is enough
+        if everything or fnmatch.fnmatch(file_path.name, pattern) or fnmatch.fnmatch(rel[cut:], pattern):
+            matches.append(rel)
+            if len(matches) >= limit:
+                break
+    return matches
 
 
 @tool("search_files", "Search text in workspace files. Returns compact 'path:line: text' lines.",
@@ -119,7 +125,7 @@ def search_files(ctx: Context, path: str, query: str, file_pattern: str = "*", c
     excluded = _excluded_names(exclude)
     matches: List[str] = []
     deadline = time.monotonic() + SEARCH_TIME_SECONDS
-    for file_path in ([target] if target.is_file() else _visible_files(ctx, target, excluded)):
+    for file_path, rel in ([(target, relative(target, ctx.root))] if target.is_file() else _visible_files(ctx, target, excluded)):
         if time.monotonic() >= deadline:
             matches.append(f"[search stopped after {SEARCH_TIME_SECONDS} seconds; narrow it with a smaller path or file_pattern]")
             break
@@ -139,7 +145,7 @@ def search_files(ctx: Context, path: str, query: str, file_pattern: str = "*", c
             continue
         for line_number, line in enumerate(text.splitlines(), start=1):
             if needle in (line if case_sensitive else line.lower()):
-                matches.append(f"{relative(file_path, ctx.root)}:{line_number}: {line[:500]}")
+                matches.append(f"{rel}:{line_number}: {line[:500]}")
                 if len(matches) >= MAX_RESULTS:
                     return matches
     return matches

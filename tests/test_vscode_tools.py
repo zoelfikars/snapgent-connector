@@ -89,6 +89,17 @@ class ReadingTests(WorkspaceCase):
         self.assertEqual(reading.search_files(self.ctx, ".", "START", case_sensitive=True), [])
         self.assertEqual(reading.search_files(self.ctx, ".", "run", file_pattern="*.yml"), [])
 
+    def test_find_files_gives_the_model_a_short_list_and_the_extension_the_whole_project(self):
+        for index in range(limits.MAX_RESULTS + 30):
+            self.write(f"many/f{index:05d}.txt", "x")
+        self.assertEqual(len(reading.find_files(self.ctx, "many", "*")), limits.MAX_RESULTS)
+        self.assertEqual(len(reading.find_files(self.ctx, "many", "*", max_results=limits.MAX_RESULTS + 30)), limits.MAX_RESULTS + 30)
+        self.assertEqual(len(reading.find_files(self.ctx, "many", "*", max_results=5)), 5)
+
+    def test_a_hidden_folder_like_snapgent_plans_is_listed(self):
+        self.write(".snapgent/plans/add-login.md", "# plan")
+        self.assertIn(".snapgent/plans/add-login.md", reading.find_files(self.ctx, "."))
+
     def test_search_skips_binary_and_oversized_files_and_excluded_folders(self):
         (self.root / "blob.bin").write_bytes(b"NEEDLE\0\1\2")
         self.write("huge.log", "NEEDLE\n" + "x" * (limits.MAX_SEARCH_FILE_BYTES + 10))

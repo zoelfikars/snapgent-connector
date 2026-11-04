@@ -1,6 +1,7 @@
 """Which paths are special: secrets, git internals, and files that decide what gets executed."""
 
 import fnmatch
+import re
 from typing import Iterable, List
 
 # Files whose contents would be sent to a third-party website if the model read them.
@@ -26,9 +27,20 @@ def _parts(relative_path: str) -> List[str]:
     return [part for part in relative_path.replace("\\", "/").split("/") if part and part != "."]
 
 
+def _compile(patterns: Iterable[str]):
+    """One pattern for the whole list, case-insensitive (a project has tens of thousands of files; each is asked about every list)."""
+    return re.compile("|".join(fnmatch.translate(pattern) for pattern in patterns), re.IGNORECASE)
+
+
+_COMPILED = {}
+
+
 def _matches(name: str, patterns: Iterable[str]) -> bool:
-    lowered = name.lower()
-    return any(fnmatch.fnmatch(lowered, pattern.lower()) for pattern in patterns)
+    key = patterns if isinstance(patterns, tuple) else tuple(patterns)
+    compiled = _COMPILED.get(key)
+    if compiled is None:
+        compiled = _COMPILED[key] = _compile(key)
+    return compiled.match(name) is not None
 
 
 def is_sensitive(relative_path: str) -> bool:

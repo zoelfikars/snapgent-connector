@@ -5,6 +5,7 @@ IGNORED_DIRECTORIES = frozenset({
     "__pycache__", ".pytest_cache", ".mypy_cache", ".next", "dist", "build",
 })
 MAX_RESULTS = 2000
+MAX_LISTED_FILES = 50_000             # the most find_files may be asked for (the extension lists a whole project to tag files)
 MAX_FILE_CHARS = 200_000
 MAX_OUTPUT_CHARS = 1_000_000          # hard ceiling for any size the extension asks for
 COMMAND_OUTPUT_CHARS = 40_000         # a command's output is shortened to head + tail beyond this unless told otherwise

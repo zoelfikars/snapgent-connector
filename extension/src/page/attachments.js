@@ -13,9 +13,10 @@ import { withoutResultHeader } from "../domain/tools/result-marker.js";
 import { bareToolName } from "../domain/tools/names.js";
 
 export const MAX_TAGGED = 20;        // tags in one message
+const MAX_LISTED = 50000;            // the most files the list asks the server for
 const MAX_FILES = 200;               // files in one message, folders included
 const FILES_PER_CALL = 25;
-const LIST_TTL_MS = 30000;
+const LIST_TTL_MS = 10000;
 const MIN_FILES_CHARS = 4000;
 const MESSAGE_OVERHEAD = 400;        // the line that introduces the files, and spacing
 
@@ -26,15 +27,17 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, p
 
   /** Every file and folder of the workspace (relative paths, a folder with its closing slash), cached briefly. */
   async function listFiles() {
-    if (files && Date.now() - files.at < LIST_TTL_MS) return { ok: true, paths: files.paths };
-    const feedback = await tools.runner.run({ tool: "find_files", arguments: { path: "." } });
+    if (files && Date.now() - files.at < LIST_TTL_MS && files.at >= state.filesChangedAt) return { ok: true, paths: files.paths };
+    const startedAt = Date.now();
+    // The whole project (not the first 2000 files the model gets by default): every file must be taggable.
+    const feedback = await tools.runner.run({ tool: "find_files", arguments: { path: ".", max_results: MAX_LISTED } });
     let paths = null;
     try { paths = JSON.parse(withoutResultHeader(feedback)); } catch { /* an error text, not a list */ }
     if (!Array.isArray(paths)) return { ok: false, error: feedbackIsError(feedback) ? withoutResultHeader(feedback).split("\n")[0] : "The file list could not be read." };
     const only = paths.filter((path) => typeof path === "string");
     const folders = foldersOf(only);
     paths = [...only, ...folders].sort((a, b) => a.localeCompare(b));
-    files = { paths, known: new Set(paths), files: only, folders: new Set(folders), at: Date.now() };
+    files = { paths, known: new Set(paths), files: only, folders: new Set(folders), at: startedAt };
     return { ok: true, paths };
   }
 

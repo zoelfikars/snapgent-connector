@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Tuple
 
 from .limits import IGNORED_DIRECTORIES
 
@@ -34,3 +34,18 @@ def iter_files(base: Path, excluded=IGNORED_DIRECTORIES) -> Iterable[Path]:
         dirs[:] = sorted(name for name in dirs if name not in excluded)
         for name in sorted(names):
             yield Path(current) / name
+
+
+def walk_files(base: Path, root: Path, excluded=IGNORED_DIRECTORIES) -> Iterable[Tuple[Path, str]]:
+    """Like iter_files, but with each file's path relative to `root` already worked out (as a string, no Path arithmetic: this
+    runs once per file, and tens of thousands of files is a normal project)."""
+    if base.is_file():
+        yield base, relative(base, root)
+        return
+    root_text = str(root)
+    for current, dirs, names in os.walk(base):
+        dirs[:] = sorted(name for name in dirs if name not in excluded)
+        inside = current[len(root_text):].replace(os.sep, "/").strip("/")
+        prefix = f"{inside}/" if inside else ""
+        for name in sorted(names):
+            yield Path(current) / name, f"{prefix}{name}"

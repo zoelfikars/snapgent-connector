@@ -41,6 +41,10 @@ All notable changes to snapgentV3 Free are documented here.
   (bash, git, cargo) inherited it; they now get the user's own value back.
 - **`search_files` and `find_files` were slow in big projects.** They walked into `target/`, `vendor/`, `.cache/` and the like only to drop the files afterwards; those
   folders are no longer entered. `search_files` also skips binary files and files over 1 MB, and stops after 20 seconds with what it has found (and says so).
+- **Tagging files was slow to load, and the list missed new files.** Listing a project took seconds (a path calculation per file, and everything was walked even
+  though only 2000 files were returned); it is now about a tenth of a second for 2000 files and under a second for 50,000, and the list for tagging covers the whole
+  project instead of its first 2000 files. The list is read again after any command ran and when the workspace changes (a plan saved in `.snapgent/plans/` is found
+  at once), and an open `@` list follows when it changes.
 - **The workspace check no longer lists the whole project every 5 seconds**: it asks for the root folder only, so it cannot time out on a big project.
 
 ### Added
