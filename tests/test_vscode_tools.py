@@ -1,3 +1,4 @@
+from unittest import mock
 import json
 import sys
 import unittest
@@ -87,6 +88,20 @@ class ReadingTests(WorkspaceCase):
         self.assertEqual(hits, ["src/app.js:1: export function start() {}"])
         self.assertEqual(reading.search_files(self.ctx, ".", "START", case_sensitive=True), [])
         self.assertEqual(reading.search_files(self.ctx, ".", "run", file_pattern="*.yml"), [])
+
+    def test_search_skips_binary_and_oversized_files_and_excluded_folders(self):
+        (self.root / "blob.bin").write_bytes(b"NEEDLE\0\1\2")
+        self.write("huge.log", "NEEDLE\n" + "x" * (limits.MAX_SEARCH_FILE_BYTES + 10))
+        self.write("target/debug/out.txt", "NEEDLE\n")
+        self.write("notes.txt", "a NEEDLE here\n")
+        self.assertEqual(reading.search_files(self.ctx, ".", "NEEDLE"), ["notes.txt:1: a NEEDLE here"])
+
+    def test_a_search_that_runs_out_of_time_returns_what_it_found_and_says_so(self):
+        self.write("a.txt", "NEEDLE\n")
+        self.write("b.txt", "NEEDLE\n")
+        with mock.patch.object(limits, "SEARCH_TIME_SECONDS", 0), mock.patch.object(reading, "SEARCH_TIME_SECONDS", 0):
+            hits = reading.search_files(self.ctx, ".", "NEEDLE")
+        self.assertIn("search stopped", hits[-1])
 
     def test_search_results_are_capped(self):
         self.write("big.txt", "x\n" * (limits.MAX_RESULTS + 50))

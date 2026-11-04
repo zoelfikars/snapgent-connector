@@ -12,7 +12,7 @@ export function createBridgeStatus({ state, settings, tools, send, bar, diag }) 
   const monitor = new BridgeMonitor({
     ensureTools: () => tools.catalogue.ensure(false),
     activeTools: () => tools.catalogue.active(),
-    listRoot: (name, timeout) => send({ type: "call_tool", name, arguments: { path: "." }, timeout }),
+    listRoot: (name, timeout) => send({ type: "call_tool", name, arguments: { path: ".", max_depth: 0 }, timeout }),
     isListTool: (name) => bareToolName(name) === "tree",
     onChange: () => bar().render(),
     log: (...args) => console.warn("[snapgentV3]", ...args),

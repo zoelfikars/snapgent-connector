@@ -1,5 +1,7 @@
 import os
 import unittest
+from pathlib import Path
+from unittest import mock
 
 from snapgent_vscode.paths import iter_files, relative, resolve_inside
 from tests.vscode_support import WorkspaceCase
@@ -47,6 +49,20 @@ class IterFilesTests(WorkspaceCase):
             self.write(name)
         found = [relative(p, self.root) for p in iter_files(self.root)]
         self.assertEqual(found, ["a.txt", "b.txt", "src/y.js", "src/z.js"])
+
+    def test_an_excluded_folder_is_not_even_entered(self):
+        self.write("target/debug/big.o")
+        self.write("src/a.rs")
+        entered = []
+        original = os.walk
+        def spy(base, *args, **kwargs):
+            for current, dirs, names in original(base, *args, **kwargs):
+                entered.append(Path(current).name)
+                yield current, dirs, names
+        with mock.patch("snapgent_vscode.paths.os.walk", spy):
+            found = [relative(p, self.root) for p in iter_files(self.root, {"target"})]
+        self.assertEqual(found, ["src/a.rs"])
+        self.assertNotIn("debug", entered)
 
     def test_a_single_file_yields_itself(self):
         path = self.write("one.txt")

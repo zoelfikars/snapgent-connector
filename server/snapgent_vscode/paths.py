@@ -24,12 +24,13 @@ def relative(path: Path, root: Path) -> str:
     return path.relative_to(root).as_posix() or "."
 
 
-def iter_files(base: Path) -> Iterable[Path]:
-    """Files under `base`, sorted, skipping dependency/build folders."""
+def iter_files(base: Path, excluded=IGNORED_DIRECTORIES) -> Iterable[Path]:
+    """Files under `base`, sorted. Folders named in `excluded` (dependencies, build output) are not entered at all: walking into a
+    `target/` or `node_modules/` only to throw its files away is what makes a search slow."""
     if base.is_file():
         yield base
         return
     for current, dirs, names in os.walk(base):
-        dirs[:] = sorted(name for name in dirs if name not in IGNORED_DIRECTORIES)
+        dirs[:] = sorted(name for name in dirs if name not in excluded)
         for name in sorted(names):
             yield Path(current) / name

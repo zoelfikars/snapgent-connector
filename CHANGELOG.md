@@ -36,6 +36,13 @@ All notable changes to snapgentV3 Free are documented here.
 - `run_command` waits up to 120 seconds (was 30) and says plainly when it stopped a command that took longer.
 - The bridge's terminal shows only where it listens, the approval question and fatal errors; everything else is in `logs/bridge_debug.log`.
 
+### Fixed (server)
+- **Commands failed with `bash: symbol lookup error` in the Linux program.** The one-file program points `LD_LIBRARY_PATH` at its own bundled libraries and its children
+  (bash, git, cargo) inherited it; they now get the user's own value back.
+- **`search_files` and `find_files` were slow in big projects.** They walked into `target/`, `vendor/`, `.cache/` and the like only to drop the files afterwards; those
+  folders are no longer entered. `search_files` also skips binary files and files over 1 MB, and stops after 20 seconds with what it has found (and says so).
+- **The workspace check no longer lists the whole project every 5 seconds**: it asks for the root folder only, so it cannot time out on a big project.
+
 ### Added
 - **Plan mode can save the plan.** Besides reading, the AI may now create and edit Markdown files (any name, any depth) under `.snapgent/plans/`
   (for example `.snapgent/plans/add-login.md`); every other change is still refused in Plan mode, and the refusal message tells it where it may write.

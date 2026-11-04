@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import List, Optional
 
@@ -29,6 +30,21 @@ def compact(output: str, limit: int, run_id: str) -> str:
     return output[:head_chars] + marker + output[len(output) - tail_chars:]
 
 
+def child_environment() -> dict:
+    """The environment a command should see. The one-file Linux program points LD_LIBRARY_PATH at the libraries bundled inside it;
+    a child that inherits that (bash, git, cargo) loads them instead of the system's and dies with `symbol lookup error`. PyInstaller
+    keeps the user's own value in `<NAME>_ORIG`: put it back."""
+    env = dict(os.environ)
+    if getattr(sys, "frozen", False):
+        for name in ("LD_LIBRARY_PATH", "LD_PRELOAD", "DYLD_LIBRARY_PATH"):
+            original = env.pop(f"{name}_ORIG", None)
+            if original is None:
+                env.pop(name, None)
+            else:
+                env[name] = original
+    return env
+
+
 def run_process(command: List[str], cwd: Path, timeout: int = COMMAND_TIMEOUT_SECONDS,
                 max_output_chars: Optional[int] = None) -> str:
     """Run without a shell. Returns trimmed output; a non-zero exit becomes a RuntimeError with that output.
@@ -37,7 +53,7 @@ def run_process(command: List[str], cwd: Path, timeout: int = COMMAND_TIMEOUT_SE
     group = {"start_new_session": True} if os.name != "nt" else {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)}
     process = subprocess.Popen(
         command, cwd=str(cwd), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8",
-        errors="replace", shell=False, **group,
+        errors="replace", shell=False, env=child_environment(), **group,
     )
     if job:
         job.attach(process)

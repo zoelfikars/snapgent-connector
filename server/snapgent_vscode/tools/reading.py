@@ -2,11 +2,12 @@
 
 import fnmatch
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, List
 
 from ..context import Context
-from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, MAX_OUTPUT_CHARS, MAX_RESULTS, MAX_TREE_DEPTH
+from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, MAX_OUTPUT_CHARS, MAX_RESULTS, MAX_SEARCH_FILE_BYTES, MAX_TREE_DEPTH, SEARCH_TIME_SECONDS
 from ..paths import iter_files, relative, resolve_inside
 from ..security import TRUSTED
 from ..security.files import is_sensitive
@@ -33,7 +34,7 @@ def _excluded_names(exclude) -> set:
 
 def _visible_files(ctx: Context, base: Path, excluded: set):
     hide = ctx.policy.mode != TRUSTED
-    for file_path in iter_files(base):
+    for file_path in iter_files(base, excluded):
         rel = relative(file_path, ctx.root)
         if any(part in excluded for part in Path(rel).parts):
             continue
@@ -117,12 +118,24 @@ def search_files(ctx: Context, path: str, query: str, file_pattern: str = "*", c
     needle = query if case_sensitive else query.lower()
     excluded = _excluded_names(exclude)
     matches: List[str] = []
+    deadline = time.monotonic() + SEARCH_TIME_SECONDS
     for file_path in ([target] if target.is_file() else _visible_files(ctx, target, excluded)):
+        if time.monotonic() > deadline:
+            matches.append(f"[search stopped after {SEARCH_TIME_SECONDS} seconds; narrow it with a smaller path or file_pattern]")
+            break
         if not fnmatch.fnmatch(file_path.name, file_pattern):
             continue
         try:
-            text = file_path.read_text(encoding="utf-8", errors="replace")
+            if file_path.stat().st_size > MAX_SEARCH_FILE_BYTES:
+                continue
+            with file_path.open("rb") as handle:
+                data = handle.read()
         except OSError:
+            continue
+        if b"\0" in data[:8192]:  # a binary file
+            continue
+        text = data.decode("utf-8", errors="replace")
+        if needle not in (text if case_sensitive else text.lower()):
             continue
         for line_number, line in enumerate(text.splitlines(), start=1):
             if needle in (line if case_sensitive else line.lower()):
