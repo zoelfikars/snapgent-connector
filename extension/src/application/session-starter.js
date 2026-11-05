@@ -21,7 +21,8 @@ export class SessionStarter {
    *   catalogue: Pick<import("./tool-catalogue.js").ToolCatalogue, "ensure"|"active">,
    *   callTool: (name: string, args: object, timeoutMs: number) => Promise<object>,
    *   skills: { load: () => Promise<void> },
-   *   workspace: { refresh: () => Promise<void> },        // learns which folder is the workspace (the prompt names it)
+   *   workspace: { refresh: () => Promise<void>, choose?: () => Promise<{ path?: string, none?: boolean, cancelled?: boolean, error?: string }> },
+   *     // refresh learns which folder is the workspace (the prompt names it); choose settles which folder THIS chat works in, asking the user when VS Code has several
    *   startMessage: (parts: { commands: string, tree: string }) => string,
    *   chat: { submit: (text: string) => Promise<*>, next: (base: *) => Promise<object> },
    *   runner: { run: (call: object) => Promise<string> },
@@ -68,6 +69,15 @@ export class SessionStarter {
       serverAlive: target.serverAlive(), toolNames: catalogue.active().map((tool) => tool.name),
     });
     if (problem) { view.banner("warn", problem.title, problem.text); return false; }
+
+    if (target.id() === "vscode" && this._d.workspace.choose) {
+      const choice = await this._d.workspace.choose();
+      if (!alive()) return false;
+      if (choice.cancelled) { view.toast("Start cancelled."); return false; }
+      if (choice.error) { view.banner("warn", "VS Code workspace", choice.error); return false; }
+      if (choice.none) { const banner = workspaceRequiredBanner(); view.banner("warn", banner.title, banner.text); return false; }
+      this._diag("start.workspace", { path: choice.path });
+    }
 
     if (target.id() === "vscode") {
       const probeTool = catalogue.active().find((tool) => bareToolName(tool.name) === WORKSPACE_PROBE_TOOL);

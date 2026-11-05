@@ -74,6 +74,25 @@ class ServerTests(WorkspaceCase):
         reply = self.ask("tools/call", {"name": "tree"}, open_workspace=False)
         self.assertIn("Open a project folder in VS Code", reply["error"]["message"])
 
+    def test_a_call_runs_in_the_folder_the_chat_is_bound_to_not_the_one_vscode_shows(self):
+        other = self.base / "other-project"
+        other.mkdir()
+        (other / "only-here.txt").write_text("bound", encoding="utf-8")
+        self.write("only-in-active.txt", "active")
+        bound = self.ask("tools/call", {"name": "read_files", "arguments": {"paths": ["only-here.txt"], "__snapgent_root": str(other)}})
+        self.assertIn("bound", bound["result"]["content"][0]["text"])
+        info = self.ask("tools/call", {"name": "get_workspace_info", "arguments": {"__snapgent_root": str(other)}})
+        self.assertIn("other-project", info["result"]["content"][0]["text"])
+        plain = self.ask("tools/call", {"name": "get_workspace_info"})
+        self.assertIn("workspace", plain["result"]["content"][0]["text"])
+
+    def test_a_bound_folder_works_while_no_vscode_window_is_open_and_a_missing_one_is_explained(self):
+        reply = self.ask("tools/call", {"name": "tree", "arguments": {"__snapgent_root": str(self.root)}}, open_workspace=False)
+        self.assertNotIn("error", reply)
+        gone = self.ask("tools/call", {"name": "tree", "arguments": {"__snapgent_root": str(self.base / "moved-away")}})
+        self.assertIn("cannot be used any more", gone["error"]["message"])
+        self.assertIn("Choose the folder again", gone["error"]["message"])
+
     def test_serve_loop_skips_blank_lines_garbage_and_non_objects(self):
         lines = "\n".join(["", "not json", "[1]", '"s"', json.dumps({"id": 1, "method": "ping"}), json.dumps({"method": "notifications/initialized"})]) + "\n"
         out = io.StringIO()

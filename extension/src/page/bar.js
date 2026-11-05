@@ -84,7 +84,7 @@ export function createBar({ document, window, provider, state, settings, serverD
       bridge: state.bridge, bridgeOk: monitor.bridgeOk,
       target: { id: settings.target(), name: serverDirectory.name(settings.target()) },
       activeToolCount: tools.catalogue.active().length,
-      workspaceReady: monitor.workspaceReady, workspaceProbePending: monitor.workspaceProbePending,
+      workspaceReady: monitor.workspaceReady, workspaceProbePending: monitor.workspaceProbePending, workspaceFolder: tools.workspace.bound(),
       modeWarning: !state.started && !state.starting && provider.modeWarning ? provider.modeWarning() : null,
       needsCalibration: !!provider.needsCalibration,
     });

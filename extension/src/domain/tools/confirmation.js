@@ -10,10 +10,12 @@ export const MODE_ARGUMENT = "__snapgent_mode";
 // The extension's name for a call (see domain/tools/job-key.js) and its one operation, cancel. Also never the model's.
 export const JOB_ARGUMENT = "__snapgent_job";
 export const JOB_OP_ARGUMENT = "__snapgent_job_op";
+// The folder this chat works in (see page/workspace-binding.js). Also never the model's: it must not pick the folder it works in.
+export const ROOT_ARGUMENT = "__snapgent_root";
 
 /** Model-supplied arguments, minus anything that could pose as an approval, a mode or a job. */
 export function withoutReserved(args) {
-  const { [RESERVED_ARGUMENT]: _approval, [MODE_ARGUMENT]: _mode, [JOB_ARGUMENT]: _job, [JOB_OP_ARGUMENT]: _jobOp, ...rest } = args || {};
+  const { [RESERVED_ARGUMENT]: _approval, [MODE_ARGUMENT]: _mode, [JOB_ARGUMENT]: _job, [JOB_OP_ARGUMENT]: _jobOp, [ROOT_ARGUMENT]: _root, ...rest } = args || {};
   return rest;
 }
 

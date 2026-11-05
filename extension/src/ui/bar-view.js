@@ -18,6 +18,7 @@ import { escapeHtml } from "./html.js";
  * @property {number} activeToolCount   Tools the model currently has.
  * @property {boolean} workspaceReady   VS Code has a folder open (only meaningful for the vscode target).
  * @property {boolean} workspaceProbePending
+ * @property {string|null} [workspaceFolder] the folder this chat works in (so "open it in VS Code" can name it)
  * @property {string|null} modeWarning  Why this page cannot be used as it is (shown as the message).
  * @property {boolean} [needsCalibration]  The site is not calibrated, or part of its calibration no longer matches the page.
  *
@@ -39,6 +40,9 @@ function whileStarted(state) {
   const server = (state.bridge.servers || []).find((item) => item.id === state.target.id);
   const tools = state.activeToolCount || (server && server.tools) || 0;
   const name = escapeHtml(state.target.name);
+  // A chat that works in a folder while VS Code is closed: the server then offers no commands, and the way out is to open that folder.
+  const closed = state.target.id === "vscode" && state.bridge.connected && !!server && !!server.alive && !tools;
+  if (closed && state.workspaceFolder) return view("warn", `<b>Active</b> · open <b>${escapeHtml(String(state.workspaceFolder).replace(/[\\/]+$/, "").split(/[\\/]/).pop())}</b> in VS Code`, { warn: true });
   if (!state.bridge.connected) return view("warn", `<b>Active</b> · ${state.bridge.needsApproval ? "approve in the bridge terminal" : "start the bridge"}`, { warn: true });
   if (!state.bridgeOk) return view("warn", `<b>Active</b> · ${name} offline`, { warn: true });
   return view("active", `<b>Active</b>${tools ? ` · ${tools} tools` : ""} · ${name}`);

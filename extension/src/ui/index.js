@@ -2,6 +2,7 @@
 // Everything the page code (src/page) may use from the UI layer, in one place.
 export { computeBarView } from "./bar-view.js";
 export { createConfirmDialog } from "./confirm-dialog.js";
+export { createChoiceDialog } from "./choice-dialog.js";
 export { createNotifications } from "./notifications.js";
 export { openMcpSettings } from "./mcp-settings.js";
 export { openCalibrationImport } from "./calibration-import.js";

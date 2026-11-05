@@ -11,7 +11,7 @@
 //   5. shape the result for the model          -> domain/tools/result-feedback
 
 import { FEEDBACK } from "../domain/prompt/feedback.js";
-import { JOB_ARGUMENT, JOB_OP_ARGUMENT, MODE_ARGUMENT, RESERVED_ARGUMENT, declinedFeedback, needsApproval, unavailableFeedback, withoutReserved } from "../domain/tools/confirmation.js";
+import { JOB_ARGUMENT, JOB_OP_ARGUMENT, MODE_ARGUMENT, RESERVED_ARGUMENT, ROOT_ARGUMENT, declinedFeedback, needsApproval, unavailableFeedback, withoutReserved } from "../domain/tools/confirmation.js";
 import { isolationError } from "../domain/tools/isolation.js";
 import { toFeedback } from "../domain/tools/result-feedback.js";
 import { LIST_SERVERS, isListCommands, renderCommandList, renderServerList } from "../domain/tools/virtual-commands.js";
@@ -32,10 +32,11 @@ export class ToolRunner {
    *           sink: import("./ports.js").SinkPort,
    *           confirm?: import("./ports.js").ConfirmPort,
    *           approvalMode?: () => string,
+   *           workspaceRoot?: () => (string|null),   // the folder this chat works in, sent with every VS Code command
    *           timers?: import("./ports.js").Timers,
    *           timeoutMs?: number }} deps
    */
-  constructor({ bridge, catalogue, session, visibility, sink, confirm = null, approvalMode = () => "manual", timers = globalThis, timeoutMs = DEFAULT_TIMEOUT_MS }) {
+  constructor({ bridge, catalogue, session, visibility, sink, confirm = null, approvalMode = () => "manual", workspaceRoot = () => null, timers = globalThis, timeoutMs = DEFAULT_TIMEOUT_MS }) {
     this._bridge = bridge;
     this._catalogue = catalogue;
     this._session = session;
@@ -43,6 +44,7 @@ export class ToolRunner {
     this._sink = sink;
     this._confirm = confirm;
     this._approvalMode = approvalMode;
+    this._workspaceRoot = workspaceRoot;
     this._timers = timers;
     this._timeoutMs = timeoutMs;
   }
@@ -71,6 +73,7 @@ export class ToolRunner {
     const refusal = isolationError({ name, target, targetEnabled: this._session.isEnabled(target) });
     if (refusal) return refusal;
     if (!this._catalogue.names().size) await this._catalogue.ensure();
+    if (target === "vscode" && !this._catalogue.names().size) return FEEDBACK.workspaceClosed(this._workspaceRoot());
     if (!this._catalogue.knows(name)) return FEEDBACK.unknownTool(name, [...this._catalogue.names()]);
 
     return this._execute(name, this._withBudget(name, withoutReserved(args), budgetChars), target, jobKey);
@@ -115,7 +118,8 @@ export class ToolRunner {
 
   _callBridge(name, args, target, jobKey) {
     // The VS Code server applies the bar's choice (plan / manual / auto) and keeps the call under its job key; other servers know nothing of either.
-    const sent = target === "vscode" ? { ...args, [MODE_ARGUMENT]: this._approvalMode(), ...(jobKey ? { [JOB_ARGUMENT]: jobKey } : {}) } : args;
+    const root = target === "vscode" ? this._workspaceRoot() : null;
+    const sent = target === "vscode" ? { ...args, [MODE_ARGUMENT]: this._approvalMode(), ...(jobKey ? { [JOB_ARGUMENT]: jobKey } : {}), ...(root ? { [ROOT_ARGUMENT]: root } : {}) } : args;
     return callWithGuards(
       () => this._bridge.callTool({ name, arguments: sent, timeout: this._timeoutMs, server: target }),
       { timeoutMs: this._timeoutMs, isStopped: () => this._session.isStopped(), timers: this._timers },

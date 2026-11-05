@@ -166,6 +166,35 @@ describe("SessionStarter", () => {
   });
 });
 
+describe("choosing the folder of the chat", () => {
+  const withChoice = (choice, responses = [ready]) => setup({ state: { responses }, deps: { workspace: { refresh: async () => {}, choose: async () => choice } } });
+
+  test("the chosen folder is settled before anything is read from the workspace", async () => {
+    const t = withChoice({ path: "/work/portofolio" });
+    await t.starter.start();
+    const events = t.log.filter((e) => typeof e === "string");
+    assert.ok(events.includes("diag:start.workspace"));
+    assert.ok(events.indexOf("diag:start.workspace") < events.findIndex((e) => e.startsWith("probe:")));
+    assert.ok(events.includes("markStarted"));
+  });
+
+  test("closing the question cancels the start: nothing is sent and the chat stays blank", async () => {
+    const t = withChoice({ cancelled: true });
+    await t.starter.start();
+    assert.ok(t.log.includes("toast:Start cancelled."));
+    assert.equal(t.log.some((e) => typeof e === "string" && (e.startsWith("submit:") || e === "markStarted" || e.startsWith("probe:"))), false);
+  });
+
+  test("VS Code with no folder open is the workspace banner; a bridge that cannot be reached says so", async () => {
+    const none = withChoice({ none: true });
+    await none.starter.start();
+    assert.deepEqual(banners(none.log), [["banner", WORKSPACE.title, WORKSPACE.text]]);
+    const bad = withChoice({ error: "The bridge is not reachable." });
+    await bad.starter.start();
+    assert.deepEqual(banners(bad.log), [["banner", "VS Code workspace", "The bridge is not reachable."]]);
+  });
+});
+
 describe("start preconditions", () => {
   const base = { target: "vscode", targetName: "VS Code", bridgeConnected: true, serverAlive: true, toolNames: ["tree"] };
   test("ready when the probe tool exists", () => assert.equal(checkStartPreconditions(base), null));

@@ -4,6 +4,11 @@ All notable changes to snapgentV3 Free are documented here.
 
 ## [Unreleased]
 
+### Workspace per chat
+- **A chat works in the folder it was started in.** The server used to follow VS Code's active window on every command, so a second chat (or a window switch, or a server restart that dropped the pin) moved a running chat into another project: `read_files` of `vue/src/...` failed because the root had silently become another folder. The folder is now kept per conversation, survives reloads, and is sent with every command (an argument only the extension can set).
+- When VS Code has more than one folder open, starting a session asks which one; a pinned folder is the default and is used without asking. Choosing a folder in the bar's workspace menu sets it for the current chat.
+- Older chats adopt the folder the server has at the time they are first used. A chat whose folder is not open because VS Code is closed shows `Active · open <folder> in VS Code`, and the model is told to ask the user rather than being given an empty command list.
+
 ### Speed and clarity
 - **Native tool markup is run, not rejected.** When a model writes a call in its own markup (DeepSeek's DSML `invoke`/`parameter`) the extension now reads and runs it, instead of answering with an error and waiting for a rewrite (a wasted round trip). The result message ends with a note telling the model not to use its internal tools and to call snapgentV3's general commands next time. Formats live in `domain/parser/native/` (one file each, registered in `index.js`), for every site alike.
 - The idle wait after a reply is shorter when the site shows a stop button (it ends 0.4 s after the button goes, not 2 s after the last word), sending and polling waits are shorter, and the page is read once per change rather than several times per tick. The VS Code folder is cached until VS Code's state file changes.

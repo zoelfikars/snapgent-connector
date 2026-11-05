@@ -47,16 +47,22 @@ export function createBarMenus({ document, root, group, settings, serverDirector
 
   // ── the workspace folder ──
   let pinned = null;
+  // The pill shows the folder THIS chat works in (else the server's pinned one). Only written when it changed: the page watch
+  // reacts to every change of the page, ours included.
+  let shown;
   const renderWorkspace = () => {
-    $("#zs-ws-name").textContent = workspaceLabel(pinned);
-    $("#zs-ws-btn").title = pinned || "Auto: follows the active VS Code window";
+    const folder = workspace.bound() || pinned;
+    if (folder === shown) return;
+    shown = folder;
+    $("#zs-ws-name").textContent = workspaceLabel(folder);
+    $("#zs-ws-btn").title = folder ? `This chat works in ${folder}` : "Auto: follows the active VS Code window";
   };
   const wsMenu = make("#zs-ws-btn", "#zs-ws-menu", 300, "right", 240, async () => {
     const listing = await send({ type: "workspaces" });
     if (!listing.ok) { toast(listing.error || "The bridge is not reachable."); return false; }
     pinned = listing.pinned;
     renderWorkspace();
-    fillWorkspaceMenu(listing);
+    fillWorkspaceMenu({ ...listing, pinned: workspace.bound() || listing.pinned });
   });
   const wsError = (text) => { const el = $("#zs-ws-menu .zs-ws-error"); if (el) { el.textContent = text; el.hidden = !text; } };
 
@@ -66,6 +72,7 @@ export function createBarMenus({ document, root, group, settings, serverDirector
     const reply = await send({ type: "set_workspace", path });
     if (!reply.ok) { wsError(reply.error || "Could not use that folder."); return; }
     pinned = reply.pinned;
+    workspace.bind(pinned || null); // a folder chosen here is the one THIS chat works in (Auto: it follows the server again)
     wsMenu.close();
     renderWorkspace();
     // A pinned folder is a usable workspace right away; "Auto" goes back to probing.
@@ -110,6 +117,7 @@ export function createBarMenus({ document, root, group, settings, serverDirector
     sync() {
       const options = serverDirectory.targetOptions(settings.target());
       $("#zs-target-name").textContent = (options.find((option) => option.id === settings.target()) || { name: settings.target() }).name;
+      renderWorkspace(); // another chat may be open now
       const mode = APPROVAL_MODES.find((item) => item.id === settings.approvalMode()) || APPROVAL_MODES[1];
       $("#zs-mode-name").textContent = mode.name;
       $("#zs-mode-btn").dataset.mode = mode.id;

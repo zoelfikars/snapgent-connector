@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+export { chooseWorkspace } from "./workspace-choice.js";
 export { ToolCatalogue } from "./tool-catalogue.js";
 export { ToolRunner } from "./tool-runner.js";
 export { callWithGuards } from "./call-guard.js";

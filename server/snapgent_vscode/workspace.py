@@ -16,6 +16,10 @@ from urllib.parse import unquote, urlparse
 
 PRODUCTS = ("Code", "Code - Insiders", "VSCodium")
 
+# The folder a chat works in, named by the extension on every call (the model can never set it). It is what lets two chats
+# work in two projects at once, and what keeps a chat in ITS folder when VS Code's active window or the server changes.
+ROOT_ARGUMENT = "__snapgent_root"
+
 
 class WorkspaceError(RuntimeError):
     """No usable workspace; the message tells the user what to do."""
@@ -207,6 +211,13 @@ class Workspace:
         self._cached_auto_expires = now + self._cache_ttl
         self._cached_stamp = stamp
         return resolved
+
+    def root_for(self, folder: object) -> Path:
+        """The folder a chat was bound to. It must still exist; what the user chose is not second-guessed (as with a pinned folder)."""
+        try:
+            return checked_folder(folder)
+        except WorkspaceError as error:
+            raise WorkspaceError(f"The folder this chat works in cannot be used any more. {error} Choose the folder again in the bar.") from error
 
     def is_open(self) -> bool:
         if self._pinned is not None:

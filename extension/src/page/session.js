@@ -33,6 +33,7 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
     markStarted() {
       state.started = true;
       tracker.remember(provider.conversationKey());
+      tools.workspace.commit();
       bar.render();
     },
     end(alive) {
@@ -40,6 +41,7 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
       if (!alive()) return;
       state.starting = false;
       state.startingKey = null;
+      if (!state.started) tools.workspace.clearPending(); // a start that did not finish leaves no folder behind
       bar.cover(false);
       provider.setInputLock(false);
       bar.render();
@@ -61,7 +63,7 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
       serverAlive: () => !!(state.bridge.servers || []).find((server) => server.id === "vscode" && server.alive),
     },
     catalogue: tools.catalogue,
-    callTool: (name, args, timeout) => tools.bridge.callTool({ name, arguments: args, timeout }),
+    callTool: (name, args, timeout) => tools.bridge.callTool({ name, arguments: tools.workspace.withRoot(args), timeout }),
     skills: tools.skills,
     workspace: tools.workspace,
     startMessage: ({ commands, tree }) => buildStartMessage({ prompt: tools.systemPrompt(), commands, tree }),
@@ -104,6 +106,7 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
       state.stop = true; // the loop breaks at its next checkpoint; its cleanup resets the flags, cover and lock
     }
     if (decision.started !== undefined) state.started = decision.started;
+    tools.workspace.settle();
     bar.render();
   }
 

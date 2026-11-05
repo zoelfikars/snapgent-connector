@@ -5,6 +5,30 @@ import { ToolRunner } from "../src/application/tool-runner.js";
 import { FEEDBACK } from "../src/domain/prompt/feedback.js";
 import { fakeBridge, fakeSession, fakeSink, fakeTimers, fakeVisibility, flush, tool } from "./support/fakes.js";
 
+function setupRoot(root, over = {}) {
+  const timers = fakeTimers();
+  const bridge = fakeBridge({ tools: over.tools ?? [tool("read_file", { path: { type: "string" } })] });
+  const sess = fakeSession(over.session);
+  const catalogue = new ToolCatalogue({ bridge, session: sess, now: timers.now });
+  const runner = new ToolRunner({ bridge, catalogue, session: sess, visibility: fakeVisibility(), sink: fakeSink(), timers, workspaceRoot: () => root });
+  return { runner, bridge };
+}
+
+describe("ToolRunner: the folder the chat works in", () => {
+  test("every VS Code call carries it, and a model-written one is dropped", async () => {
+    const { runner, bridge } = setupRoot("/work/portofolio");
+    await runner.run({ tool: "read_file", arguments: { path: "a", __snapgent_root: "/etc" } });
+    assert.equal(bridge.calls[0].arguments.__snapgent_root, "/work/portofolio");
+  });
+  test("with VS Code closed (no commands offered) the model is told to ask the user, not given an empty list", async () => {
+    const { runner, bridge } = setupRoot("/work/portofolio", { tools: [] });
+    const text = await runner.run({ tool: "read_file", arguments: { path: "a" } });
+    assert.equal(text, FEEDBACK.workspaceClosed("/work/portofolio"));
+    assert.match(text, /open that folder in VS Code/);
+    assert.equal(bridge.calls.length, 0);
+  });
+});
+
 function setup({ tools = [tool("read_file", { path: { type: "string" } }), tool("git_status")], results, session, visibility } = {}) {
   const timers = fakeTimers();
   const bridge = fakeBridge({ tools, results });

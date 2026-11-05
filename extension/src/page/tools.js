@@ -2,12 +2,14 @@
 // Running commands on the MCP server: the catalogue of what the server offers, the runner that executes one command under the
 // user's approval mode, the skills the model may read, and the system prompt that tells the model how all of it works.
 
-import { SkillsService, ToolCatalogue, ToolRunner } from "../application/index.js";
+import { SkillsService, ToolCatalogue, ToolRunner, chooseWorkspace } from "../application/index.js";
 import { bareToolName } from "../domain/tools/names.js";
 import { buildSystemPrompt } from "../domain/prompt/system-prompt.js";
 import { toolsReminder } from "../domain/prompt/reminder.js";
 import { withoutResultHeader } from "../domain/tools/result-marker.js";
-import { createConfirmDialog } from "../ui/index.js";
+import { ROOT_ARGUMENT } from "../domain/tools/confirmation.js";
+import { createChoiceDialog, createConfirmDialog } from "../ui/index.js";
+import { createWorkspaceBinding } from "./workspace-binding.js";
 
 /**
  * @param {{ send: Function, provider: object, state: object, settings: object, serverDirectory: object, visibility: object,
@@ -30,7 +32,9 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
   const catalogue = new ToolCatalogue({ bridge, session, diag });
   // Risky actions need the user's approval: a top-layer dialog in a closed shadow root that ignores synthetic clicks.
   const confirm = createConfirmDialog();
-  const runner = new ToolRunner({ bridge, catalogue, session, visibility, sink, confirm, approvalMode: settings.approvalMode });
+  const bindings = createWorkspaceBinding({ storage, provider });
+  const choice = createChoiceDialog();
+  const runner = new ToolRunner({ bridge, catalogue, session, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current });
   const skills = new SkillsService({
     store: storage,
     findTool: (bareName) => catalogue.active().find((tool) => bareToolName(tool.name) === bareName),
@@ -41,7 +45,45 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
 
   // Which folder the user chose, as the server sees it (the prompt opens with its name).
   let workspaceInfo = null;
+  let settledAt = 0;
+  let settling = false;
   const workspace = {
+    /** The folder this chat works in. */
+    bound: bindings.current,
+    /** `args` for a VS Code call made outside the runner, with the chat's folder. */
+    withRoot(args) {
+      const root = settings.target() === "vscode" ? bindings.current() : null;
+      return root ? { ...args, [ROOT_ARGUMENT]: root } : args;
+    },
+    /** The user chose a folder for this chat (null: let it follow the server again). */
+    bind(path) { bindings.bind(path); },
+    clearPending: bindings.clearPending,
+    commit: bindings.commit,
+    /**
+     * Before a session starts: which folder will this chat work in? The pinned folder when there is one, the only open folder, or the
+     * user's pick when VS Code has several open. `{ path }`, or `{ none }` (nothing open), `{ cancelled }`, `{ error }`.
+     */
+    async choose() {
+      const picked = await chooseWorkspace(await send({ type: "workspaces" }), (open) => choice.choose({
+        title: "Which folder should this chat work in?", hint: "VS Code has more than one folder open. This chat stays in the one you choose, whichever window you use later.", options: open,
+      }));
+      if (picked.path) bindings.setPending(picked.path);
+      return picked;
+    },
+    /** Keep the chat's folder in step with the page: remember it once the chat has an id, give an older chat the folder it has now. */
+    async settle() {
+      if (settling || !state.started || !provider.conversationKey()) return;
+      bindings.commit();
+      if (Date.now() - settledAt < 5000) return;
+      settledAt = Date.now();
+      settling = true;
+      try {
+        if (!bindings.current()) {
+          await workspace.refresh();
+          if (workspaceInfo && workspaceInfo.path) bindings.bind(workspaceInfo.path);
+        } else if (!workspaceInfo || workspaceInfo.path !== bindings.current()) await workspace.refresh();
+      } finally { settling = false; }
+    },
     async refresh() {
       state.filesChangedAt = Date.now(); // another folder: the files listed before are not its files
       const feedback = await runner.run({ tool: "get_workspace_info" });

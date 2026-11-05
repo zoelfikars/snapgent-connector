@@ -52,6 +52,10 @@ export const FEEDBACK = {
     "\n\n(System note: the commands above were written in your own internal tool-call markup. They were run this time, but do not " +
     "use that markup or any internal tool of your own here. Call snapgentV3's general commands instead, as one plain-text JSON " +
     'object: {"command": "name", "params": { ...your parameters... }}.)',
+  // VS Code has no folder open, so the server offers no commands. Said to the model instead of a list of no valid commands.
+  workspaceClosed: (folder) =>
+    `ERROR: VS Code has no project folder open right now, so no command can run${folder ? ` (this chat works in ${folder})` : ""}. ` +
+    "Do NOT retry. Tell the user to open that folder in VS Code, then continue.",
   unknownTool: (name, valid) =>
     `ERROR: unknown command "${name}". It does not exist. Valid commands are: ` +
     valid.join(", ") +

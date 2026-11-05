@@ -12,7 +12,7 @@ from .jobs import JOB_ARGUMENT, JOB_OP_ARGUMENT, JobStore
 from .security import CONFIRM, DENY, MODE_ARGUMENT, RESERVED_ARGUMENT, ConfirmationStore, Policy, SessionState, decide, policy_for_call, policy_from_env
 from .tools import registry
 from .tools.registry import READ
-from .workspace import Workspace
+from .workspace import ROOT_ARGUMENT, Workspace
 
 Handler = Callable[[Context, str, Dict[str, Any]], Any]
 
@@ -71,6 +71,7 @@ class McpServer:
         job_key = arguments.pop(JOB_ARGUMENT, None)
         job_key = job_key if isinstance(job_key, str) and job_key else None
         job_op = arguments.pop(JOB_OP_ARGUMENT, None)
+        bound_root = arguments.pop(ROOT_ARGUMENT, None)
         try:
             if job_key and job_op == "cancel":
                 return protocol.result(request_id, protocol.tool_output(self._jobs.cancel(job_key)))
@@ -78,7 +79,8 @@ class McpServer:
             if existing is not None:
                 # The same call again (the page was reloaded): answer from the job, never run it twice or ask the user again.
                 return protocol.result(request_id, protocol.tool_output(existing.wait()))
-            ctx = Context(root=self._workspace.root(), policy=policy, session=self._session)
+            root = self._workspace.root_for(bound_root) if isinstance(bound_root, str) and bound_root.strip() else self._workspace.root()
+            ctx = Context(root=root, policy=policy, session=self._session)
             definition = registry.get(name)
             decision = decide(policy, name, definition.risk, arguments, self._session)
             if decision.verdict == DENY:
