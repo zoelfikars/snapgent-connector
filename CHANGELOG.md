@@ -39,7 +39,7 @@ All notable changes to snapgentV3 Free are documented here.
 
 ### Fixed (server)
 - **Commands failed with `bash: symbol lookup error` in the Linux program.** The one-file program points `LD_LIBRARY_PATH` at its own bundled libraries and its children
-  (bash, git, cargo) inherited it; they now get the user's own value back.
+  (bash, git, cargo) inherited it; they now get the user's own value back, with the unpacked folders of the program (and of the bridge that started it) taken out.
 - **`search_files` and `find_files` were slow in big projects.** They walked into `target/`, `vendor/`, `.cache/` and the like only to drop the files afterwards; those
   folders are no longer entered. `search_files` also skips binary files and files over 1 MB, and stops after 20 seconds with what it has found (and says so).
 - **Tagging files was slow to load, and the list missed new files.** Listing a project took seconds (a path calculation per file, and everything was walked even
@@ -58,6 +58,7 @@ All notable changes to snapgentV3 Free are documented here.
   size), and the **folders left out of the files you can attach**, one name per line, with the usual ones (`node_modules`, `target`, `.rustup`, ...) as the
   starting list and a button to restore it. Saved as your preference, the same on every site; the `@` list and the Files menu follow it at once. In a git project
   `.gitignore` still applies on top.
+- "Copy diagnostics" also says which approval mode (plan / manual / auto) the page is sending.
 - **The composer says exactly what is running**: `1/4 · run_command · go test ./... -run TestLogin` (the command with all its arguments, other tools with their first argument in full), up to three lines, and the full text on hover.
 - **Attach a folder.** Tag a folder like a file (`@src/` or `@"my folder/"`, from the `@` list or the Files menu, where folders are listed with a closing
   slash): every text file under it is read and attached (images, archives and lock files are skipped; up to 200 files).

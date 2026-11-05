@@ -30,18 +30,27 @@ def compact(output: str, limit: int, run_id: str) -> str:
     return output[:head_chars] + marker + output[len(output) - tail_chars:]
 
 
+def _without_bundle(paths: str) -> str:
+    """`paths` (a colon separated list) without the folders this program unpacked itself into (`/tmp/_MEIxxxx`, or `sys._MEIPASS`)."""
+    bundle = getattr(sys, "_MEIPASS", None)
+    kept = [entry for entry in paths.split(os.pathsep) if entry and "/_MEI" not in entry and not (bundle and entry.startswith(bundle))]
+    return os.pathsep.join(kept)
+
+
 def child_environment() -> dict:
     """The environment a command should see. The one-file Linux program points LD_LIBRARY_PATH at the libraries bundled inside it;
     a child that inherits that (bash, git, cargo) loads them instead of the system's and dies with `symbol lookup error`. PyInstaller
-    keeps the user's own value in `<NAME>_ORIG`: put it back."""
+    keeps the user's own value in `<NAME>_ORIG`: put it back. That value can itself name the unpacked folder of the program that started
+    this one (the bridge starts this program again), so those folders are taken out either way."""
     env = dict(os.environ)
     if getattr(sys, "frozen", False):
         for name in ("LD_LIBRARY_PATH", "LD_PRELOAD", "DYLD_LIBRARY_PATH"):
             original = env.pop(f"{name}_ORIG", None)
-            if original is None:
-                env.pop(name, None)
+            value = _without_bundle(original if original is not None else "")
+            if value:
+                env[name] = value
             else:
-                env[name] = original
+                env.pop(name, None)
     return env
 
 

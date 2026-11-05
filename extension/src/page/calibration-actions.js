@@ -99,7 +99,7 @@ export function createCalibrationActions({ document, location, provider, state, 
     const chain = (el) => { const parts = []; for (let n = el; n && n.nodeType === 1 && parts.length < 4; n = n.parentElement) parts.push(describeElement(n)); return parts.join(" < "); };
     const rect = (el) => { const r = el.getBoundingClientRect(); return `${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`; };
     const lines = ["snapgent diagnostics", `site: ${location.hostname}${location.pathname}`, `calibrated: ${!provider.needsCalibration} (${provider.calibrationSource === "default" ? "the one shipped with the extension" : provider.calibrationSource === "own" ? "your own" : "none"})`,
-      `session: started=${state.started} starting=${state.starting} running=${state.running} target=${settings.target()}`];
+      `session: started=${state.started} starting=${state.starting} running=${state.running} target=${settings.target()} approval=${settings.approvalMode()}`];
     if (provider.diagnose) {
       const d = provider.diagnose();
       lines.push(`profile: ${JSON.stringify(d.profile)}`, `health: ${JSON.stringify(d.health)}`,

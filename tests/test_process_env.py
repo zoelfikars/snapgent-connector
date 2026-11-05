@@ -19,6 +19,16 @@ class ChildEnvironmentTests(unittest.TestCase):
         self.assertNotIn("LD_LIBRARY_PATH_ORIG", result)
         self.assertEqual(result["PATH"], "/bin")
 
+    def test_the_unpacked_folder_of_a_parent_program_is_taken_out_too(self):
+        # the bridge starts this program again: the "original" this one saw is the bridge's own bundle
+        polluted = "/tmp/_MEIabc123:/opt/lib:/tmp/_MEIdef456/lib"
+        with mock.patch.dict(os.environ, {"LD_LIBRARY_PATH": "/tmp/_MEInew", "LD_LIBRARY_PATH_ORIG": polluted}, clear=True), \
+                mock.patch.object(sys, "frozen", True, create=True):
+            self.assertEqual(child_environment()["LD_LIBRARY_PATH"], "/opt/lib")
+        with mock.patch.dict(os.environ, {"LD_LIBRARY_PATH": "/tmp/_MEInew", "LD_LIBRARY_PATH_ORIG": "/tmp/_MEIabc123"}, clear=True), \
+                mock.patch.object(sys, "frozen", True, create=True):
+            self.assertNotIn("LD_LIBRARY_PATH", child_environment())
+
     def test_without_an_original_the_bundle_path_is_removed(self):
         with mock.patch.dict(os.environ, {"LD_LIBRARY_PATH": "/tmp/_MEI1234"}, clear=True), mock.patch.object(sys, "frozen", True, create=True):
             self.assertNotIn("LD_LIBRARY_PATH", child_environment())
