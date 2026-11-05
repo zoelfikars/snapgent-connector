@@ -31,10 +31,11 @@ def compact(output: str, limit: int, run_id: str) -> str:
 
 
 def _without_bundle(paths: str) -> str:
-    """`paths` (a colon separated list) without the folders this program unpacked itself into (`/tmp/_MEIxxxx`, or `sys._MEIPASS`)."""
+    """`paths` (a colon separated list, as LD_LIBRARY_PATH is) without the folders this program unpacked itself into (`/tmp/_MEIxxxx`, or `sys._MEIPASS`)."""
     bundle = getattr(sys, "_MEIPASS", None)
-    kept = [entry for entry in paths.split(os.pathsep) if entry and "/_MEI" not in entry and not (bundle and entry.startswith(bundle))]
-    return os.pathsep.join(kept)
+    # Always ":" (these variables are Unix ones, whatever system the tests run on).
+    kept = [entry for entry in paths.split(":") if entry and "/_MEI" not in entry and not (bundle and entry.startswith(bundle))]
+    return ":".join(kept)
 
 
 def child_environment() -> dict:
