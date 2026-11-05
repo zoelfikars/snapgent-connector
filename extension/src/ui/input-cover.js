@@ -18,9 +18,9 @@ export function createInputCover({ document, provider }) {
   let coverRaf = 0;
   let label = DEFAULT_LABEL;
 
-  /** What the cover says; an empty text goes back to the plain "working" label. */
+  /** What the cover says, word for word; an empty text goes back to the plain "working" label. */
   function setLabel(text) {
-    label = text ? `Running ${text}` : DEFAULT_LABEL;
+    label = text || DEFAULT_LABEL;
     const span = cover && cover.querySelector("span");
     if (span) { span.textContent = label; span.title = label; }
   }
@@ -28,6 +28,7 @@ export function createInputCover({ document, provider }) {
   function set(on) {
     const ed = provider.getEditor();
     if (!on) {
+      setLabel(""); // the next time it comes up it starts from the plain label, not from where the last run left it
       if (cover) { cover.style.display = "none"; cover.dataset.on = ""; }
       if (ed) ed.classList.remove("zs-typing");
       win.cancelAnimationFrame(coverRaf);

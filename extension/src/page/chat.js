@@ -6,11 +6,19 @@ import { describeAnchor } from "../infrastructure/chat/index.js";
 import { SESSION_PHRASE } from "../domain/constants.js";
 import { sleep, waitFor } from "./visibility.js";
 
+// What the cover says while the extension waits for the AI, in the order the waiting really goes.
+const PHASE_LABELS = {
+  waiting: "Waiting for the AI to start its reply…",
+  writing: "The AI is writing its reply…",
+  checking: "Reply looks finished · checking that it is complete…",
+  reading: "Reading the commands in the reply…",
+};
+
 /**
  * @param {{ document: Document, provider: object, state: object, visibility: object, catalogue: object, diag: Function,
  *           cover: (on: boolean) => void, banner: Function }} deps
  */
-export function createChat({ document, provider, state, visibility, catalogue, diag, cover, banner }) {
+export function createChat({ document, provider, state, visibility, catalogue, diag, cover, banner, progress = () => {} }) {
   // Optional provider abilities are handed over only when the provider has them.
   const optional = (name) => (typeof provider[name] === "function" ? (...args) => provider[name](...args) : undefined);
 
@@ -46,6 +54,7 @@ export function createChat({ document, provider, state, visibility, catalogue, d
     catalogueSize: () => catalogue.names().size,
     describeLayout,
     diag,
+    phase: (name) => progress(PHASE_LABELS[name]),
   });
 
   const sender = new MessageSender({

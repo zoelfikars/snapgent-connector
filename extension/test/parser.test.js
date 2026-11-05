@@ -103,8 +103,47 @@ describe("DeepSeek DSML markup", () => {
     ]) assert.ok(P.DSML_RE.test(text), text);
   });
 
-  test("is not a tool signature (falls to the parse_error ladder)", () => {
-    assert.equal(P.hasToolSignature(full), false);
+  test("is a tool signature and is read into a call, marked as native", () => {
+    assert.equal(P.hasToolSignature(full), true);
+    assert.deepEqual(P.parseToolCalls(full), [{ tool: "read_file", arguments: { path: "src/a.js" }, native: "dsml" }]);
+  });
+
+  const seen = [
+    "<｜｜DSML｜｜ calls>",
+    '<｜｜DSML｜｜ invoke name="read_files">',
+    '<｜｜DSML｜｜ parameter name="paths" string="false">["api/todo/internal/interfaces/responses/pagination.go"]</｜｜DSML｜｜ parameter>',
+    '<｜｜DSML｜｜ parameter name="max_total_chars" string="false">2500</｜｜DSML｜｜ parameter>',
+    "</｜｜DSML｜｜ invoke>",
+    "</｜｜DSML｜｜ calls>",
+  ].join("\n");
+
+  test("a call seen live: JSON parameters keep their type (list, number)", () => {
+    assert.deepEqual(P.parseToolCalls(seen), [{
+      tool: "read_files", native: "dsml",
+      arguments: { paths: ["api/todo/internal/interfaces/responses/pagination.go"], max_total_chars: 2500 },
+    }]);
+  });
+
+  test("several invokes are several calls, in order; a string parameter is kept as written", () => {
+    const text = '<|DSML|>tool_calls>\n<|DSML|>invoke name="a">\n<|DSML|>parameter name="x" string="true">\nline 1\n  line 2\n</|DSML|>parameter>\n</|DSML|>invoke>\n' +
+      '<|DSML|>invoke name="b">\n</|DSML|>invoke>\n</|DSML|>tool_calls>';
+    const calls = P.parseToolCalls(text);
+    assert.deepEqual(calls.map((c) => c.tool), ["a", "b"]);
+    assert.equal(calls[0].arguments.x, "line 1\n  line 2");
+  });
+
+  test("still being written: open until the invoke and the calls around it are closed", () => {
+    assert.equal(P.hasOpenToolBlock(seen), false);
+    assert.equal(P.hasOpenToolBlock(seen.replace(/\n<\/｜｜DSML｜｜ calls>/, "")), true);
+    assert.equal(P.hasOpenToolBlock(seen.split("\n").slice(0, 3).join("\n")), true);
+    assert.equal(P.hasOpenToolBlock("<｜｜DSML｜｜ inv"), true);
+  });
+
+  test("our own command wins when both are written, and another format can be registered", () => {
+    const both = `${seen}\n{"command":"tree","params":{}}`;
+    assert.deepEqual(P.parseToolCalls(both), [{ tool: "tree", arguments: {} }]);
+    P.registerNativeFormat({ id: "demo", recognises: (t) => t.startsWith("CALL "), parse: (t) => [{ tool: t.slice(5), arguments: {} }], isOpen: () => false });
+    assert.deepEqual(P.parseToolCalls("CALL tree"), [{ tool: "tree", arguments: {}, native: "demo" }]);
   });
 
   test("no false positives on prose or a real command", () => {

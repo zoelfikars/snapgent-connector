@@ -13,6 +13,7 @@ import { profileProblems } from "./profile.js";
 const TIMINGS = { GEN_IDLE_MS: 2000, REASON_IDLE_MS: 15000, WARMUP_MS: 60000, REASON_NOREPLY_MS: 120000, STABLE_MS: 10000, RESPONSE_TIMEOUT_MS: 300000 };
 const STOP_LABEL = /\b(stop|cancel|halt|arr[êe]ter)\b/i;
 const SETTLE_MS = 150;        // let a rich editor learn where the caret is before input arrives
+const STOP_GONE_MS = 400;     // once a stop button has been seen for this reply, its disappearance ends the generation after this long
 
 const isValueEditor = (el) => !!el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT");
 const byDocumentOrder = (a, b) => (a.compareDocumentPosition(b) & 4 ? -1 : 1); // 4: b follows a
@@ -26,6 +27,23 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   const win = document.defaultView;
   const sampler = new StreamSampler({ now, minLen: 1 });
   let preferredWrite = null; // the writing method that worked last time
+
+  // ── what was read from the page, kept until the page changes ────────────────
+  // The agent loop asks the same questions several times per tick (the turns, the last reply's text). While nothing in the page has
+  // changed the answer is the same, so it is worked out once. A change is noticed twice over: the observer's callback (changes of an
+  // earlier task, already delivered) and `takeRecords()` (a change made a moment ago, not yet delivered).
+  let watcher = null;
+  const memo = new Map();
+  function remembered(key, compute) {
+    if (!watcher && typeof win.MutationObserver === "function") {
+      watcher = new win.MutationObserver(() => memo.clear());
+      watcher.observe(document.documentElement, { childList: true, subtree: true, attributes: true, characterData: true });
+    }
+    if (!watcher) return compute();
+    if (watcher.takeRecords().length) memo.clear();
+    if (!memo.has(key)) memo.set(key, compute());
+    return memo.get(key);
+  }
 
   // ── finding things ────────────────────────────────────────────────────────
   const find = (selector) => {
@@ -48,8 +66,8 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   // A turn is something laid out on the page: a template, a script or a collapsed copy that happens to carry the same attributes is
   // not a message, and would make an empty chat look started.
   const turnsOf = (selector) => outermost(find(selector).filter(visible));
-  const assistantTurns = () => turnsOf(profile.assistant.turn);
-  const userTurns = () => turnsOf(profile.user.turn);
+  const assistantTurns = () => remembered("assistant", () => turnsOf(profile.assistant.turn)).slice();
+  const userTurns = () => remembered("user", () => turnsOf(profile.user.turn)).slice();
   const allItems = () => [...new Set([...assistantTurns(), ...userTurns()])].sort(byDocumentOrder);
   const isUserItem = (item) => !!item && item.matches(profile.user.turn);
   const isAssistantItem = (item) => !!item && item.matches(profile.assistant.turn);
@@ -63,10 +81,11 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     const matches = outermost([...item.querySelectorAll(profile.assistant.body)]);
     return matches.length ? matches[matches.length - 1] : item;
   };
-  const itemText = (item) => (item ? readText(isAssistantItem(item) ? bodyOf(item) : item) : "");
+  const bodyText = (item) => remembered(item, () => readText(bodyOf(item)));
+  const itemText = (item) => (item ? (isAssistantItem(item) ? bodyText(item) : readText(item)) : "");
   const readAssistant = () => {
     const item = lastAssistant();
-    return { present: !!item, reply: item ? readText(bodyOf(item)).trim() : "", thinking: "", item };
+    return { present: !!item, reply: item ? bodyText(item).trim() : "", thinking: "", item };
   };
   // A chat has begun when a message of the user's is on the page: the home page's cards, a greeting or an overlay that happens
   // to look like an AI turn do not make an empty chat look started.
@@ -77,10 +96,20 @@ export function createCalibratedProvider({ document, location, profile, diag = (
 
   // A stable key for a turn when the page gives one (an id-like attribute on the turn or inside it), else null.
   const ID_ATTRIBUTE = /message-id|msg-id|turn-id|item-id/;
+  // An id does not change once a turn has one, so a found one is kept; looking is bounded to the first 200 elements and builds no list.
+  const knownIds = new WeakMap();
   function idOf(item) {
     if (!item) return null;
-    for (const el of [item, ...item.querySelectorAll("*")].slice(0, 200)) {
-      for (const attr of el.attributes) if (ID_ATTRIBUTE.test(attr.name) && attr.value) return attr.value.split(" ")[0];
+    if (knownIds.has(item)) return knownIds.get(item);
+    const walker = document.createTreeWalker(item, 1 /* SHOW_ELEMENT */);
+    for (let el = item, seen = 0; el && seen < 200; el = walker.nextNode(), seen++) {
+      for (const attr of el.attributes) {
+        if (ID_ATTRIBUTE.test(attr.name) && attr.value) {
+          const id = attr.value.split(" ")[0];
+          knownIds.set(item, id);
+          return id;
+        }
+      }
     }
     return null;
   }
@@ -241,10 +270,17 @@ export function createCalibratedProvider({ document, location, profile, diag = (
       return occurrences(squash(document.body.textContent || ""), probe) - (box ? occurrences(squash(box.textContent || ""), probe) : 0);
     };
     const shownBefore = shown();
+    // Reading the whole page's text is the costly signal: the cheap ones go first and this one is looked at twice a second at most.
+    let shownAt = 0;
+    const shownMore = () => {
+      if (now() - shownAt < 500) return false;
+      shownAt = now();
+      return shown() > shownBefore;
+    };
     await writeComposer(text);
     // Accepted when any of: the box emptied, a new user turn, a stop button, the conversation got an id, our text is on the page.
     const accepted = () =>
-      editorText().trim() === "" || userCount() > usersBefore || !!stopButton() || conversationKey() !== keyBefore || shown() > shownBefore;
+      editorText().trim() === "" || userCount() > usersBefore || !!stopButton() || conversationKey() !== keyBefore || shownMore();
     let sent;
     if (profile.send.selector) {
       if (!(await waitFor(sendReady, 30000))) throw new Error("The send button did not become available. Re-calibrate it.");
@@ -292,10 +328,15 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   // ── generation ────────────────────────────────────────────────────────────
   const streamLen = (item) => (item === undefined ? itemText(lastAssistant()) : itemText(item)).length;
   const isHardGenerating = () => !!stopButton();
+  // A stop button seen on THIS reply is a trustworthy signal: when it goes, the reply is over (a short grace covers a button that
+  // blinks between the thinking and the answer). Only a reply that never showed one falls back on "the text grew in the last 2 s".
+  let hardSeen = { item: null, at: 0 };
   const isGenerating = () => {
     const item = lastAssistant();
     sampler.sample(item, streamLen(item));
-    return isHardGenerating() || sampler.grewWithin(TIMINGS.GEN_IDLE_MS);
+    if (isHardGenerating()) { hardSeen = { item, at: now() }; return true; }
+    if (hardSeen.item && hardSeen.item === item) return now() - hardSeen.at < STOP_GONE_MS || sampler.grewWithin(STOP_GONE_MS);
+    return sampler.grewWithin(TIMINGS.GEN_IDLE_MS);
   };
   const stopGeneration = () => { const button = stopButton(); if (button) try { button.click(); } catch { /* gone */ } };
 

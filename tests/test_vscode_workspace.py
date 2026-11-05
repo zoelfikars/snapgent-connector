@@ -102,5 +102,23 @@ class WorkspaceObjectTests(unittest.TestCase):
             w.root()
 
 
+class WorkspaceCacheTests(unittest.TestCase):
+    def test_the_folder_is_not_looked_up_again_until_the_state_file_changes(self):
+        calls = []
+        stamp = {"value": 1}
+
+        def finder():
+            calls.append(1)
+            return Path("/tmp")
+
+        w = ws.Workspace(finder, stamp=lambda: stamp["value"])
+        w.root()
+        w.root()
+        self.assertEqual(len(calls), 1)
+        stamp["value"] = 2
+        w.root()
+        self.assertEqual(len(calls), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

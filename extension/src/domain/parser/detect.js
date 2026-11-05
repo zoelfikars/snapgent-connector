@@ -3,13 +3,15 @@
 
 import { START_M, CMD_KEY_RE } from "./markers.js";
 import { matchBrace } from "./json-scan.js";
+import { hasOpenNative, recognisesNative } from "./native/index.js";
 import { startsWithResult } from "../tools/result-marker.js";
 
 export function hasToolSignature(r) {
   return (
     r.includes(START_M) ||
     r.includes("MCP_TOOL") ||
-    CMD_KEY_RE.test(r)
+    CMD_KEY_RE.test(r) ||
+    recognisesNative(r)
   );
 }
 
@@ -18,6 +20,7 @@ export function hasToolSignature(r) {
 // response watcher to avoid finalizing a command that is still being streamed.
 export function hasOpenToolBlock(r) {
   if (!r) return false;
+  if (hasOpenNative(r)) return true;
   const sm = r.indexOf(START_M);
   if (sm !== -1) {
     const low = r.toLowerCase();

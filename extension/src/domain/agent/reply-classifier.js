@@ -32,6 +32,11 @@ export function classifyReply(reply, { item, hasContinueButton, knowsTool, catal
     if (calls.length) return done({ kind: "tool", calls, item });
     // A half-written command plus the site's Continue button means it was truncated: resume, don't report bad JSON.
     if (hasContinueButton()) return done({ kind: "truncated", text: reply, item });
+    // The model's own markup that could not be read (cut off, or no tool named): not one of OUR commands, so not "unclosed"/"malformed".
+    if (DSML_RE.test(reply)) {
+      diags.push(["cmd.dsml", { len: reply.length }]);
+      return parseError("dsml");
+    }
     if (reply.includes(START_M)) return parseError("malformed");
     // An opener with no closer. If only the trailing closers were lost (the model hit its output
     // limit with the payload complete) auto-close and run it; salvageCutOff refuses a cut that
@@ -50,12 +55,6 @@ export function classifyReply(reply, { item, hasContinueButton, knowsTool, catal
     if (name && name !== "command" && knowsTool(name)) return parseError("malformed");
   }
 
-  // The model answered in its OWN native markup (DeepSeek's DSML). Unambiguous, so no known-tool gate:
-  // the degenerate form carries no tool name at all.
-  if (DSML_RE.test(reply)) {
-    diags.push(["cmd.dsml", { len: reply.length }]);
-    return parseError("dsml");
-  }
   // A tool's raw arguments as a bare JSON object, without the {"command":..., "params":...} envelope.
   if (RAW_ARGUMENT_KEYS_RE.test(reply) && !HAS_COMMAND_KEY_RE.test(reply)) return parseError("envelope");
 

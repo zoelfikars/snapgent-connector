@@ -85,6 +85,7 @@ export class AgentLoop {
           continue;
         }
         if (plan.type === "parse-error") {
+          if (this._d.view.progress) this._d.view.progress("The command could not be read · asking the AI to send it again…");
           base = await this._d.chat.submit(plan.feedback);
           continue;
         }

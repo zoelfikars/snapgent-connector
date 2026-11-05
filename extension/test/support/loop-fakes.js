@@ -18,6 +18,7 @@ export function createLoopHarness({ responses = [], runner, hidden = false, hasC
     banner: (level, title, text) => log.push(["banner", level, title, text]),
     toast: (text) => log.push(["toast", text]),
     keepCover: () => log.push(["cover"]),
+    progress: (text) => log.push(["progress", text]),
     toolRunning: (item, call) => log.push(["tool:running", call.tool]),
     toolFinished: () => log.push(["tool:finished"]),
   };

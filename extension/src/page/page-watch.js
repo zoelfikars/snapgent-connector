@@ -4,12 +4,15 @@
 
 const EVERY_MS = 2500;
 const HIDDEN_DELAY_MS = 100;
+const MIN_GAP_MS = 250; // a streaming reply changes the page every frame; the bar does not need to follow it that closely
 
 /** @param {{ document: Document, window: Window, provider: object, session: object, bar: object }} deps */
 export function startPageWatch({ document, window, provider, session, bar }) {
   let scheduled = false;
+  let lastRefreshAt = 0;
   function refresh() {
     scheduled = false;
+    lastRefreshAt = Date.now();
     session.sync();
     provider.enforceComposer(); // keep the composer in the modes the profile needs
     bar.render();
@@ -18,7 +21,9 @@ export function startPageWatch({ document, window, provider, session, bar }) {
   function schedule() {
     if (scheduled) return;
     scheduled = true;
-    if (document.hidden) setTimeout(refresh, HIDDEN_DELAY_MS);
+    const wait = Math.max(0, lastRefreshAt + MIN_GAP_MS - Date.now());
+    if (document.hidden) setTimeout(refresh, Math.max(HIDDEN_DELAY_MS, wait));
+    else if (wait) setTimeout(() => window.requestAnimationFrame(refresh), wait);
     else window.requestAnimationFrame(refresh);
   }
 

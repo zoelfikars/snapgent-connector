@@ -411,3 +411,61 @@ describe("writing and sending", () => {
     window.close();
   });
 });
+
+describe("a stop button seen on the reply ends the generation soon after it goes", () => {
+  function withClock(key) {
+    const site = SITES[key];
+    const { window, document } = pageWith(site.html(), site.url);
+    const learned = learnProfile({ hostname: site.hostname, name: site.name, picks: site.clicks(document) });
+    const clock = { t: 1000 };
+    const provider = createCalibratedProvider({ document, location: window.location, profile: learned.profile, now: () => clock.t });
+    return { provider, document, clock, window };
+  }
+
+  test("after the stop button vanishes the reply counts as finished within the short grace, not the 2 s text-growth window", () => {
+    const { provider, clock, window } = withClock("chatgpt");
+    const stop = window.document.createElement("button");
+    stop.setAttribute("aria-label", "Stop generating");
+    provider.composerFrame().appendChild(stop);
+    assert.equal(provider.isGenerating(), true, "the stop button is shown");
+    stop.remove();
+    clock.t += 100;
+    assert.equal(provider.isGenerating(), true, "a button that blinks does not end it");
+    clock.t += 600;
+    assert.equal(provider.isGenerating(), false);
+    window.close();
+  });
+
+  test("a reply that never showed a stop button keeps the text-growth rule", () => {
+    const { provider, clock, window } = withClock("chatgpt");
+    provider.isGenerating();
+    clock.t += 700;
+    // The fixture's reply was sampled at 1000; with no stop button seen, the 2 s window is the only evidence.
+    assert.equal(provider.isGenerating(), true);
+    clock.t += 2000;
+    assert.equal(provider.isGenerating(), false);
+    window.close();
+  });
+});
+
+describe("what the provider read is dropped when the page changes", () => {
+  const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  test("a turn added or a reply that grew in an earlier task is seen on the next read", async () => {
+    const site = SITES.chatgpt;
+    const { provider, document, window } = calibrated(site);
+    const before = provider.assistantCount();
+    const last = provider.lastAssistant();
+    const textBefore = provider.readAssistant().reply;
+    assert.equal(provider.readAssistant().reply, textBefore, "read twice: same answer");
+    await nextTask();
+    (provider.review().body || last).appendChild(document.createTextNode(" and more words"));
+    await nextTask(); // the observer has delivered its records by now: only its callback can tell
+    assert.ok(provider.readAssistant().reply.endsWith("and more words"), "the grown reply is read");
+    const copy = last.cloneNode(true);
+    last.after(copy);
+    await nextTask();
+    assert.equal(provider.assistantCount(), before + 1, "the new turn is counted");
+    window.close();
+  });
+});

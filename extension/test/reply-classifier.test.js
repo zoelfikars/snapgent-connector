@@ -40,7 +40,7 @@ describe("classifyReply: commands", () => {
 
 describe("classifyReply: model dialects", () => {
   test("DeepSeek DSML markup", () => {
-    const { result, diags } = classify('<|DSML|>tool_calls>\n<|DSML|>invoke name="x">');
+    const { result, diags } = classify('<|DSML|>tool_calls>\n<|DSML|>invoke name="x">'); // cut off: not readable, so the DSML note, not "unclosed"
     assert.equal(result.reason, "dsml");
     assert.equal(diags[0][0], "cmd.dsml");
   });

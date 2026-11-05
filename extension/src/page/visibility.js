@@ -12,7 +12,7 @@ export async function waitFor(predicate, timeoutMs) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     if (predicate()) return true;
-    await sleep(120);
+    await sleep(50);
   }
   return false;
 }

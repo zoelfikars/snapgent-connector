@@ -33,6 +33,19 @@ def storage_paths(platform: str, env: Mapping[str, str], home: Path) -> List[Pat
     return [base / product / "User" / "globalStorage" / "storage.json" for product in PRODUCTS]
 
 
+def storage_stamp(platform: str = sys.platform, env: Optional[Mapping[str, str]] = None, home: Optional[Path] = None) -> tuple:
+    """When VS Code's state files last changed: a cheap `stat`, so a cached folder can be trusted until one of them changes."""
+    env = os.environ if env is None else env
+    home = Path.home() if home is None else home
+    stamp = []
+    for path in storage_paths(platform, env, home):
+        try:
+            stamp.append(path.stat().st_mtime_ns)
+        except OSError:
+            stamp.append(None)
+    return tuple(stamp)
+
+
 def folder_uris(storage: Dict[str, Any]) -> List[str]:
     """Open-folder URIs, the last active window first."""
     windows = (storage or {}).get("windowsState") or {}
@@ -128,24 +141,27 @@ class Workspace:
 
     Replaceable in tests with a fixed folder.
 
-    The auto-detected folder is cached briefly: VS Code's storage.json (and, on
-    Windows, the process list) does not change between two tool calls that land
-    within a couple of seconds, and re-reading it for every call was the main
-    avoidable cost behind a slow ``read_file``. Pinning always invalidates it.
+    The auto-detected folder is cached: finding it means reading VS Code's storage.json (and, on
+    Windows, listing the processes), a cost every tool call used to pay once the model's turn was
+    longer than a couple of seconds. The cache lasts while storage.json is unchanged (checked with a
+    `stat`), and at most DEFAULT_CACHE_TTL_SECONDS. Pinning always invalidates it.
     """
 
     # How long a cached auto-detected folder stays valid. Short enough that a
     # folder change in VS Code is picked up quickly, long enough to cover a
     # burst of tool calls.
-    DEFAULT_CACHE_TTL_SECONDS = 2.0
+    DEFAULT_CACHE_TTL_SECONDS = 30.0
 
     def __init__(self, finder: Callable[[], Optional[Path]] = active_folder,
                  lister: Callable[[], List[Path]] = open_folders,
-                 cache_ttl: float = DEFAULT_CACHE_TTL_SECONDS) -> None:
+                 cache_ttl: float = DEFAULT_CACHE_TTL_SECONDS,
+                 stamp: Callable[[], object] = storage_stamp) -> None:
         self._finder = finder
         self._lister = lister
         self._pinned: Optional[Path] = None
         self._cache_ttl = max(0.0, float(cache_ttl))
+        self._stamp = stamp
+        self._cached_stamp: object = None
         self._cached_auto: Optional[Path] = None
         self._cached_auto_expires: float = 0.0
         self._cached_auto_valid: bool = False
@@ -173,6 +189,7 @@ class Workspace:
         self._cached_auto_valid = False
         self._cached_auto = None
         self._cached_auto_expires = 0.0
+        self._cached_stamp = None
 
     def _auto_folder(self) -> Optional[Path]:
         """The resolved VS Code folder, cached for a short while."""
@@ -180,13 +197,15 @@ class Workspace:
             folder = self._finder()
             return folder.resolve() if folder is not None else None
         now = time.monotonic()
-        if self._cached_auto_valid and now < self._cached_auto_expires:
+        stamp = self._stamp()
+        if self._cached_auto_valid and now < self._cached_auto_expires and stamp == self._cached_stamp:
             return self._cached_auto
         folder = self._finder()
         resolved = folder.resolve() if folder is not None else None
         self._cached_auto = resolved
         self._cached_auto_valid = True
         self._cached_auto_expires = now + self._cache_ttl
+        self._cached_stamp = stamp
         return resolved
 
     def is_open(self) -> bool:

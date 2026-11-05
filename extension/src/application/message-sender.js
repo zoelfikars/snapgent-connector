@@ -8,7 +8,7 @@
 // landed, and say so out loud when nothing landed.
 
 const DEFAULT_RETRY_LIMIT = 4;
-const SETTLE_SAMPLE_MS = 200;
+const SETTLE_SAMPLE_MS = 100;
 const STILL_GENERATING_WAIT_MS = 4000;
 const LANDED_WAIT_MS = 3500;
 

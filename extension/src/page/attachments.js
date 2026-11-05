@@ -82,7 +82,7 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, p
     while (queue.length) {
       if (bodies.length && left < MIN_FILES_CHARS) { unread.push(...queue); break; }
       const group = queue.splice(0, FILES_PER_CALL);
-      bar.coverLabel(`read_files · ${paths.length - queue.length - group.length + 1}-${paths.length - queue.length} of ${paths.length}`);
+      bar.coverLabel(`Running read_files · ${paths.length - queue.length - group.length + 1}-${paths.length - queue.length} of ${paths.length}`);
       const feedback = await tools.runner.run({ tool: "read_files", arguments: { paths: group } }, { budgetChars: Math.max(MIN_FILES_CHARS, left) });
       if (feedbackIsError(feedback)) return { error: withoutResultHeader(feedback).split("\n").slice(0, 3).join(" ") };
       const body = withoutResultHeader(feedback).replace(/\n?\.\.\. \[\d+ more files remaining:[\s\S]*\]\s*$/, "").trim();
@@ -97,7 +97,7 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, p
 
   async function sendWithFiles(text, tags) {
     bar.cover(true);
-    bar.coverLabel(`read_files · ${tags.length} tag${tags.length > 1 ? "s" : ""}`);
+    bar.coverLabel(`Running read_files · ${tags.length} tag${tags.length > 1 ? "s" : ""}`);
     let handedOver = false;
     try {
       const { paths, left } = expand(tags);

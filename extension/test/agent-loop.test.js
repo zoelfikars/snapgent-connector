@@ -54,6 +54,26 @@ describe("AgentLoop: a command round-trip", () => {
     assert.equal(h.state.submitted[0].text, "» a\nok\n\n» b\nok");
   });
 
+  test("the cover says what is happening, command by command, until the results are sent", async () => {
+    const both = { kind: "tool", item: {}, calls: [{ tool: "apply_patch" }, { tool: "read_files" }] };
+    const h = await run({ responses: [both, textTurn] });
+    assert.deepEqual(h.events("progress").map((e) => e[1]), [
+      "Running command 1/2 · apply_patch",
+      "Running command 2/2 · read_files",
+      "2/2 commands done · sending the results to the AI…",
+    ]);
+  });
+
+  test("calls the model wrote in its own markup run, and the answer tells it to use our commands", async () => {
+    const native = { kind: "tool", item: {}, calls: [{ tool: "a", native: "dsml" }, { tool: "b", native: "dsml" }] };
+    const h = await run({ responses: [native, textTurn] });
+    assert.deepEqual(h.events("run"), [["run", "a"], ["run", "b"]]);
+    const text = h.state.submitted[0].text;
+    assert.ok(text.startsWith("» a\nok\n\n» b\nok"));
+    assert.ok(text.endsWith(FEEDBACK.nativeFormat), "the note is the last thing in the message");
+    assert.doesNotMatch(FEEDBACK.nativeFormat, /DSML/i, "the note describes the markup and never quotes it");
+  });
+
   test("a parse error asks the model to rewrite", async () => {
     const h = await run({ responses: [{ kind: "parse_error", reason: "unclosed", raw: '{"command":"edit_file"', item: { id: 1 } }, textTurn] });
     assert.equal(h.state.submitted[0].text, FEEDBACK.parseError("unclosed"));

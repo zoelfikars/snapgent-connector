@@ -62,7 +62,7 @@ bar = createBar({
   onStop: () => stop.stopLoop(),
 });
 
-const chat = createChat({ document, provider, state, visibility, catalogue: tools.catalogue, diag, cover: bar.cover, banner: notify });
+const chat = createChat({ document, provider, state, visibility, catalogue: tools.catalogue, diag, cover: bar.cover, banner: notify, progress: (text) => bar.coverLabel(text) });
 const { turnKey, executed } = createTurns({ provider });
 const budget = createMessageBudget({ storage, hostname: location.hostname, provider, diag });
 const resend = createPromptResend({ provider, state, storage, systemPrompt: tools.systemPrompt, limit: budget.limit, chat, diag });

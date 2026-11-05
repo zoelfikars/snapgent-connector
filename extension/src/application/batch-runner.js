@@ -10,6 +10,7 @@ import { feedbackIsError, runningLabel } from "../domain/tools/result-summary.js
 import { jobKey } from "../domain/tools/job-key.js";
 import { DEFAULT_BATCH_CALLS, MAX_RESULT_PARTS, MIN_CALL_CHARS, callShare, composeBatch, sessionIsLarge, trimMiddle } from "../domain/prompt/budget.js";
 import { partMessages } from "../domain/prompt/parts.js";
+import { FEEDBACK } from "../domain/prompt/feedback.js";
 
 export class BatchRunner {
   /** @param {object} deps  the AgentLoop's deps, plus `park(scope, extra)` (wait while the tab is hidden) and `diag` */
@@ -21,9 +22,9 @@ export class BatchRunner {
   }
 
   /** Room in the next message for what is added AFTER the results: the command reminder and a re-stated system prompt. */
-  _reserved() {
+  _reserved(calls = []) {
     const { reminder, tools, outbox } = this._d;
-    let reserved = 0;
+    let reserved = calls.some((call) => call.native) ? FEEDBACK.nativeFormat.length : 0;
     if (typeof reminder.willBeDue === "function" && reminder.willBeDue({ hasCatalogue: tools.hasCatalogue() })) reserved += tools.reminderText().length;
     if (typeof outbox.reserve === "function") reserved += outbox.reserve();
     return reserved;
@@ -40,7 +41,7 @@ export class BatchRunner {
     const batch = calls.slice(0, maxCalls);
     const notRun = calls.slice(maxCalls).map((call) => ({ tool: call.tool, why: `at most ${maxCalls} commands per reply` }));
     const results = [];
-    const messageRoom = Math.max(MIN_CALL_CHARS, this._budget.limit() - this._reserved());
+    const messageRoom = Math.max(MIN_CALL_CHARS, this._budget.limit() - this._reserved(batch));
     // All the messages together may hold this much; the output of one command may run over from one message into the next.
     const room = this._d.parts ? messageRoom * MAX_RESULT_PARTS : messageRoom;
     const batchId = this._d.jobs ? await this._d.jobs.begin(item) : null;
@@ -69,9 +70,15 @@ export class BatchRunner {
       if (step.isErr && index < batch.length - 1) { skipRest("stopped after the error above", index + 1); break; }
     }
 
-    if (this._d.view.progress) this._d.view.progress(""); // back to the plain "working" label while the AI answers
+    const ran = results.length;
+    const said = ran === calls.length ? (ran === 1 ? "Command done" : `${ran}/${ran} commands done`) : `${ran} of ${calls.length} commands run`;
     const composed = composeBatch(results, notRun);
     const messages = this._d.parts ? partMessages(composed, messageRoom, MAX_RESULT_PARTS) : [composed.length > room ? trimMiddle(composed, room, "the results") : composed];
+    // Calls the model wrote in its own markup were run anyway; it is told, in the same message, to use our commands next time.
+    if (batch.some((call) => call.native)) {
+      messages[messages.length - 1] += FEEDBACK.nativeFormat;
+      this._diag("tools.nativeNote", { format: batch.find((call) => call.native).native });
+    }
     if (reminder.onResult({ isErr: failed, tool: last.tool, hasCatalogue: tools.hasCatalogue() })) {
       messages[messages.length - 1] += tools.reminderText();
       this._diag("tools.reminder");
@@ -81,6 +88,7 @@ export class BatchRunner {
     if (messages.length > 1) { this._d.parts.hold(messages); this._diag("batch.parts", { parts: messages.length, chars: composed.length }); }
     this.lastSentChars = messages[0].length;
     if (this._budget.sent && sessionIsLarge(this._budget.sent(composed.length), this._budget.limit())) this._d.view.toast("This chat is getting large. A new chat will be cheaper.");
+    if (this._d.view.progress) this._d.view.progress(`${said} · sending the results to the AI…`);
     const base = await this._d.chat.submit(messages[0]);
     this._end(item);
     return { base };
@@ -97,7 +105,7 @@ export class BatchRunner {
     // Park BEFORE marking the turn dispatched, so a long minimize neither shows a bogus running time nor loses the command on reload.
     if (!(await this._d.park("tool", { name: call.tool }))) return { halted: true };
 
-    if (view.progress) view.progress(runningLabel(call, step));
+    if (view.progress) view.progress(`Running ${step && step.total > 1 ? "command " : ""}${runningLabel(call, step)}`);
     view.toolRunning(item, call);
     memory.executed(item);
     this._diag("tool.start", { name: call.tool });

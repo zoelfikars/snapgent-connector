@@ -13,7 +13,7 @@ describe("ResponseWatcher: finishing a reply", () => {
       .at(300, { reply: "Hello wor" }).at(600, { reply: "Hello world", gen: false });
     const res = await wait(h);
     assert.deepEqual([res.kind, res.text], ["text", "Hello world"]);
-    assert.ok(h.elapsed() >= 600 + 500, "waits for the 500ms settle after generation stops");
+    assert.ok(h.elapsed() >= 600 + 250, "waits for the 250ms settle after generation stops");
   });
 
   test("a command reply returns the parsed call", async () => {
@@ -30,6 +30,16 @@ describe("ResponseWatcher: finishing a reply", () => {
     const res = await wait(h);
     assert.equal(res.kind, "tool");
     assert.ok(h.elapsed() >= 1000);
+  });
+});
+
+describe("ResponseWatcher: what it says it is doing", () => {
+  test("waiting, writing, checking, then reading, each said once and in order", async () => {
+    const h = createWatchHarness({ initial: { gen: false, reply: "" } })
+      .at(300, { gen: true, reply: "Hel" }).at(900, { reply: CMD, gen: false });
+    const said = [];
+    await new ResponseWatcher({ ...h.deps, phase: (name) => said.push(name) }).wait(0);
+    assert.deepEqual(said, ["waiting", "writing", "checking", "reading"]);
   });
 });
 

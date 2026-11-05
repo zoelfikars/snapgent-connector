@@ -4,6 +4,11 @@ All notable changes to snapgentV3 Free are documented here.
 
 ## [Unreleased]
 
+### Speed and clarity
+- **Native tool markup is run, not rejected.** When a model writes a call in its own markup (DeepSeek's DSML `invoke`/`parameter`) the extension now reads and runs it, instead of answering with an error and waiting for a rewrite (a wasted round trip). The result message ends with a note telling the model not to use its internal tools and to call snapgentV3's general commands next time. Formats live in `domain/parser/native/` (one file each, registered in `index.js`), for every site alike.
+- The idle wait after a reply is shorter when the site shows a stop button (it ends 0.4 s after the button goes, not 2 s after the last word), sending and polling waits are shorter, and the page is read once per change rather than several times per tick. The VS Code folder is cached until VS Code's state file changes.
+- The text above the composer says what is really happening: waiting for the reply, the reply being written, checking it is complete, reading the commands, `Running command 1/2 · ...`, `2/2 commands done · sending the results to the AI...`.
+
 ### Build and release
 - The project now lives at `github.com/zoelfikarshomelab/snapgent-connector`; links in the README, the project page and the extension point there, and credit to the original project (`herdodp/snapgent-connector`) is kept. The Firefox add-on id is unchanged, so existing installs keep working.
 - **Tidy repository root**: the bridge, the VS Code server, their launchers and PyInstaller specs moved

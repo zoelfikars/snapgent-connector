@@ -3,6 +3,7 @@
 
 import { START_M, END_M } from "./markers.js";
 import { matchBrace, parseLoose, extractJson } from "./json-scan.js";
+import { parseNative } from "./native/index.js";
 
 // Normalise a parsed JSON object into { tool, arguments }, accepting both the
 // new snapgentV3 schema ("command"/"params") and the function-calling
@@ -68,5 +69,7 @@ export function parseToolCalls(r) {
   if (out.length === 0) {
     out.push(...extractToolsAnywhere(r));
   }
+  // Last, the model's own markup (DeepSeek's DSML): only when it wrote no command of ours.
+  if (out.length === 0) out.push(...parseNative(r));
   return out;
 }

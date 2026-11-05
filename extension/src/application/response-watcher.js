@@ -16,7 +16,7 @@ const GEN_STOP_GRACE_MS = 2500;      // gen off this long => an "open tool block
 const OPEN_BLOCK_QUIET_MS = 6000;    // an open block only counts as streaming while the text keeps changing
 const PRE_START_SILENCE_MS = 60000;  // a reply turn that never appears
 const UNREADABLE_MS = 15000;         // generating, yet no reply turn is found: the page layout is not understood
-const SETTLE_MS = 500;               // DOM must be stable this long before we parse
+const SETTLE_MS = 250;               // DOM must be stable this long before we parse
 
 const pass = null;
 const wait = (ms) => ({ wait: ms });
@@ -35,17 +35,20 @@ export class ResponseWatcher {
    *   catalogueSize: () => number,
    *   describeLayout?: () => object,   // what the page looks like, logged when replies cannot be read
    *   diag?: (event: string, data?: object) => void,
+   *   phase?: (name: "waiting"|"writing"|"checking"|"reading") => void,   // what the watcher is doing now
    * }} deps
    */
   constructor(deps) {
     this._d = deps;
     this._diag = deps.diag || (() => {});
+    this._say = deps.phase || (() => {});
   }
 
   /** @param {number} base assistant-turn count before the send (fallback for "is there a new reply") */
   async wait(base) {
     const { clock, timings } = this._d;
     const s = new WatchState(clock.now);
+    this._phase = ""; 
     while (clock.now() - s.lastActiveAt < timings.RESPONSE_TIMEOUT_MS) {
       const verdict = await this._tick(base, s);
       if (verdict && verdict.done) return verdict.done;
@@ -53,6 +56,8 @@ export class ResponseWatcher {
     }
     return { kind: "timeout" };
   }
+
+  _is(phase) { if (this._phase !== phase) this._say((this._phase = phase)); } // what is being waited for, said once per change
 
   async _tick(base, s) {
     const { chat, visibility, isStopped } = this._d;
@@ -89,10 +94,7 @@ export class ResponseWatcher {
     );
   }
 
-  /**
-   * Is there a reply for THIS send? Prefer node identity (virtualisation-proof). A null id means the
-   * provider could not read one for the current last turn (e.g. a regenerated turn): use the count test.
-   */
+  /** Is there a reply for THIS send? By node identity (virtualisation-proof); with no readable id, by the turn count. */
   _hasNewReply(base) {
     const { chat, sendToken } = this._d;
     const current = chat.lastAssistantId ? chat.lastAssistantId() : undefined;
@@ -109,6 +111,7 @@ export class ResponseWatcher {
       this._diag("empty.why", { branch: "preStart", rep: (d.reply || "").length });
       return finish({ kind: "empty" });
     }
+    this._is("waiting");
     return wait(200);
   }
 
@@ -119,10 +122,7 @@ export class ResponseWatcher {
     return detail ? finish({ kind: "context_limit", detail }) : pass;
   }
 
-  /**
-   * The site says it is generating but the adapter finds no reply turn at all. Waiting longer cannot
-   * help: the adapter does not understand this page (the site changed its markup). Say so, with data.
-   */
+  /** The site says it is generating but no reply turn is found: the page layout is not understood, and waiting cannot help. */
   _gateUnreadable(s, d) {
     if (d.item || !s.started) { s.unreadableSince = 0; return pass; }
     if (!s.unreadableSince) s.unreadableSince = s.now();
@@ -144,6 +144,7 @@ export class ResponseWatcher {
     if ((gen || effectiveBlock) && !stuckDone) {
       if (s.genOffFirstAt) { if (gen) s.waitedFlicker++; else if (effectiveBlock) s.waitedBlock++; }
       s.doneSince = 0;
+      this._is("writing");
       return wait(160);
     }
     if (stuckDone && gen) this._diag("watcher.stuckGen");
@@ -157,8 +158,7 @@ export class ResponseWatcher {
   _gateNoTurnYet(s, d, gen, newReply, base) {
     const { chat, sendToken } = this._d;
     if (!(chat.reliableCounts && !newReply)) {
-      s.noTurnSince = 0;
-      s.noTurnLoggedAt = 0;
+      s.noTurnSince = s.noTurnLoggedAt = 0;
       return pass;
     }
     if (!s.noTurnSince) s.noTurnSince = s.now();
@@ -173,13 +173,13 @@ export class ResponseWatcher {
         base, gen, started: s.started, replyLen: (d.reply || "").length,
       });
     }
-    return waited < NO_TURN_GRACE_MS ? wait(200) : pass;
+    return waited < NO_TURN_GRACE_MS ? (this._is(s.started ? "checking" : "waiting"), wait(200)) : pass;
   }
 
   /** Everything above says "done"; require it to hold for a moment so the DOM is stable. */
   _gateSettle(s) {
     if (!s.doneSince) s.doneSince = s.now();
-    return s.now() - s.doneSince < SETTLE_MS ? wait(120) : pass;
+    return s.now() - s.doneSince < SETTLE_MS ? (this._is("checking"), wait(120)) : pass;
   }
 
   /** A turn that has produced NOTHING yet is warming up: never finalize it as empty/truncated/text. */
@@ -202,6 +202,7 @@ export class ResponseWatcher {
   /** The reply is settled: apply the last holds, then classify it. */
   async _finalize(s, d) {
     const { chat } = this._d;
+    this._is("reading");
     // Blank-read guard: this read came back empty but the same turn had real text a tick ago.
     let reply = d.reply;
     if (!reply && s.lastGoodReply) {

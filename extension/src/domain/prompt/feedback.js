@@ -46,6 +46,12 @@ export const FEEDBACK = {
     };
     return notes[reason] || notes.malformed;
   },
+  // Appended to the results of calls that were written in the model's own markup. Like `dsml` above it describes that markup and
+  // never quotes it: a quoted marker in a user turn is echoed back by the model.
+  nativeFormat:
+    "\n\n(System note: the commands above were written in your own internal tool-call markup. They were run this time, but do not " +
+    "use that markup or any internal tool of your own here. Call snapgentV3's general commands instead, as one plain-text JSON " +
+    'object: {"command": "name", "params": { ...your parameters... }}.)',
   unknownTool: (name, valid) =>
     `ERROR: unknown command "${name}". It does not exist. Valid commands are: ` +
     valid.join(", ") +
