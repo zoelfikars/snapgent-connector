@@ -16,7 +16,7 @@ const callsText = (count) => `${count} command${count === 1 ? "" : "s"}`;
 
 const slider = (id, label, min, max, step, note) =>
   `<div class="zs-pref"><div style="display:flex;justify-content:space-between;gap:8px;font-weight:600"><span>${label}</span><span id="${id}-value"></span></div>` +
-  `<input type="range" id="${id}" min="${min}" max="${max}" step="${step}" style="width:100%;margin:8px 0 2px" aria-label="${label}">` +
+  `<input type="range" id="${id}" min="${min}" max="${max}" step="${step}" style="width:100%;box-sizing:border-box;margin:8px 0 2px" aria-label="${label}">` +
   `<div class="zs-mcp-pop-note">${note}</div></div>`;
 
 /**
@@ -29,16 +29,18 @@ export function openPreferences({ document, values, defaults, save }) {
   const { pop, close } = mountPopup(document);
   pop.innerHTML =
     `<div class="zs-mcp-pop-card" role="dialog" aria-label="Preferences"><div class="zs-mcp-pop-head"><span>Preferences</span>${closeButton}</div>` +
+    `<div class="zs-mcp-pop-body">` +
     slider("zs-pref-chars", "Message size", MIN_PROMPT_CHARS, MAX_PROMPT_CHARS, CHARS_STEP,
       "The most one message to the chat may hold. Longer output goes in the next messages (up to 5), the rest is cut in the middle. About 4 characters per token.") +
     slider("zs-pref-calls", "Commands per reply", MIN_BATCH_CALLS, MAX_BATCH_CALLS, 1,
       "How many commands the AI may send in one reply. They run in order and are answered in one message; any beyond it are reported as not run.") +
-    `<div class="zs-pref" style="margin-top:12px"><div style="font-weight:600">Folders left out of attachments</div>` +
+    `<div class="zs-pref"><div style="font-weight:600">Folders left out of attachments</div>` +
     `<textarea id="zs-pref-folders" rows="7" spellcheck="false" style="width:100%;box-sizing:border-box;margin-top:8px;${MONO};background:transparent;color:inherit;${BOX};padding:6px" ` +
     `aria-label="Folders left out of attachments">${esc(values.folders.join("\n"))}</textarea>` +
     `<div class="zs-mcp-pop-note">One folder name per line (or separated by commas): a folder of that name is skipped wherever it is, in the <code>@</code> list and in the Files menu. ` +
-    `In a git project the project's own <code>.gitignore</code> already applies on top.</div>` +
-    `<div style="display:flex;gap:8px;margin-top:8px"><button id="zs-pref-reset" class="zs-gear" style="flex:1">Restore the defaults</button></div></div></div>`;
+    `In a git project the project's own <code>.gitignore</code> already applies on top.</div></div>` +
+    `</div>` +
+    `<div class="zs-mcp-pop-foot"><button id="zs-pref-reset" class="zs-mcp-pop-btn zs-mcp-pop-btn-block">Restore the defaults</button></div></div>`;
   pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
 
   const bind = (id, value, show, store) => {

@@ -469,3 +469,45 @@ describe("what the provider read is dropped when the page changes", () => {
     window.close();
   });
 });
+
+describe("two elements match the text box", () => {
+  function withTwin(key) {
+    const site = SITES[key];
+    const { window, document } = pageWith(site.html(), site.url);
+    const learned = learnProfile({ hostname: site.hostname, name: site.name, picks: site.clicks(document) });
+    const events = [];
+    const provider = createCalibratedProvider({ document, location: window.location, profile: learned.profile, diag: (event, data) => events.push([event, data]) });
+    const real = provider.getEditor();
+    const twin = real.cloneNode(true);
+    return { provider, real, twin, events, window };
+  }
+  const noSize = { width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0 };
+
+  test("a copy that is laid out but has no size is not the text box, wherever it is in the page", () => {
+    const { provider, real, twin, window } = withTwin("chatgpt");
+    twin.getBoundingClientRect = () => noSize;
+    real.before(twin);
+    assert.equal(provider.getEditor(), real);
+    real.after(twin);
+    assert.equal(provider.getEditor(), real);
+    window.close();
+  });
+
+  test("a copy drawn invisible (visibility/opacity) is not the text box", () => {
+    const { provider, real, twin, window } = withTwin("chatgpt");
+    twin.checkVisibility = () => false;
+    real.before(twin);
+    assert.equal(provider.getEditor(), real);
+    window.close();
+  });
+
+  test("with two real candidates the one used stays the one, and the choice is noted for the report", () => {
+    const { provider, real, twin, events, window } = withTwin("chatgpt");
+    assert.equal(provider.getEditor(), real);
+    real.after(twin); // the last one on the page would be picked afresh, but the one in use is kept
+    assert.equal(provider.getEditor(), real);
+    assert.equal(provider.getEditor(), real);
+    assert.ok(events.some(([name, data]) => name === "composer.picked" && data.matches === 2));
+    window.close();
+  });
+});

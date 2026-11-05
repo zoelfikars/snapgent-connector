@@ -14,13 +14,13 @@ const skillRow = (skill, enabled) =>
   `<label class="zs-mcp-row"><span class="zs-mcp-row-info"><span class="zs-mcp-row-name">${esc(skill.name)}</span><span class="zs-mcp-row-meta">${esc(skill.description)}</span></span><input type="checkbox" class="zs-mcp-check" data-name="${esc(skill.name)}" ${enabled ? "checked" : ""}><span class="zs-mcp-toggle"></span></label>`;
 
 const globalRow = (name, description) =>
-  `<div class="zs-mcp-row"><span class="zs-mcp-row-info"><span class="zs-mcp-row-name">${esc(name)}</span><span class="zs-mcp-row-meta">${esc(description)}</span></span><button class="zs-gear zs-gskill-install" data-name="${esc(name)}">Install</button><button class="zs-gear zs-gskill-del" data-name="${esc(name)}">Delete</button></div>`;
+  `<div class="zs-mcp-row"><span class="zs-mcp-row-info"><span class="zs-mcp-row-name">${esc(name)}</span><span class="zs-mcp-row-meta">${esc(description)}</span></span><span class="zs-mcp-row-actions"><button class="zs-mcp-pop-btn zs-mcp-pop-btn-small zs-gskill-install" data-name="${esc(name)}">Install</button><button class="zs-mcp-pop-btn zs-mcp-pop-btn-small zs-gskill-del" data-name="${esc(name)}">Delete</button></span></div>`;
 
 const shell = (title, label, body) =>
   `<div class="zs-mcp-pop-card" role="dialog" aria-label="${label}"><div class="zs-mcp-pop-head"><span>${title}</span>${closeButton}</div>${body}</div>`;
 
 const actions = (...buttons) =>
-  `<div style="display:flex;gap:8px;margin-top:8px">${buttons.map(([id, text]) => `<button id="${id}" class="zs-gear" style="flex:1">${text}</button>`).join("")}</div>`;
+  `<div class="zs-mcp-pop-foot">${buttons.map(([id, text]) => `<button id="${id}" class="zs-mcp-pop-btn">${text}</button>`).join("")}</div>`;
 
 /**
  * @param {{ document: Document,
@@ -41,9 +41,11 @@ export function openSkillsSettings({ document, skills, maxFileBytes, loadOnOpen,
 
   function renderPaste() {
     pop.innerHTML = shell("Import skill", "Import skill",
-      `<input type="file" id="zs-skill-file" accept=".md,.txt,text/markdown,text/plain" style="margin-bottom:6px;font-size:11px;max-width:100%">` +
+      `<div class="zs-mcp-pop-body">` +
+      `<input type="file" id="zs-skill-file" accept=".md,.txt,text/markdown,text/plain" style="font-size:11px;max-width:100%">` +
       `<textarea id="zs-skill-text" rows="10" style="width:100%;box-sizing:border-box;${MONO};background:transparent;color:inherit;${BOX};padding:6px" placeholder="Paste the full SKILL.md here (with --- name / description --- frontmatter)">${esc(draft)}</textarea>` +
-      `<div class="zs-mcp-pop-note" style="color:${WARN}">${esc(message)}</div>` + actions(["zs-skill-cancel", "Cancel"], ["zs-skill-review", "Review"]));
+      (message ? `<div class="zs-mcp-pop-note" style="color:${WARN}">${esc(message)}</div>` : "") +
+      `</div>` + actions(["zs-skill-cancel", "Cancel"], ["zs-skill-review", "Review"]));
     pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
     const fileInput = pop.querySelector("#zs-skill-file");
     fileInput.addEventListener("change", () => {
@@ -68,10 +70,12 @@ export function openSkillsSettings({ document, skills, maxFileBytes, loadOnOpen,
   function renderReview() {
     const checked = skills.validate(draft);
     pop.innerHTML = shell("Import skill", "Import skill",
+      `<div class="zs-mcp-pop-body">` +
       `<div class="zs-mcp-pop-note" style="color:${CAUTION}">Review carefully. Third-party skills can contain instructions that make the AI run commands or change files. It will be saved DISABLED until you turn it on.</div>` +
       `<div class="zs-mcp-pop-note"><b>${esc(checked.name || "")}</b> - ${esc(checked.description || "")}</div>` +
-      `<pre style="max-height:220px;overflow:auto;white-space:pre-wrap;${MONO};${BOX};padding:6px;margin:6px 0">${esc(draft)}</pre>` +
-      `<div class="zs-mcp-pop-note" style="color:${WARN}">${esc(message)}</div>` +
+      `<pre style="max-height:220px;overflow:auto;white-space:pre-wrap;${MONO};${BOX};padding:6px">${esc(draft)}</pre>` +
+      (message ? `<div class="zs-mcp-pop-note" style="color:${WARN}">${esc(message)}</div>` : "") +
+      `</div>` +
       actions(["zs-skill-back", "Back"], ["zs-skill-global", "Save to global"], ["zs-skill-confirm", "Confirm import"]));
     pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
     on("#zs-skill-back", () => { mode = "paste"; message = ""; render(); });
@@ -92,15 +96,17 @@ export function openSkillsSettings({ document, skills, maxFileBytes, loadOnOpen,
   function renderList() {
     const names = Object.keys(skills.globals);
     pop.innerHTML = shell("Skills", "Skills settings",
+      `<div class="zs-mcp-pop-body">` +
       `<div class="zs-mcp-pop-note">Only enabled skills are listed in the prompt. Changes apply to the next chat session.</div>` +
       `<div class="zs-mcp-pop-list">${skills.all.length
         ? skills.all.map((skill) => skillRow(skill, skills.isEnabled(skill.name))).join("")
         : `<div class="zs-mcp-pop-note">No skills found in .snapgent/skills/ (VS Code workspace only).</div>`}</div>` +
-      `<div class="zs-mcp-pop-note" style="margin-top:10px"><b>Global library</b> (stored in this browser; install into a workspace to use)</div>` +
+      `<div class="zs-mcp-pop-note"><b>Global library</b> (stored in this browser; install into a workspace to use)</div>` +
       (names.length
-        ? names.map((name) => globalRow(name, skills.globals[name].description)).join("")
+        ? `<div>${names.map((name) => globalRow(name, skills.globals[name].description)).join("")}</div>`
         : `<div class="zs-mcp-pop-note">Empty. Use "Save to global" while reviewing an import.</div>`) +
-      `<div style="margin-top:8px"><button id="zs-skill-import" class="zs-gear" style="width:100%">+ Import skill</button></div>`);
+      `</div>` +
+      `<div class="zs-mcp-pop-foot"><button id="zs-skill-import" class="zs-mcp-pop-btn zs-mcp-pop-btn-block">+ Import skill</button></div>`);
     pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
     pop.querySelectorAll(".zs-gskill-install").forEach((button) => button.addEventListener("click", () => {
       const entry = skills.globals[button.dataset.name];

@@ -6,7 +6,7 @@
 import { setNativeValue } from "../chat/dom-helpers.js";
 import { StreamSampler } from "../chat/stream-sampler.js";
 import { waitFor } from "../chat/wait.js";
-import { alternativeSelectors, visible } from "./dom-signals.js";
+import { alternativeSelectors, shown, visible } from "./dom-signals.js";
 import { readText } from "./page-text.js";
 import { profileProblems } from "./profile.js";
 
@@ -60,7 +60,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     }
     return strict;
   };
-  const firstVisible = (selector) => findLoose(selector).find(visible) || null;
+  const firstVisible = (selector) => findLoose(selector).find(shown) || null;
 
   // ── turns ─────────────────────────────────────────────────────────────────
   // A turn is something laid out on the page: a template, a script or a collapsed copy that happens to carry the same attributes is
@@ -122,14 +122,31 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   const healedWith = (how, el) => { if (healed !== how) { healed = how; diag("composer.healed", { how, element: el.localName }); } return el; };
   function onlyTextBox() {
     const turns = [...assistantTurns(), ...userTurns()];
-    const boxes = outermost(find("textarea, input:not([type]), input[type=text], [contenteditable]").filter(editable).filter(visible)).filter((box) => !turns.some((turn) => turn.contains(box)));
+    const boxes = outermost(find("textarea, input:not([type]), input[type=text], [contenteditable]").filter(editable).filter(shown)).filter((box) => !turns.some((turn) => turn.contains(box)));
     return boxes.length === 1 ? boxes[0] : null;
   }
+  // When several elements match, the one used last stays the one (the cover and the bar are glued to it: two candidates taking turns
+  // would make them jump between two places); a new choice is the LAST one on the page, where the composer sits. What was chosen and
+  // what else matched is noted once per change, for the report.
+  let lastEditor = null;
+  let lastNote = "";
+  function pickEditor(candidates, how) {
+    const list = candidates.filter(shown);
+    const chosen = lastEditor && list.includes(lastEditor) ? lastEditor : list[list.length - 1] || null;
+    const note = `${how}|${list.length}|${chosen ? chosen.localName + "." + String(chosen.className).slice(0, 40) : ""}`;
+    if (chosen && (chosen !== lastEditor || list.length > 1) && note !== lastNote) {
+      lastNote = note;
+      const box = chosen.getBoundingClientRect();
+      diag("composer.picked", { how, matches: list.length, index: list.indexOf(chosen), tag: chosen.localName, cls: String(chosen.className).slice(0, 60), top: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) });
+    }
+    if (chosen) lastEditor = chosen;
+    return chosen;
+  }
   const getEditor = () => {
-    const named = find(profile.composer.selector).find(visible);
+    const named = pickEditor(find(profile.composer.selector), "selector");
     if (named) { healed = ""; return named; }
     for (const form of alternativeSelectors(profile.composer.selector)) {
-      const found = find(form).filter(editable).find(visible);
+      const found = pickEditor(find(form).filter(editable), `relaxed ${form}`);
       if (found) return healedWith(`selector ${form}`, found);
     }
     const only = onlyTextBox();

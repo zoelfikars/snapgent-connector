@@ -129,6 +129,18 @@ describe("ResponseWatcher: gates", () => {
     assert.ok(h.elapsed() >= 3000);
   });
 
+  test("reliableCounts: new reply text under the same turn id is not held for the whole grace", async () => {
+    // The site keeps the previous turn's id (or recycles the node) while the new answer streams in.
+    // The no-turn grace must not hold it for its full window once the text is clearly new.
+    const h = createWatchHarness({ initial: { gen: false, reply: "old reply", lastId: "t0" }, reliableCounts: true })
+      .at(500, { gen: true, reply: "old replyNEW" })
+      .at(1500, { gen: false, reply: "old replyNEW answer" });
+    h.sendToken.value = "t0";
+    const res = await wait(h);
+    assert.deepEqual([res.kind, res.text], ["text", "old replyNEW answer"]);
+    assert.ok(h.elapsed() < 5000, `took ${h.elapsed()} ms`);
+  });
+
   test("a hidden tab slides every deadline: a long park never trips the timeout", async () => {
     const h = createWatchHarness({ initial: { gen: true, reply: "streaming" }, tabs: { hidden: true, parkMs: 3_600_000 }, timings: { RESPONSE_TIMEOUT_MS: 20000 } })
       .at(1_000, { gen: false });

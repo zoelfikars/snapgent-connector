@@ -5,6 +5,18 @@
 /** Laid out and attached. */
 export const visible = (el) => !!el && el.isConnected && el.getClientRects().length > 0;
 
+/**
+ * Really on screen, for the few elements the agent writes into or presses: `visible` also lets through a copy that is laid out but not
+ * drawn (a hidden twin some editors keep to measure their text: `visibility:hidden`, `opacity:0`) or has no size. Such a twin can sit
+ * anywhere on the page, and the cover then follows IT instead of the text box.
+ */
+export const shown = (el) => {
+  if (!visible(el)) return false;
+  if (typeof el.checkVisibility === "function" && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, opacityProperty: true, visibilityProperty: true })) return false;
+  const box = el.getBoundingClientRect();
+  return box.width > 0 && box.height > 0;
+};
+
 // Attributes that change while the page is used, or that browser add-ons stamp on inputs.
 const DYNAMIC_ATTRIBUTE = /^(data-placeholder|data-state|data-zs|data-csig|data-focus|data-hover|data-active|data-highlighted|data-orientation|data-disabled|data-selected|data-radix|data-headlessui|data-ecto-composer-prehydration|data-gramm|data-enable-grammarly|data-1p|data-lp|data-bw|data-form-type|data-ssr|data-react|data-reactid|data-v-)/;
 

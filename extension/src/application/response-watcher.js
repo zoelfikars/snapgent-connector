@@ -21,6 +21,7 @@ const SETTLE_MS = 250;               // DOM must be stable this long before we p
 const pass = null;
 const wait = (ms) => ({ wait: ms });
 const finish = (result) => ({ done: result });
+const normText = (text) => (text || "").replace(/\s+/g, " ").trim();
 
 export class ResponseWatcher {
   /**
@@ -76,7 +77,7 @@ export class ResponseWatcher {
     if (gen) s.lastActiveAt = s.now(); // actively generating => never time out
     const d = chat.readAssistant();
     const newReply = this._hasNewReply(base);
-    s.observeTurn(d);
+    if (s.baseReply === null) s.baseReply = normText(d.reply); s.observeTurn(d);
 
     const early = this._gatePreStart(s, d, gen, newReply);
     if (early) return early;
@@ -161,6 +162,8 @@ export class ResponseWatcher {
       s.noTurnSince = s.noTurnLoggedAt = 0;
       return pass;
     }
+    // New content is already here (text differs from the wait's start) even if the turn id did not change.
+    if (d.reply && normText(d.reply) !== s.baseReply) { s.noTurnSince = s.noTurnLoggedAt = 0; return pass; }
     if (!s.noTurnSince) s.noTurnSince = s.now();
     const waited = s.now() - s.noTurnSince;
     if (waited > 800 && (!s.noTurnLoggedAt || s.now() - s.noTurnLoggedAt > 3000)) {

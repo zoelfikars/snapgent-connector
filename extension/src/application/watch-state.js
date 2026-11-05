@@ -14,6 +14,7 @@ export class WatchState {
     this.doneSince = 0;      // when every "still working" gate first cleared
     this.lastLimitScan = 0;
     this.lastText = null;
+    this.baseReply = null;   // the reply text when this wait began: real new content differs from it
     this.genFalseSince = 0;  // how long the generating flag has been off (resets on a flicker back on)
     this.preStartSilent = 0; // nothing produced and not generating
     this.warmSince = 0;      // current turn has produced nothing yet
