@@ -120,6 +120,16 @@ export function createCalibrationActions({ document, location, provider, state, 
     } catch (error) { toast(String((error && error.message) || error)); }
   }
 
+  /** Filler text as a .txt file given to the page by `method` (paste, input or drop), and not sent. */
+  async function attachTestFile(chars, method) {
+    if (provider.needsCalibration) { toast("Calibrate this site first."); return; }
+    const text = loremIpsum(chars);
+    try {
+      const result = await provider.attachFile(new File([text], "test.txt", { type: "text/plain" }), method);
+      toast(`Gave the page test.txt (${text.length.toLocaleString("en-US")} characters) by ${result.method}${result.handled ? "; the page reacted to it" : "; the page did not cancel the event"}. Look for an attachment chip.`);
+    } catch (error) { toast(String((error && error.message) || error)); }
+  }
+
   async function remove() {
     await store.remove(location.hostname);
     toast("Calibration removed.");
@@ -147,5 +157,5 @@ export function createCalibrationActions({ document, location, provider, state, 
   // undefined: not calibrated, so nothing to keep them in; null: calibrated, no values of its own.
   const limits = () => (provider.needsCalibration ? undefined : provider.limits || null);
 
-  return { limits, setLimits, copyTestText, fillTestText, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
+  return { limits, setLimits, copyTestText, fillTestText, attachTestFile, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
 }

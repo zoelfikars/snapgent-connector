@@ -42,7 +42,7 @@ function whileStarted(state) {
   const name = escapeHtml(state.target.name);
   // A chat that works in a folder while VS Code is closed: the server then offers no commands, and the way out is to open that folder.
   const closed = state.target.id === "vscode" && state.bridge.connected && !!server && !!server.alive && !tools;
-  if (closed && state.workspaceFolder) return view("warn", `<b>Active</b> · open <b>${escapeHtml(String(state.workspaceFolder).replace(/[\\/]+$/, "").split(/[\\/]/).pop())}</b> in VS Code`, { warn: true });
+  if (closed && state.workspaceFolder) return view("warn", `<b>Active</b> · open <b>${escapeHtml(String(state.workspaceFolder).replace(/[\\/]+$/, "").split(/[\\/]/).pop())}</b> in your editor`, { warn: true });
   if (!state.bridge.connected) return view("warn", `<b>Active</b> · ${state.bridge.needsApproval ? "approve in the bridge terminal" : "start the bridge"}`, { warn: true });
   if (!state.bridgeOk) return view("warn", `<b>Active</b> · ${name} offline`, { warn: true });
   return view("active", `<b>Active</b>${tools ? ` · ${tools} tools` : ""} · ${name}`);
@@ -56,7 +56,7 @@ function beforeStart(state) {
   let message;
   if (!state.bridge.connected) message = state.bridge.needsApproval ? "Approve this extension in the <b>bridge terminal</b>" : "Start the <b>bridge</b>";
   else if (isVscode && (state.bridgeOk || folderMissing)) {
-    message = state.workspaceProbePending ? "Checking <b>VS Code workspace</b>…" : "Open a <b>folder in VS Code</b>";
+    message = state.workspaceProbePending ? "Checking the <b>workspace</b>…" : "Open a <b>folder in your editor</b>";
   } else message = `<b>${escapeHtml(state.target.name)} unavailable</b>`;
   return view("warn", message, { label: START, kind: "start", disabled: true, warn: true });
 }

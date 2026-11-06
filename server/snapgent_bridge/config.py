@@ -72,7 +72,7 @@ class ConfigStore:
         if not valid_server_id(server_id):
             raise ConfigError("Invalid MCP server id.")
         if server_id == PROTECTED_SERVER_ID:
-            raise ConfigError("The VS Code MCP server cannot be removed.")
+            raise ConfigError("The Snapgent MCP server cannot be removed.")
         self._mutate(lambda servers: servers.pop(server_id, None))
 
     def _mutate(self, change) -> None:

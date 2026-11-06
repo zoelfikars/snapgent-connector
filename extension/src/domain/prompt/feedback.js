@@ -52,10 +52,10 @@ export const FEEDBACK = {
     "\n\n(System note: the commands above were written in your own internal tool-call markup. They were run this time, but do not " +
     "use that markup or any internal tool of your own here. Call snapgentV3's general commands instead, as one plain-text JSON " +
     'object: {"command": "name", "params": { ...your parameters... }}.)',
-  // VS Code has no folder open, so the server offers no commands. Said to the model instead of a list of no valid commands.
+  // The editor has no folder open, so the server offers no commands. Said to the model instead of a list of no valid commands.
   workspaceClosed: (folder) =>
-    `ERROR: VS Code has no project folder open right now, so no command can run${folder ? ` (this chat works in ${folder})` : ""}. ` +
-    "Do NOT retry. Tell the user to open that folder in VS Code, then continue.",
+    `ERROR: no project folder is open in the user's editor right now, so no command can run${folder ? ` (this chat works in ${folder})` : ""}. ` +
+    "Do NOT retry. Tell the user to open that folder in their editor (VS Code or Antigravity), then continue.",
   unknownTool: (name, valid) =>
     `ERROR: unknown command "${name}". It does not exist. Valid commands are: ` +
     valid.join(", ") +
@@ -68,7 +68,7 @@ export const FEEDBACK = {
   staleExtension:
     "ERROR: the snapgentV3 extension was reloaded or updated while this page was open, so this " +
     "tab is running a version of it that no longer exists and NO command can reach the user's " +
-    "machine from here. The bridge and VS Code are NOT the problem - do not tell the user " +
+    "machine from here. The bridge and the editor are NOT the problem - do not tell the user " +
     "to check them, and do not retry the command, because every retry will fail the same way. " +
     "Tell the user in one short sentence to RELOAD THIS PAGE (F5), then stop and wait.",
   bridgeOffline:

@@ -65,7 +65,8 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
       ? slider("zs-pref-lorem", "Test text size", MIN_PROMPT_CHARS, MAX_PROMPT_CHARS, CHARS_STEP,
         "Copies this many characters of lorem ipsum to the clipboard, to paste into the chat and see how much one message it accepts. Fill the text box writes it the way the extension writes its own messages, which a site may treat differently from a paste of your own. Nothing is saved.") +
         `<div class="zs-pref"><button id="zs-pref-lorem-copy" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block">Copy test text</button>` +
-        (actions.onFillTest ? `<button id="zs-pref-lorem-fill" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block" style="margin-top:6px">Fill the text box</button>` : "") + `</div>`
+        (actions.onFillTest ? `<button id="zs-pref-lorem-fill" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block" style="margin-top:6px">Fill the text box</button>` : "") +
+        (actions.onAttachTest ? `<select id="zs-pref-lorem-method" aria-label="How to attach the file" style="margin-top:6px;width:100%"><option value="paste">as a pasted file</option><option value="input">through the file input</option><option value="drop">as a dropped file</option></select><button id="zs-pref-lorem-file" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block" style="margin-top:6px">Fill the text box with a .txt file</button>` : "") + `</div>`
       : "") +
     `<div class="zs-pref"><div style="font-weight:600">Folders left out of attachments</div>` +
     `<textarea id="zs-pref-folders" rows="7" spellcheck="false" style="width:100%;box-sizing:border-box;margin-top:8px;${MONO};background:transparent;color:inherit;${BOX};padding:6px" ` +
@@ -101,6 +102,8 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
   if (loremSize) {
     bind("zs-pref-lorem", 100000, charsText, () => {});
     pop.querySelector("#zs-pref-lorem-copy").addEventListener("click", () => actions.onCopyTest(Number(loremSize.value)));
+    const attach = pop.querySelector("#zs-pref-lorem-file");
+    if (attach) attach.addEventListener("click", () => { const size = Number(loremSize.value); const method = pop.querySelector("#zs-pref-lorem-method").value; close(); actions.onAttachTest(size, method); });
     const fill = pop.querySelector("#zs-pref-lorem-fill");
     if (fill) fill.addEventListener("click", () => { const size = Number(loremSize.value); close(); actions.onFillTest(size); });
   }

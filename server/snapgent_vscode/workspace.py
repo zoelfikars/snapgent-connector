@@ -14,7 +14,12 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 from urllib.parse import unquote, urlparse
 
-PRODUCTS = ("Code", "Code - Insiders", "VSCodium")
+# The editors that keep VS Code's workspace state. Antigravity IDE is a VS Code fork and writes the same storage.json, so its
+# folder is read the same way. The order is the order of preference when several of them have a folder open.
+PRODUCTS = ("Code", "Code - Insiders", "VSCodium", "Antigravity IDE")
+# The image name a product shows on Windows, where a closed editor leaves its state file behind. A product not named here is
+# read without that check: guessing at its process name would either hide its folder or trust a closed editor's.
+WINDOWS_PROCESSES = {"Code": "Code.exe"}
 
 # The folder a chat works in, named by the extension on every call (the model can never set it). It is what lets two chats
 # work in two projects at once, and what keeps a chat in ITS folder when VS Code's active window or the server changes.
@@ -29,7 +34,9 @@ def storage_paths(platform: str, env: Mapping[str, str], home: Path) -> List[Pat
     """Where VS Code (and its forks) keep storage.json on this platform."""
     if platform == "win32":
         appdata = env.get("APPDATA")
-        return [Path(appdata) / "Code" / "User" / "globalStorage" / "storage.json"] if appdata else []
+        if not appdata:
+            return []
+        return [Path(appdata) / product / "User" / "globalStorage" / "storage.json" for product in PRODUCTS]
     if platform == "linux":
         base = Path(env.get("XDG_CONFIG_HOME") or home / ".config")
     else:
@@ -72,14 +79,22 @@ def uri_to_path(uri: str, platform: str) -> Path:
     return Path(path)
 
 
-def _vscode_running_on_windows(run: Callable) -> bool:
+def _vscode_running_on_windows(process_name: str, run: Callable) -> bool:
     result = run(
-        ["tasklist", "/FI", "IMAGENAME eq Code.exe", "/NH"],
+        ["tasklist", "/FI", f"IMAGENAME eq {process_name}", "/NH"],
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=5, check=False,
     )
     if result.returncode != 0:
         raise WorkspaceError("Could not check whether VS Code is running.")
-    return "Code.exe" in result.stdout
+    return process_name in result.stdout
+
+
+def _product_of(path: Path) -> Optional[str]:
+    """Which product's storage.json this is (`.../<product>/User/globalStorage/storage.json`)."""
+    for product in PRODUCTS:
+        if product in path.parts:
+            return product
+    return None
 
 
 def open_folders(
@@ -91,11 +106,19 @@ def open_folders(
     """The folders VS Code has open, the last active window first (folders that no longer exist are left out)."""
     env = os.environ if env is None else env
     home = Path.home() if home is None else home
-    if platform == "win32" and not _vscode_running_on_windows(run):
-        return []
+    # On Windows a closed editor leaves its state behind, so a product whose process name is known is only read while that
+    # process runs. Checked once per call, whether or not the state file is there, so a broken process list is always reported.
+    running: Dict[str, bool] = {}
+    if platform == "win32":
+        for product, process in WINDOWS_PROCESSES.items():
+            running[product] = _vscode_running_on_windows(process, run)
+
+    def reads(product: Optional[str]) -> bool:
+        return running.get(product, True) if product is not None else True
+
     found: List[Path] = []
     for storage_path in storage_paths(platform, env, home):
-        if not storage_path.is_file():
+        if not storage_path.is_file() or not reads(_product_of(storage_path)):
             continue
         try:
             data = json.loads(storage_path.read_text(encoding="utf-8", errors="replace"))
@@ -231,5 +254,5 @@ class Workspace:
             return self.pinned.resolve()
         folder = self._auto_folder()
         if folder is None:
-            raise WorkspaceError("Open a project folder in VS Code before using the VS Code MCP server.")
+            raise WorkspaceError("Open a project folder in VS Code (or another supported editor, such as Antigravity IDE) before using the VS Code MCP server.")
         return folder

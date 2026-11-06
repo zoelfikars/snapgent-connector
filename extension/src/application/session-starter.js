@@ -77,7 +77,7 @@ export class SessionStarter {
       const choice = await this._d.workspace.choose();
       if (!alive()) return false;
       if (choice.cancelled) { view.toast("Start cancelled."); return false; }
-      if (choice.error) { view.banner("warn", "VS Code workspace", choice.error); return false; }
+      if (choice.error) { view.banner("warn", "Workspace", choice.error); return false; }
       if (choice.none) { const banner = workspaceRequiredBanner(); view.banner("warn", banner.title, banner.text); return false; }
       this._diag("start.workspace", { path: choice.path });
     }

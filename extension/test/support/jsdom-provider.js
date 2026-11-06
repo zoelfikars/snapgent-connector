@@ -13,7 +13,13 @@ export function pageWith(html, url = "https://example.test/") {
   Object.defineProperty(window.HTMLElement.prototype, "offsetParent", { get() { return hiddenAbove(this) ? null : this.ownerDocument.body; } });
   // a box is as tall as the controls it holds, so a card is bigger than the text field inside it
   window.HTMLElement.prototype.getBoundingClientRect = function () { const height = 20 + 12 * this.querySelectorAll("button, [role=button]").length; return { width: 100, height, top: 0, left: 0, right: 100, bottom: height }; };
-  window.DataTransfer = class { constructor() { this.data = {}; } setData(type, value) { this.data[type] = value; } getData(type) { return this.data[type] || ""; } };
+  // As in a browser: setData/getData for text, and files put in through items.add (a FileList is only ever read).
+  window.DataTransfer = class {
+    constructor() { this.data = {}; this.items = { files: [], add(file) { this.files.push(file); } }; }
+    setData(type, value) { this.data[type] = value; }
+    getData(type) { return this.data[type] || ""; }
+    get files() { return this.items.files; }
+  };
   window.ClipboardEvent = class extends window.Event { constructor(type, init = {}) { super(type, init); this.clipboardData = init.clipboardData; } };
   window.InputEvent = window.InputEvent || class extends window.Event { constructor(type, init = {}) { super(type, init); Object.assign(this, init); } };
   return { window, document: window.document };

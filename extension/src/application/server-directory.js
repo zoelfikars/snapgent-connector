@@ -4,7 +4,7 @@
 // which servers exist; what is kept here is only display names, the on/off toggles and the prompt.
 
 const KEYS = { toggles: "zsMcpEnabled", custom: "zsCustomMcpServers", prompt: "zsCustomPrompt" };
-const BUILT_IN = { id: "vscode", name: "VS Code" };
+const BUILT_IN = { id: "vscode", name: "Snapgent MCP" };
 
 const isPlainObject = (value) => value && typeof value === "object" && !Array.isArray(value);
 

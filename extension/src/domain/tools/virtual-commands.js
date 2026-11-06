@@ -17,10 +17,10 @@ export const serverOf = (tool) => tool.server || "vscode";
 export function renderServerList({ servers, target }) {
   const lines = servers.length
     ? servers.map((sv) => {
-        const label = sv.id === "vscode" ? "VS Code (default target)" : `${sv.id} (addon)`;
+        const label = sv.id === "vscode" ? "Snapgent MCP (default target)" : `${sv.id} (addon)`;
         return `- ${sv.id}: ${label} - ${sv.alive ? `${sv.tools || 0} commands available` : "offline (no tools)"}`;
       })
-    : ["- vscode: VS Code (default target) - unknown (bridge did not report server health)"];
+    : ["- vscode: Snapgent MCP (default target) - unknown (bridge did not report server health)"];
   return (
     `${resultHeader(LIST_SERVERS)}\n` +
     `Connected MCP servers (${lines.length}):\n${lines.join("\n")}\n` +

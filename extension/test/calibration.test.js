@@ -280,6 +280,22 @@ describe("limits kept in the calibration (message size, commands per reply)", ()
   });
 });
 
+describe("a file given to the page", () => {
+  test("pasted: the text box receives the file, and a page that cancels the paste is reported as having reacted", async () => {
+    const { provider, window } = calibrated(SITES.gemini);
+    const seen = [];
+    provider.getEditor().addEventListener("paste", (event) => { seen.push(event.clipboardData.files.length); event.preventDefault(); });
+    const result = await provider.attachFile(new window.File(["hello"], "test.txt", { type: "text/plain" }), "paste");
+    assert.deepEqual(seen, [1]);
+    assert.deepEqual(result, { method: "paste", handled: true });
+  });
+
+  test("through the file input: a page without one says so", async () => {
+    const { provider, window } = calibrated(SITES.gemini);
+    await assert.rejects(() => provider.attachFile(new window.File(["x"], "test.txt"), "input"), /no file input/);
+  });
+});
+
 describe("conversation identity", () => {
   test("a chat with no turns has no identity yet, whatever its URL says (Gemini's fresh chat is /app)", () => {
     const { provider, window } = calibrated(SITES.gemini);

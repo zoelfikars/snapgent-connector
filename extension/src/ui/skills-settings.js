@@ -100,7 +100,7 @@ export function openSkillsSettings({ document, skills, maxFileBytes, loadOnOpen,
       `<div class="zs-mcp-pop-note">Only enabled skills are listed in the prompt. Changes apply to the next chat session.</div>` +
       `<div class="zs-mcp-pop-list">${skills.all.length
         ? skills.all.map((skill) => skillRow(skill, skills.isEnabled(skill.name))).join("")
-        : `<div class="zs-mcp-pop-note">No skills found in .snapgent/skills/ (VS Code workspace only).</div>`}</div>` +
+        : `<div class="zs-mcp-pop-note">No skills found in .snapgent/skills/ (workspace only).</div>`}</div>` +
       `<div class="zs-mcp-pop-note"><b>Global library</b> (stored in this browser; install into a workspace to use)</div>` +
       (names.length
         ? `<div>${names.map((name) => globalRow(name, skills.globals[name].description)).join("")}</div>`

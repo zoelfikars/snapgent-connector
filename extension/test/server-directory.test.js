@@ -65,7 +65,7 @@ describe("ServerDirectory", () => {
 
   test("names: the built-in one, a known one, and an unknown id as itself", async () => {
     const { dir } = await directory({ stored: { zsCustomMcpServers: [{ id: "a", name: "Alpha" }] }, live: [{ id: "a" }] });
-    assert.deepEqual(["vscode", "a", "zzz"].map((id) => dir.name(id)), ["VS Code", "Alpha", "zzz"]);
+    assert.deepEqual(["vscode", "a", "zzz"].map((id) => dir.name(id)), ["Snapgent MCP", "Alpha", "zzz"]);
   });
 
   test("the dropdown offers only enabled servers but never loses the current target", async () => {

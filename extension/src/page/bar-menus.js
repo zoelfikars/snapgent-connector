@@ -56,7 +56,7 @@ export function createBarMenus({ document, root, group, settings, serverDirector
     if (folder === shown) return;
     shown = folder;
     $("#zs-ws-name").textContent = workspaceLabel(folder);
-    $("#zs-ws-btn").title = folder ? `This chat works in ${folder}` : "Auto: follows the active VS Code window";
+    $("#zs-ws-btn").title = folder ? `This chat works in ${folder}` : "Auto: follows your active editor window";
   };
   const wsMenu = make("#zs-ws-btn", "#zs-ws-menu", 300, "right", 240, async () => {
     const listing = await send({ type: "workspaces" });
@@ -81,7 +81,7 @@ export function createBarMenus({ document, root, group, settings, serverDirector
     monitor.workspaceProbePending = false;
     catalogue.ensure(true);
     workspace.refresh();
-    toast(pinned ? `Working in ${workspaceLabel(pinned)}` : "Following the active VS Code window");
+    toast(pinned ? `Working in ${workspaceLabel(pinned)}` : "Following your active editor window");
   }
 
   function fillWorkspaceMenu(listing) {

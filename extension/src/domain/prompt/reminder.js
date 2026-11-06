@@ -16,7 +16,7 @@ export function compactTools(tools) {
 // a tool result every so often so the model does not drift from the exact
 // command names over a long session. It is explicitly framed as an automatic
 // snapgentV3 reminder (NOT a user message and NOT a new command to run).
-export function toolsReminder(tools, targetName = "VS Code", serverId = "vscode") {
+export function toolsReminder(tools, targetName = "Snapgent MCP", serverId = "vscode") {
   const toolsString =
     `  list_commands(server: "${serverId}") - list available ${targetName} commands with full parameter details\n` +
     compactTools(tools);

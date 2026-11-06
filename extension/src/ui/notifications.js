@@ -70,7 +70,7 @@ export function createNotifications({ root, reload = () => globalThis.location.r
     actions.append(close);
     el.append(
       element("div", "zs-banner-t", "⚠ snapgentV3 disconnected"),
-      element("div", "zs-banner-m", "Bridge stopped. Start the bridge again and keep your project open in VS Code."),
+      element("div", "zs-banner-m", "Bridge stopped. Start the bridge again and keep your project open in your editor."),
       actions,
     );
     root.appendChild(el);

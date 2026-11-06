@@ -105,7 +105,7 @@ describe("a chat whose folder is not open because VS Code is closed", () => {
   const base = { staleExtension: false, starting: false, started: true, running: false, parked: false, blankChat: false, bridge: { connected: true, servers: [{ id: "vscode", alive: true, tools: 0 }] }, bridgeOk: false, target: { id: "vscode", name: "VS Code" }, activeToolCount: 0, workspaceReady: false, workspaceProbePending: false, modeWarning: null };
   test("the bar names the folder to open", () => {
     const v = computeBarView({ ...base, workspaceFolder: "/home/me/Projects/portofolio" });
-    assert.equal(v.message, "<b>Active</b> · open <b>portofolio</b> in VS Code");
+    assert.equal(v.message, "<b>Active</b> · open <b>portofolio</b> in your editor");
     assert.equal(v.warn, true);
   });
   test("with no known folder it says what it said before", () => {

@@ -75,7 +75,7 @@ class RepositoryLayoutTests(unittest.TestCase):
     """The repository root stays a table of contents, not a drawer. Add a folder here only on purpose."""
 
     ALLOWED_ROOT = {
-        ".gitattributes", ".gitignore", "CHANGELOG.md", "LICENSE", "README.md",
+        ".gitattributes", ".gitignore", "AGENTS.md", "CHANGELOG.md", "LICENSE", "README.md",
         ".github", ".snapgent", "assets", "docs", "extension", "scripts", "server", "tests",
     }
 

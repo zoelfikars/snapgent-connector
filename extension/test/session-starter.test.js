@@ -4,7 +4,7 @@ import { SessionStarter } from "../src/application/session-starter.js";
 import { checkStartPreconditions, handshakeUnavailable, probeSucceeded } from "../src/domain/agent/session-start.js";
 
 const tool = (name) => ({ name });
-const WORKSPACE = { title: "VS Code workspace required", text: "Open a project folder in VS Code, then try again." };
+const WORKSPACE = { title: "Workspace required", text: "Open a project folder in VS Code or Antigravity, then try again." };
 
 function setup(over = {}) {
   const log = [];
@@ -191,7 +191,7 @@ describe("choosing the folder of the chat", () => {
     assert.deepEqual(banners(none.log), [["banner", WORKSPACE.title, WORKSPACE.text]]);
     const bad = withChoice({ error: "The bridge is not reachable." });
     await bad.starter.start();
-    assert.deepEqual(banners(bad.log), [["banner", "VS Code workspace", "The bridge is not reachable."]]);
+    assert.deepEqual(banners(bad.log), [["banner", "Workspace", "The bridge is not reachable."]]);
   });
 });
 

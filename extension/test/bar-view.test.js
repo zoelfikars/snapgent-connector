@@ -30,17 +30,17 @@ describe("bar view: before a session", () => {
 
   test("bridge up but VS Code has no folder open", () => {
     const v = bar({ bridgeOk: true, workspaceReady: false });
-    assert.equal(v.message, "Open a <b>folder in VS Code</b>");
+    assert.equal(v.message, "Open a <b>folder in your editor</b>");
     assert.equal(v.disabled, true);
   });
 
   test("the server is alive but advertises no tools yet: still the folder message", () => {
     const v = bar({ bridgeOk: false, workspaceReady: false, bridge: { connected: true, servers: [{ id: "vscode", alive: true, tools: 0 }] } });
-    assert.equal(v.message, "Open a <b>folder in VS Code</b>");
+    assert.equal(v.message, "Open a <b>folder in your editor</b>");
   });
 
   test("while the workspace is being probed", () => {
-    assert.equal(bar({ workspaceReady: false, workspaceProbePending: true }).message, "Checking <b>VS Code workspace</b>…");
+    assert.equal(bar({ workspaceReady: false, workspaceProbePending: true }).message, "Checking the <b>workspace</b>…");
   });
 
   test("another target that is down is 'unavailable', and its name is escaped", () => {

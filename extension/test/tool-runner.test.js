@@ -24,7 +24,7 @@ describe("ToolRunner: the folder the chat works in", () => {
     const { runner, bridge } = setupRoot("/work/portofolio", { tools: [] });
     const text = await runner.run({ tool: "read_file", arguments: { path: "a" } });
     assert.equal(text, FEEDBACK.workspaceClosed("/work/portofolio"));
-    assert.match(text, /open that folder in VS Code/);
+    assert.match(text, /open that folder in their editor/);
     assert.equal(bridge.calls.length, 0);
   });
 });
@@ -124,7 +124,7 @@ describe("ToolRunner.run — virtual commands", () => {
   test("list_mcp_servers reports only the selected, enabled server", async () => {
     const { runner } = setup({ session: { servers: [{ id: "vscode", alive: true, tools: 2 }, { id: "other", alive: true, tools: 9 }] } });
     const text = await runner.run({ tool: "list_mcp_servers" });
-    assert.match(text, /- vscode: VS Code \(default target\) - 2 commands available/);
+    assert.match(text, /- vscode: Snapgent MCP \(default target\) - 2 commands available/);
     assert.doesNotMatch(text, /other/);
   });
 });

@@ -73,7 +73,7 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
      */
     async choose() {
       const picked = await chooseWorkspace(await send({ type: "workspaces" }), (open) => choice.choose({
-        title: "Which folder should this chat work in?", hint: "VS Code has more than one folder open. This chat stays in the one you choose, whichever window you use later.", options: open,
+        title: "Which folder should this chat work in?", hint: "Your editor has more than one folder open. This chat stays in the one you choose, whichever window you use later.", options: open,
       }));
       if (picked.path) bindings.setPending(picked.path);
       return picked;

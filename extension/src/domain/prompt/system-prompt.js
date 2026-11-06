@@ -8,10 +8,10 @@ import { SESSION_PHRASE } from "../constants.js";
  * @param {{ workspace?: { name?: string, path?: string, git?: boolean }|null, targetName?: string, customPrompt?: string,
  *           providerNotes?: string, skills?: { name: string, description: string, path?: string }[] }} opts
  */
-export function buildSystemPrompt({ workspace = null, targetName = "VS Code", customPrompt = "", providerNotes = "", skills = [] } = {}) {
+export function buildSystemPrompt({ workspace = null, targetName = "Snapgent MCP", customPrompt = "", providerNotes = "", skills = [] } = {}) {
   const name = (workspace && workspace.name) || "This folder";
   const where = workspace && workspace.path ? ` It is at ${workspace.path}${workspace.git ? " and it is a git repository" : ""}.` : "";
-  const prompt = `${name} ${SESSION_PHRASE}.${where} It is a project on my computer, open in ${targetName}. You and I are working on it together: I say what I want, and you look at the files, change them and run commands there for me, through a small tool that runs in my browser; nothing else of yours reaches my machine (your own built-in tools and code execution do not), so everything you know about the project comes from the commands below.
+  const prompt = `${name} ${SESSION_PHRASE}.${where} It is a project on my computer, and you work in it through ${targetName}. You and I are working on it together: I say what I want, and you look at the files, change them and run commands there for me, through a small tool that runs in my browser; nothing else of yours reaches my machine (your own built-in tools and code execution do not), so everything you know about the project comes from the commands below.
 
 Whenever you want something done, write the command as its own fenced JSON block in your reply:
 \`\`\`json

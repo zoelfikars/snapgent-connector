@@ -279,6 +279,45 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     }
   }
 
+  /**
+   * Put a file into the chat the way a person would: pasted into the text box, through the page's file input, or dropped on the box.
+   * Nothing is sent. `handled` says only that the page reacted (a paste or drop it cancelled, an input that exists): what shows up is the page's business.
+   */
+  async function attachFile(file, method) {
+    const editor = getEditor();
+    if (!editor) throw new Error("The text box is not on the page. Re-calibrate it.");
+    const data = new win.DataTransfer();
+    data.items.add(file);
+    editor.focus();
+    await settle();
+    if (method === "paste") {
+      const event = new win.ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true });
+      editor.dispatchEvent(event);
+      return { method, handled: event.defaultPrevented };
+    }
+    if (method === "input") {
+      const inputs = [...document.querySelectorAll("input[type=file]")].filter((el) => !el.closest("#zs-root"));
+      if (!inputs.length) throw new Error("The page has no file input right now (some sites only make it when the + button is clicked).");
+      const input = inputs[inputs.length - 1];
+      input.files = data.files;
+      for (const type of ["input", "change"]) input.dispatchEvent(new win.Event(type, { bubbles: true }));
+      return { method, handled: true, inputs: inputs.length };
+    }
+    if (method === "drop") {
+      const target = composerFrame() || editor;
+      let handled = false;
+      for (const type of ["dragenter", "dragover", "drop"]) {
+        let event;
+        if (typeof win.DragEvent === "function") event = new win.DragEvent(type, { dataTransfer: data, bubbles: true, cancelable: true });
+        else { event = new win.Event(type, { bubbles: true, cancelable: true }); Object.defineProperty(event, "dataTransfer", { value: data }); }
+        target.dispatchEvent(event);
+        if (type === "drop") handled = event.defaultPrevented;
+      }
+      return { method, handled };
+    }
+    throw new Error(`Unknown way to attach a file: ${method}`);
+  }
+
   const pressed = (button) => {
     for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
       try {
@@ -431,7 +470,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
 
     getEditor, editorText, composerFrame, barAnchor: composerFrame, setInputLock() {}, installSendHooks,
     enforceComposer: () => ({ ready: !!getEditor() }), ensureComposerReady: async () => ({ ready: !!getEditor() }),
-    typeAndSend, writeText: writeComposer,
+    typeAndSend, writeText: writeComposer, attachFile,
 
     scanError: () => null, isTooLongMsg: () => false, isBusyMsg: () => false,
     findContinueBtn: () => null, clickContinueBtn: () => false,

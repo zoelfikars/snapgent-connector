@@ -3,7 +3,7 @@
 
 import { bareToolName } from "../tools/names.js";
 
-const WORKSPACE_REQUIRED = Object.freeze({ title: "VS Code workspace required", text: "Open a project folder in VS Code, then try again." });
+const WORKSPACE_REQUIRED = Object.freeze({ title: "Workspace required", text: "Open a project folder in VS Code or Antigravity, then try again." });
 export const workspaceRequiredBanner = () => ({ ...WORKSPACE_REQUIRED });
 
 /** The cheap tool we call to prove a workspace is really open. */
