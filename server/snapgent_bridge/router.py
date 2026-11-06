@@ -1,6 +1,7 @@
 """Turns one request from the extension into replies. No sockets: it talks through `reply` and `broadcast`."""
 
 import asyncio
+import os
 import time
 from typing import Any, Awaitable, Callable, Dict
 
@@ -86,10 +87,22 @@ class RequestRouter:
         await self._broadcast(self.connected_message())
 
     async def _workspaces(self, request, reply):
-        await self._ask_vscode("snapgent/workspaces", {}, request, reply)
+        await self._ask_vscode("snapgent/workspaces", {}, request, reply, self._with_recent)
 
     async def _set_workspace(self, request, reply):
-        await self._ask_vscode("snapgent/set_workspace", {"path": request.get("path")}, request, reply)
+        await self._ask_vscode("snapgent/set_workspace", {"path": request.get("path")}, request, reply, self._remember)
+
+    def _with_recent(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """The folders used lately that still exist: what a chat can start in when no editor has a folder open."""
+        return {**data, "recent": [path for path in self._config.recent_folders() if os.path.isdir(path)]}
+
+    def _remember(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        if data.get("pinned"):
+            try:
+                self._config.remember_folder(data["pinned"])
+            except (OSError, RuntimeError) as error:  # a recent list that cannot be saved must not fail the choice
+                self._log(f"recent folders not saved: {error}")
+        return data
 
     async def _pick_folder(self, request, reply):
         """Open the system's folder window on this machine; the answer is the chosen path (or none when it was closed)."""
@@ -100,7 +113,7 @@ class RequestRouter:
             return
         await reply(protocol.workspace_message(request.get("id"), True, {"picked": chosen}))
 
-    async def _ask_vscode(self, method, params, request, reply):
+    async def _ask_vscode(self, method, params, request, reply, finish=lambda data: data):
         """The bar's questions about the default server's workspace (which folders, which one is pinned)."""
         server = self._registry.servers.get(PROTECTED_SERVER_ID)
         if server is None:
@@ -111,7 +124,7 @@ class RequestRouter:
         except (asyncio.TimeoutError, RuntimeError, OSError) as error:
             await reply(protocol.workspace_message(request.get("id"), False, error=str(error) or "The Snapgent MCP server did not answer."))
             return
-        await reply(protocol.workspace_message(request.get("id"), True, data if isinstance(data, dict) else {}))
+        await reply(protocol.workspace_message(request.get("id"), True, finish(data if isinstance(data, dict) else {})))
 
     async def _call_tool(self, request, reply):
         call = protocol.parse_tool_call(request)

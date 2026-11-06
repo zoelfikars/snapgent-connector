@@ -75,6 +75,12 @@ describe("which folder a new chat starts in", () => {
     assert.deepEqual(await chooseWorkspace({ ok: true, open: [] }, ask(null)), { none: true });
     assert.deepEqual(await chooseWorkspace({ ok: false, error: "down" }, ask(null)), { error: "down" });
   });
+  test("with no editor open the folders used lately are offered, after the open ones", async () => {
+    assert.deepEqual(await chooseWorkspace({ ok: true, open: [], recent: ["/r1", "/r2"] }, ask("/r2")), { path: "/r2" });
+    assert.deepEqual(ask.seen, ["/r1", "/r2"]);
+    assert.deepEqual(await chooseWorkspace({ ok: true, open: ["/a", "/b"], recent: ["/a", "/r1"] }, ask("/r1")), { path: "/r1" });
+    assert.deepEqual(ask.seen, ["/a", "/b", "/r1"], "a folder already open is not listed twice");
+  });
 });
 
 describe("the folder question", () => {
@@ -102,7 +108,7 @@ describe("the folder question", () => {
 });
 
 describe("a chat whose folder is not open because VS Code is closed", () => {
-  const base = { staleExtension: false, starting: false, started: true, running: false, parked: false, blankChat: false, bridge: { connected: true, servers: [{ id: "snapgent", alive: true, tools: 0 }] }, bridgeOk: false, target: { id: "snapgent", name: "VS Code" }, activeToolCount: 0, workspaceReady: false, workspaceProbePending: false, modeWarning: null };
+  const base = { staleExtension: false, starting: false, started: true, running: false, parked: false, blankChat: false, bridge: { connected: true, servers: [{ id: "snapgent", alive: true, tools: 0 }] }, bridgeOk: false, target: { id: "snapgent", name: "Snapgent MCP" }, activeToolCount: 0, workspaceReady: false, workspaceProbePending: false, modeWarning: null };
   test("the bar names the folder to open", () => {
     const v = computeBarView({ ...base, workspaceFolder: "/home/me/Projects/portofolio" });
     assert.equal(v.message, "<b>Active</b> · open <b>portofolio</b> in your editor");

@@ -83,6 +83,28 @@ class StoreTests(unittest.TestCase):
         with self.assertRaises(ConfigError):
             self.store.add_server("a", "node", [], {})
 
+    def test_recent_folders_are_kept_latest_first_without_repeats_and_at_most_ten(self):
+        self.assertEqual(self.store.recent_folders(), [])
+        for name in ("a", "b", "a"):
+            self.store.remember_folder(f"/work/{name}")
+        self.assertEqual(self.store.recent_folders(), ["/work/a", "/work/b"])
+        for number in range(15):
+            self.store.remember_folder(f"/work/p{number}")
+        self.assertEqual(len(self.store.recent_folders()), 10)
+        self.assertEqual(self.store.recent_folders()[0], "/work/p14")
+
+    def test_remembering_a_folder_keeps_the_servers_and_ignores_junk(self):
+        self.store.add_server("extra", "node", [], {})
+        self.store.remember_folder("/work/a")
+        self.store.remember_folder("")
+        self.store.remember_folder(None)
+        self.assertEqual(list(self.store.load_servers()), ["extra"])
+        self.assertEqual(self.store.recent_folders(), ["/work/a"])
+
+    def test_a_broken_config_has_no_recent_folders(self):
+        self.path.write_text("{not json", encoding="utf-8")
+        self.assertEqual(self.store.recent_folders(), [])
+
     def test_mcpservers_must_be_an_object(self):
         self.path.write_text(json.dumps({"mcpServers": []}), encoding="utf-8")
         with self.assertRaisesRegex(ConfigError, "mcpServers"):

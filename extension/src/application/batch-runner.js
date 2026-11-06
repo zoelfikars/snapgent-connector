@@ -73,7 +73,9 @@ export class BatchRunner {
     const ran = results.length;
     const said = ran === calls.length ? (ran === 1 ? "Command done" : `${ran}/${ran} commands done`) : `${ran} of ${calls.length} commands run`;
     const composed = composeBatch(results, notRun);
-    const messages = this._d.parts ? partMessages(composed, messageRoom, MAX_RESULT_PARTS) : [composed.length > room ? trimMiddle(composed, room, "the results") : composed];
+    // "Output as file": one message, however long; the chat turns it into a file when it is over the size (page/output-file.js).
+    const asFile = typeof this._budget.asFile === "function" && this._budget.asFile();
+    const messages = asFile ? [composed] : this._d.parts ? partMessages(composed, messageRoom, MAX_RESULT_PARTS) : [composed.length > room ? trimMiddle(composed, room, "the results") : composed];
     // Calls the model wrote in its own markup were run anyway; it is told, in the same message, to use our commands next time.
     if (batch.some((call) => call.native)) {
       messages[messages.length - 1] += FEEDBACK.nativeFormat;

@@ -34,17 +34,20 @@ const folderName = (path) => String(path).replace(/[\\/]+$/, "").split(/[\\/]/).
 
 /**
  * The workspace pop-over: follow VS Code's active window (Auto), one of the folders VS Code has open, or any folder typed in.
- * @param {{ active: string|null, open: string[], pinned: string|null }} state
+ * @param {{ active: string|null, open: string[], pinned: string|null, recent?: string[] }} state  `recent`: folders used lately (from the bridge), shown after the open ones
  */
-export function workspaceMenuHtml({ active, open, pinned }) {
+export function workspaceMenuHtml({ active, open, pinned, recent = [] }) {
   const row = (path, title, note, current) =>
     `<button type="button" class="zs-site-opt zs-ws-opt${current ? " zs-target-cur" : ""}" data-path="${escapeHtml(path)}">` +
     `<span class="zs-site-name"><span>${escapeHtml(title)}</span><span class="zs-site-host">${escapeHtml(note)}</span></span>${current ? `<span class="zs-site-badge">in use</span>` : ""}</button>`;
   const auto = row("", "Auto", active ? `follows your editor: ${folderName(active)}` : "follows your active editor window", !pinned);
   const folders = open.map((path) => row(path, folderName(path), path, pinned === path)).join("");
   const typed = pinned && !open.includes(pinned) ? row(pinned, folderName(pinned), pinned, true) : "";
+  // Folders used lately, so a chat can start in one when no editor has a folder open (the editor's own list comes first).
+  const recentRows = recent.filter((path) => !open.includes(path) && path !== pinned).map((path) => row(path, folderName(path), path, false)).join("");
   return `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Workspace</span></div>${auto}</section>` +
     (folders || typed ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Open in your editor</span></div>${folders}${typed}</section>` : "") +
+    (recentRows ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Used lately</span></div>${recentRows}</section>` : "") +
     `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Another folder</span></div>` +
     `<button type="button" class="zs-site-opt zs-ws-pick"><span class="zs-site-name"><span>Choose a folder…</span><span class="zs-site-host">opens your system's folder window</span></span></button>` +
     // The typed path is only the way out when this machine has no folder window.

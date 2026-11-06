@@ -3,7 +3,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from snapgent_mcp.paths import iter_files, relative, resolve_inside
+from snapgent_mcp.paths import find_outside_root, iter_files, relative, resolve_inside
+from snapgent_mcp.tools.commands import outside_root_argument, run_command
 from tests.mcp_support import WorkspaceCase
 
 
@@ -41,6 +42,25 @@ class ResolveInsideTests(WorkspaceCase):
     def test_relative_formatting(self):
         self.assertEqual(relative(self.root / "a" / "b.txt", self.root), "a/b.txt")
         self.assertEqual(relative(self.root, self.root), ".")
+
+
+class OutsideRootGuardTests(WorkspaceCase):
+    def test_paths_that_leave_the_root_are_found(self):
+        for bad in (("/etc/passwd",), ("../x",), ("a/../../x",), ("--out=/etc/x",), ("~/notes",), (str(self.base / "other"),)):
+            self.assertIsNotNone(find_outside_root(list(bad), self.root), bad)
+
+    def test_ordinary_arguments_and_paths_inside_are_fine(self):
+        for good in (["-m", "unittest"], ["src/a.py"], [str(self.root / "x")], ["a/../b"], ["/dev/null"], ["s/a/b/"], ["--flag=value"], ["print('/etc')"]):
+            self.assertIsNone(find_outside_root(good, self.root), good)
+
+    def test_run_command_refuses_and_names_the_root(self):
+        with self.assertRaisesRegex(ValueError, "outside the workspace root") as caught:
+            run_command(self.ctx, "cat", ["/etc/passwd"])
+        self.assertIn(str(self.root), str(caught.exception))
+
+    def test_the_program_may_live_anywhere_but_not_climb_out_with_dots(self):
+        self.assertIsNone(outside_root_argument("/usr/bin/python3", ["-m", "unittest"], self.root))
+        self.assertIsNotNone(outside_root_argument("../tool.sh", [], self.root))
 
 
 class IterFilesTests(WorkspaceCase):

@@ -15,7 +15,7 @@ export const PROFILE_VERSION = 1;
  * @property {{ turn: string, body: string|null, thinking?: string }} assistant   `thinking`: the reasoning inside the same turn, left out of the reply
  * @property {{ turn: string }} user
  * @property {{ selector: string }|null} stop    optional; otherwise found by label next to the composer
- * @property {{ chars?: number, calls?: number }} [limits]   what this AI accepts: message size and commands per reply; absent = the general preferences
+ * @property {{ chars?: number, calls?: number, asFile?: boolean }} [limits]   what this AI accepts: message size, commands per reply, and whether a message over the size goes as a file; absent = the general preferences
  * @property {{ selector: string }|null} [card]   optional: the box around the text box and its buttons; otherwise found by looking
  */
 
@@ -101,6 +101,7 @@ export function updateProfile(profile, role, picks) {
     const limits = {};
     if (wanted.chars > 0) limits.chars = Math.round(wanted.chars);
     if (wanted.calls > 0) limits.calls = Math.round(wanted.calls);
+    if (typeof wanted.asFile === "boolean") limits.asFile = wanted.asFile;
     return { profile: Object.keys(limits).length ? { ...rest, limits } : rest, warnings };
   }
   return { error: `Unknown part "${role}".` };
@@ -119,7 +120,8 @@ export function profileProblems(profile) {
   if (profile.limits !== undefined) {
     const { limits } = profile;
     const ok = (value) => value === undefined || (Number.isFinite(value) && value > 0);
-    if (!limits || typeof limits !== "object" || !ok(limits.chars) || !ok(limits.calls)) problems.push("limits must be positive numbers (chars, calls)");
+    const flag = (value) => value === undefined || typeof value === "boolean";
+    if (!limits || typeof limits !== "object" || !ok(limits.chars) || !ok(limits.calls) || !flag(limits.asFile)) problems.push("limits must be positive numbers (chars, calls) and a true or false (asFile)");
   }
   return problems;
 }

@@ -42,8 +42,10 @@ class McpServer:
         if method == "ping":
             return protocol.result(request_id, {})
         if method == "tools/list":
-            # No workspace, no tools: the extension then reports the target as unavailable.
-            return protocol.result(request_id, {"tools": self._schemas() if self._workspace.is_open() else []})
+            # The tools are listed whether or not an editor has a folder open: each call carries the folder its chat works in
+            # (ROOT_ARGUMENT), so the editor is not what makes a call possible. A call with no folder of its own is refused
+            # when it is made, with a message that says how to choose one.
+            return protocol.result(request_id, {"tools": self._schemas()})
         if method == "tools/call":
             return self._tools_call(request_id, params)
         if method == "notifications/initialized":
@@ -101,7 +103,13 @@ class McpServer:
             if existing is not None:
                 # The same call again (the page was reloaded): answer from the job, never run it twice or ask the user again.
                 return protocol.result(request_id, protocol.tool_output(existing.wait()))
-            root = self._workspace.root_for(bound_root) if isinstance(bound_root, str) and bound_root.strip() else self._workspace.root()
+            if isinstance(bound_root, str) and bound_root.strip():
+                root = self._workspace.root_for(bound_root)
+            elif self._workspace.is_open():
+                root = self._workspace.root()
+            else:
+                # No editor, no folder picked for this chat yet: say what to do instead of failing on "no workspace".
+                raise ValueError("This chat has no folder yet and no editor has one open. Choose the folder for this chat in the bar (the folder menu), then run the command again.")
             # A running command reports its output while it runs; a call with no job has nobody to show it to.
             ctx = Context(root=root, policy=policy, session=self._session,
                           stream=self._streamer(job_key) if job_key else None)

@@ -1,8 +1,9 @@
 """Path rules: everything a tool touches must resolve inside the workspace root."""
 
 import os
+import re
 from pathlib import Path
-from typing import Iterable, Tuple
+from typing import Iterable, Optional, Sequence, Tuple
 
 from .limits import IGNORED_DIRECTORIES
 
@@ -18,6 +19,41 @@ def resolve_inside(rel_or_abs: str, root: Path) -> Path:
     except ValueError as error:
         raise ValueError(f"Path escapes workspace root: {rel_or_abs}") from error
     return target
+
+
+WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:[\\/]")
+ALLOWED_OUTSIDE = frozenset({"/dev/null"})
+
+
+def _points_outside(value: str, root: Path) -> bool:
+    """Whether one argument that looks like a path leads out of `root`. Anything that does not look like a path is left alone."""
+    if not value or "\n" in value or value in ALLOWED_OUTSIDE:
+        return False
+    if value.startswith("~") or value.startswith("/") or WINDOWS_DRIVE.match(value):
+        target = Path(os.path.expanduser(value))
+    elif ".." in re.split(r"[\\/]", value):
+        target = root / value
+    else:
+        return False
+    try:
+        target.resolve().relative_to(root)
+    except (ValueError, OSError, RuntimeError):
+        return True
+    return False
+
+
+def find_outside_root(values: Sequence[str], root: Path) -> Optional[str]:
+    """The first argument that names a place outside `root` (`--flag=/path` counts as `/path`), or None.
+
+    A heuristic, not a sandbox: a program can still build a path itself. It stops the usual accident of a command aimed at another folder."""
+    for value in values:
+        text = str(value)
+        candidates = [text]
+        if text.startswith("-") and "=" in text:
+            candidates.append(text.split("=", 1)[1])
+        if any(_points_outside(candidate, root) for candidate in candidates):
+            return text
+    return None
 
 
 def relative(path: Path, root: Path) -> str:

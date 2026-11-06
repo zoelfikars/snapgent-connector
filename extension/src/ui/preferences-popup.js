@@ -39,6 +39,8 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     ? `<label class="zs-pref" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="zs-pref-site" style="margin-top:3px"><span><b>Only for this site</b>` +
       `<span class="zs-mcp-pop-note" style="display:block">Keep these two values in this AI's calibration: they go with Export calibration, and other sites keep the general values.</span></span></label>`
     : "";
+  const asFileBox = `<label class="zs-pref" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="zs-pref-asfile" style="margin-top:3px"><span><b>Output as file</b>` +
+    `<span class="zs-mcp-pop-note" style="display:block">A message longer than the message size is attached to the chat as a .txt file instead of being sent in parts (up to 5, the rest cut). Turn it on only for an AI that reads attached files.</span></span></label>`;
   const barSection = actions.onToggleCorner
     ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>This bar</span></div>` +
       row("zs-bar-corner", `Move to the ${otherCorner} corner`) +
@@ -60,7 +62,7 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     slider("zs-pref-chars", "Message size", MIN_PROMPT_CHARS, MAX_PROMPT_CHARS, CHARS_STEP,
       "The most one message to the chat may hold. Longer output goes in the next messages (up to 5), the rest is cut in the middle. About 4 characters per token.") +
     slider("zs-pref-calls", "Commands per reply", MIN_BATCH_CALLS, MAX_BATCH_CALLS, 1,
-      "How many commands the AI may send in one reply. They run in order and are answered in one message; any beyond it are reported as not run.") + siteBox +
+      "How many commands the AI may send in one reply. They run in order and are answered in one message; any beyond it are reported as not run.") + asFileBox + siteBox +
     (actions.onCopyTest
       ? slider("zs-pref-lorem", "Test text size", MIN_PROMPT_CHARS, MAX_PROMPT_CHARS, CHARS_STEP,
         "Copies this many characters of lorem ipsum to the clipboard, to paste into the chat and see how much one message it accepts. Fill the text box writes it the way the extension writes its own messages, which a site may treat differently from a paste of your own. Nothing is saved.") +
@@ -93,11 +95,18 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
   // With "Only for this site" ticked the sliders write to this AI's calibration, otherwise to the general preferences.
   const own = values.site || null;
   let useSite = !!own;
-  const general = { chars: values.chars, calls: values.calls };
+  const general = { chars: values.chars, calls: values.calls, asFile: !!values.asFile };
   const sliderValue = (id) => Number(pop.querySelector(`#${id}`).value);
-  const both = () => ({ chars: sliderValue("zs-pref-chars"), calls: sliderValue("zs-pref-calls") });
+  const both = () => ({ chars: sliderValue("zs-pref-chars"), calls: sliderValue("zs-pref-calls"), asFile: pop.querySelector("#zs-pref-asfile").checked });
   bind("zs-pref-chars", own && own.chars ? own.chars : values.chars, charsText, (value) => { if (useSite) save.site(both()); else { general.chars = value; save.chars(value); } });
   bind("zs-pref-calls", own && own.calls ? own.calls : values.calls, callsText, (value) => { if (useSite) save.site(both()); else { general.calls = value; save.calls(value); } });
+  const asFileTick = pop.querySelector("#zs-pref-asfile");
+  asFileTick.checked = own && typeof own.asFile === "boolean" ? own.asFile : !!values.asFile;
+  asFileTick.addEventListener("change", () => {
+    if (useSite) { save.site(both()); return; }
+    general.asFile = asFileTick.checked;
+    if (save.asFile) save.asFile(asFileTick.checked);
+  });
   const loremSize = pop.querySelector("#zs-pref-lorem");
   if (loremSize) {
     bind("zs-pref-lorem", 100000, charsText, () => {});
@@ -114,6 +123,7 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
       useSite = siteTick.checked;
       if (useSite) { save.site(both()); return; }
       save.site(null);
+      asFileTick.checked = general.asFile;
       for (const [id, value] of [["zs-pref-chars", general.chars], ["zs-pref-calls", general.calls]]) {
         const input = pop.querySelector(`#${id}`);
         input.value = String(value);

@@ -115,6 +115,52 @@ class CallToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, [])
 
 
+class WorkspaceRequestTests(unittest.IsolatedAsyncioTestCase):
+    """The bar's folder questions go to the default server; the bridge adds the folders used lately and remembers what was pinned."""
+
+    def stub_workspace(self, registry, listing):
+        """The default server's answers to the bar's two questions (the bridge asks it with `request`, not `tools/call`)."""
+        calls = []
+
+        async def request(method, params, timeout=10):
+            calls.append((method, params))
+            if method == "snapgent/workspaces":
+                return dict(listing)
+            return {"pinned": listing.get("pinned")}
+
+        registry.servers["snapgent"].request = request
+        return calls
+
+    async def test_workspaces_adds_the_recent_folders_that_still_exist(self):
+        router, registry, *_ = make()
+        calls = self.stub_workspace(registry, {"active": None, "open": [], "pinned": None})
+        keep = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: keep.rmdir())
+        router._config.remember_folder(str(keep))
+        router._config.remember_folder(str(keep / "gone"))
+        [reply] = await ask(router, {"type": "workspaces", "id": 1})
+        self.assertEqual(reply["recent"], [str(keep)], "a folder that is gone is not offered")
+        self.assertEqual(calls[0][0], "snapgent/workspaces")
+
+    async def test_a_pinned_folder_is_remembered_and_an_error_reading_the_list_is_survivable(self):
+        router, registry, *_ = make()
+        self.stub_workspace(registry, {"active": None, "open": [], "pinned": "/work/portofolio"})
+        [reply] = await ask(router, {"type": "set_workspace", "id": 2, "path": "/work/portofolio"})
+        self.assertTrue(reply["ok"])
+        self.assertEqual(router._config.recent_folders(), ["/work/portofolio"])
+
+    async def test_a_recent_list_that_cannot_be_saved_does_not_fail_the_choice(self):
+        router, registry, *_ = make()
+        self.stub_workspace(registry, {"active": None, "open": [], "pinned": "/work/a"})
+
+        def broken(_path):
+            raise OSError("disk full")
+
+        router._config.remember_folder = broken
+        [reply] = await ask(router, {"type": "set_workspace", "id": 3, "path": "/work/a"})
+        self.assertTrue(reply["ok"])
+
+
 class ServerManagementTests(unittest.IsolatedAsyncioTestCase):
     async def test_add_server_persists_restarts_replies_and_broadcasts(self):
         tmp = tempfile.TemporaryDirectory()

@@ -4,7 +4,8 @@
 import { bareToolName } from "../tools/names.js";
 import { DEFAULT_SERVER_ID } from "../tools/default-server.js";
 
-const WORKSPACE_REQUIRED = Object.freeze({ title: "Workspace required", text: "Open a project folder in VS Code or Antigravity, then try again." });
+// No folder at all: the editor has none open and this chat has none yet. The bar's folder menu is always a way to pick one.
+const WORKSPACE_REQUIRED = Object.freeze({ title: "Workspace required", text: "Open a project folder in your editor, or choose the folder for this chat in the bar's folder menu, then try again." });
 export const workspaceRequiredBanner = () => ({ ...WORKSPACE_REQUIRED });
 
 /** The cheap tool we call to prove a workspace is really open. */

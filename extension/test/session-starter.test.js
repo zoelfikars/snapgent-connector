@@ -4,7 +4,7 @@ import { SessionStarter } from "../src/application/session-starter.js";
 import { checkStartPreconditions, handshakeUnavailable, probeSucceeded } from "../src/domain/agent/session-start.js";
 
 const tool = (name) => ({ name });
-const WORKSPACE = { title: "Workspace required", text: "Open a project folder in VS Code or Antigravity, then try again." };
+const WORKSPACE = { title: "Workspace required", text: "Open a project folder in your editor, or choose the folder for this chat in the bar's folder menu, then try again." };
 
 function setup(over = {}) {
   const log = [];

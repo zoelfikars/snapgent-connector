@@ -7,6 +7,7 @@ import { MIN_PROMPT_CHARS, clampBatchCalls, clampPromptChars, effectiveLimit } f
 
 const SETTING_KEY = "zsMaxPromptChars";
 const CALLS_KEY = "zsMaxBatchCalls";
+const AS_FILE_KEY = "zsOutputAsFile";
 const VOLUMES_KEY = "zsVolumes";
 const VOLUMES_KEPT = 200;
 const LEARNED_SHARE = 0.6; // after a "too long": stay at this share of the size that was refused
@@ -16,6 +17,7 @@ export function createMessageBudget({ storage, hostname, provider, diag }) {
   const learnedKey = `zsLearnedCap:${hostname}`;
   let setting = clampPromptChars(undefined);
   let calls = clampBatchCalls(undefined);
+  let asFile = false;
   let learned = Infinity;
   const volume = { key: "", total: 0 };
 
@@ -23,6 +25,8 @@ export function createMessageBudget({ storage, hostname, provider, diag }) {
   storage.get(learnedKey).then((saved) => { if (saved > 0) learned = saved; });
   storage.get(CALLS_KEY).then((saved) => { calls = clampBatchCalls(saved); });
   storage.watch(CALLS_KEY, (saved) => { calls = clampBatchCalls(saved); });
+  storage.get(AS_FILE_KEY).then((saved) => { asFile = saved === true; });
+  storage.watch(AS_FILE_KEY, (saved) => { asFile = saved === true; });
   storage.watch(SETTING_KEY, (saved) => { setting = clampPromptChars(saved); learned = Infinity; storage.remove(learnedKey); });
 
   // This AI's own values (from its calibration) win over the general preferences; read on every use, the provider changes without a reload.
@@ -51,5 +55,8 @@ export function createMessageBudget({ storage, hostname, provider, diag }) {
     diag("budget.learned", { chars, cap: learned });
   }
 
-  return { limit, calls: () => (siteLimits().calls > 0 ? clampBatchCalls(siteLimits().calls) : calls), sent, tooLong };
+  // Whether a message over the size goes as a file: this AI's own choice (from its calibration) wins over the general one.
+  const outputAsFile = () => (typeof siteLimits().asFile === "boolean" ? siteLimits().asFile : asFile);
+
+  return { limit, calls: () => (siteLimits().calls > 0 ? clampBatchCalls(siteLimits().calls) : calls), asFile: outputAsFile, sent, tooLong };
 }

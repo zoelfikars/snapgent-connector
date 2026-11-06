@@ -41,9 +41,10 @@ class ServerTests(WorkspaceCase):
         self.assertEqual(reply["result"]["serverInfo"]["name"], SERVER_NAME)
         self.assertEqual(self.ask("ping")["result"], {})
 
-    def test_tools_list_is_empty_when_no_workspace_is_open(self):
+    def test_tools_are_listed_whether_or_not_an_editor_has_a_folder_open(self):
+        # Each call carries the folder its chat works in, so the editor is not what makes a call possible.
         self.assertEqual(len(self.ask("tools/list")["result"]["tools"]), 24)
-        self.assertEqual(self.ask("tools/list", open_workspace=False)["result"]["tools"], [])
+        self.assertEqual(self.ask("tools/list", open_workspace=False)["result"]["tools"], self.ask("tools/list")["result"]["tools"])
 
     def test_notifications_get_no_reply(self):
         self.assertIsNone(self.ask("notifications/initialized"))
@@ -72,7 +73,7 @@ class ServerTests(WorkspaceCase):
 
     def test_tool_calls_without_a_workspace_explain_what_to_do(self):
         reply = self.ask("tools/call", {"name": "tree"}, open_workspace=False)
-        self.assertIn("Open a project folder in VS Code", reply["error"]["message"])
+        self.assertIn("Choose the folder for this chat in the bar", reply["error"]["message"])
 
     def test_a_call_runs_in_the_folder_the_chat_is_bound_to_not_the_one_vscode_shows(self):
         other = self.base / "other-project"

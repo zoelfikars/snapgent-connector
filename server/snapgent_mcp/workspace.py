@@ -254,5 +254,5 @@ class Workspace:
             return self.pinned.resolve()
         folder = self._auto_folder()
         if folder is None:
-            raise WorkspaceError("Open a project folder in VS Code (or another supported editor, such as Antigravity IDE) before using the VS Code MCP server.")
+            raise WorkspaceError("Open a project folder in VS Code (or another supported editor, such as Antigravity IDE), or choose the folder for this chat in the bar, before using the Snapgent MCP server.")
         return folder

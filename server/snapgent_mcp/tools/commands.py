@@ -10,6 +10,7 @@ from typing import List, Optional
 from ..context import Context
 from ..limits import COMMAND_TIMEOUT_SECONDS, MAX_OUTPUT_CHARS, SAFE_PROJECT_SCRIPTS, SCRIPT_TIMEOUT_SECONDS
 from ..outputs import CACHE
+from ..paths import find_outside_root
 from ..process import run_process_streaming
 from ..security.commands import unsafe_for_cmd
 from .registry import EXECUTE, READ, tool
@@ -51,11 +52,21 @@ def shell_wrap(command: List[str], windows: Optional[bool] = None) -> List[str]:
     return ["cmd.exe", "/c", *command]
 
 
+def outside_root_argument(command: str, args: List[str], root: Path) -> Optional[str]:
+    """What the command is given that leads out of the root, or None. The program may live anywhere (/usr/bin/python3); only a
+    program written as a relative path that climbs out with `..` counts, and every argument is checked."""
+    climbs = ".." in command.replace("\\", "/").split("/")
+    return find_outside_root(([command] if climbs else []) + list(args), root)
+
+
 @tool("run_command", "Run a command with the workspace as its working directory.",
       {"command": STR, "args": STR_LIST, "max_output_chars": OUTPUT_CHARS}, ["command"], risk=EXECUTE)
 def run_command(ctx: Context, command: str, args: Optional[List[str]] = None, max_output_chars: Optional[int] = None) -> str:
     if not command.strip():
         raise ValueError("Command cannot be empty.")
+    stray = outside_root_argument(command, args or [], ctx.root)
+    if stray:
+        raise ValueError(f"Refused: '{stray}' points outside the workspace root ({ctx.root}). Use a path inside the root, or choose another folder in the bar. This is a safety check, not a sandbox.")
     return run_process_streaming(shell_wrap([command, *(args or [])]), ctx.root, timeout=COMMAND_TIMEOUT_SECONDS,
                                  max_output_chars=max_output_chars, on_chunk=ctx.stream)
 

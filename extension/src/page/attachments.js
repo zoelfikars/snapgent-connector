@@ -113,7 +113,8 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, p
       if (read.unread.length) notes.push(`Not attached, no room left: ${read.unread.join(", ")}`);
       if (left) notes.push(`Only the first ${MAX_FILES} files of the folders were attached (${left} more).`);
       const message = `${text.trimEnd()}\n\nAttached files (their current contents, with line numbers; no need to read them again):\n${read.body}${notes.length ? `\n\n${notes.join("\n")}` : ""}`;
-      const messages = partMessages(message, budget.limit(), MAX_RESULT_PARTS);
+      // With "Output as file" the message goes whole: the chat turns it into a file when it is over the size (page/output-file.js).
+      const messages = budget.asFile && budget.asFile() ? [message] : partMessages(message, budget.limit(), MAX_RESULT_PARTS);
       if (messages.length > 1) parts.hold(messages);
       handedOver = true; // the sender takes the flags from here
       const base = await chat.submit(messages[0]);

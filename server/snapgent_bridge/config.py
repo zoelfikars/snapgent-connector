@@ -8,6 +8,8 @@ from typing import Any, Dict, List
 SERVER_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
 PROTECTED_SERVER_ID = "snapgent"  # the default target cannot be removed
 LEGACY_SERVER_ID = "vscode"  # its name in older versions: protected too, until the launcher renames it
+RECENT_KEY = "recentFolders"
+RECENT_LIMIT = 10
 
 
 class ConfigError(RuntimeError):
@@ -76,13 +78,33 @@ class ConfigStore:
             raise ConfigError("The Snapgent MCP server cannot be removed.")
         self._mutate(lambda servers: servers.pop(server_id, None))
 
+    def recent_folders(self) -> List[str]:
+        """The folders the user worked in lately, the latest first. A config that cannot be read has none."""
+        try:
+            items = self._read().get(RECENT_KEY)
+        except ConfigError:
+            return []
+        return [item for item in items if isinstance(item, str)] if isinstance(items, list) else []
+
+    def remember_folder(self, path: Any) -> None:
+        """Put a folder first in the recent list (once, at most RECENT_LIMIT of them)."""
+        if not isinstance(path, str) or not path.strip():
+            return
+        config = self._read()
+        others = [item for item in self.recent_folders() if item != path]
+        config[RECENT_KEY] = [path, *others][:RECENT_LIMIT]
+        self._write(config)
+
+    def _write(self, config: Dict[str, Any]) -> None:
+        # Write atomically so a crash mid-write never leaves a half-written config.
+        temp = self._path.with_suffix(".json.tmp")
+        temp.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        temp.replace(self._path)
+
     def _mutate(self, change) -> None:
         config = self._read()
         servers = config.setdefault("mcpServers", {})
         if not isinstance(servers, dict):
             raise ConfigError("mcpServers must be a JSON object.")
         change(servers)
-        # Write atomically so a crash mid-write never leaves a half-written config.
-        temp = self._path.with_suffix(".json.tmp")
-        temp.write_text(json.dumps(config, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        temp.replace(self._path)
+        self._write(config)

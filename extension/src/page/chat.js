@@ -4,6 +4,7 @@
 import { MessageSender, ResponseWatcher } from "../application/index.js";
 import { describeAnchor } from "../infrastructure/chat/index.js";
 import { SESSION_PHRASE } from "../domain/constants.js";
+import { createOutputFile } from "./output-file.js";
 import { sleep, waitFor } from "./visibility.js";
 
 // What the cover says while the extension waits for the AI, in the order the waiting really goes.
@@ -18,7 +19,8 @@ const PHASE_LABELS = {
  * @param {{ document: Document, provider: object, state: object, visibility: object, catalogue: object, diag: Function,
  *           cover: (on: boolean) => void, banner: Function }} deps
  */
-export function createChat({ document, provider, state, visibility, catalogue, diag, cover, banner, progress = () => {} }) {
+export function createChat({ document, provider, state, visibility, catalogue, diag, cover, banner, progress = () => {}, budget = null }) {
+  const outputFile = createOutputFile({ provider, budget, diag });
   // Optional provider abilities are handed over only when the provider has them.
   const optional = (name) => (typeof provider[name] === "function" ? (...args) => provider[name](...args) : undefined);
 
@@ -89,11 +91,11 @@ export function createChat({ document, provider, state, visibility, catalogue, d
     /** The loop's and the starter's view of the conversation. */
     turns: {
       next: (base) => watcher.wait(base),
-      submit: (text) => sender.submit(text),
+      submit: async (text) => sender.submit(await outputFile.prepare(text)),
       isHalted: (item) => provider.turnHalted(item),
       resumeTruncated: async () => !!(provider.clickContinueBtn() && await waitFor(() => provider.isGenerating(), 2500)),
     },
     waitForResponse: (base) => watcher.wait(base),
-    submit: (text) => sender.submit(text),
+    submit: async (text) => sender.submit(await outputFile.prepare(text)),
   };
 }

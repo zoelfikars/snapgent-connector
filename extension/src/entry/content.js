@@ -67,9 +67,9 @@ bar = createBar({
   onStop: () => stop.stopLoop(),
 });
 
-const chat = createChat({ document, provider, state, visibility, catalogue: tools.catalogue, diag, cover: bar.cover, banner: notify, progress: (text) => bar.coverLabel(text) });
-const { turnKey, executed } = createTurns({ provider });
 const budget = createMessageBudget({ storage, hostname: location.hostname, provider, diag });
+const chat = createChat({ document, provider, state, visibility, catalogue: tools.catalogue, diag, cover: bar.cover, banner: notify, progress: (text) => bar.coverLabel(text), budget });
+const { turnKey, executed } = createTurns({ provider });
 const resend = createPromptResend({ provider, state, storage, systemPrompt: tools.systemPrompt, limit: budget.limit, chat, diag });
 const parts = new PartQueue();
 const loop = createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs: createBatchJobs({ storage, provider, turnKey }), resend, parts, diag });

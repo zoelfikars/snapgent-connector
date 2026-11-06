@@ -83,7 +83,19 @@ describe("preferences", () => {
 
   test("read() gives what the panel shows", async () => {
     const preferences = createPreferences({ storage: fakeStorage({ [KEYS.chars]: 150000, [KEYS.calls]: 12 }), state: {} });
-    assert.deepEqual(await preferences.read(), { chars: 150000, calls: 12, folders: DEFAULT_EXCLUDED_FOLDERS, contextFiles: DEFAULT_CONTEXT_FILES });
+    assert.deepEqual(await preferences.read(), { chars: 150000, calls: 12, asFile: false, folders: DEFAULT_EXCLUDED_FOLDERS, contextFiles: DEFAULT_CONTEXT_FILES });
+  });
+
+  test("output as file: off until switched on, saved as true or false, and read back", async () => {
+    const storage = fakeStorage();
+    const preferences = createPreferences({ storage, state: {} });
+    await flush();
+    assert.equal(preferences.asFile(), false);
+    preferences.setAsFile(true);
+    assert.equal(storage.data[KEYS.asFile], true);
+    assert.equal((await preferences.read()).asFile, true);
+    preferences.setAsFile("yes");
+    assert.equal(storage.data[KEYS.asFile], false, "only true counts");
   });
 });
 

@@ -145,7 +145,7 @@ class WorkspaceObjectTests(unittest.TestCase):
     def test_nothing_open(self):
         w = ws.Workspace(lambda: None)
         self.assertFalse(w.is_open())
-        with self.assertRaisesRegex(ws.WorkspaceError, re.escape("Open a project folder in VS Code (or another supported editor, such as Antigravity IDE)")):
+        with self.assertRaisesRegex(ws.WorkspaceError, re.escape("Open a project folder in VS Code (or another supported editor, such as Antigravity IDE), or choose the folder for this chat in the bar")):
             w.root()
 
 
