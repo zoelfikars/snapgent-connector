@@ -6,3 +6,4 @@ export { compactTools, toolsReminder } from "./reminder.js";
 export * from "./budget.js";
 export * from "./parts.js";
 export * from "./excluded-folders.js";
+export * from "./context-file.js";

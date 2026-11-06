@@ -4,6 +4,7 @@
 // Orchestration only; the rules live in domain/agent/session-start.
 
 import { WORKSPACE_PROBE_TOOL, checkStartPreconditions, handshakeUnavailable, isWorkspaceServer, probeSucceeded, workspaceRequiredBanner } from "../domain/agent/session-start.js";
+import { cleanContext } from "../domain/prompt/context-file.js";
 import { withoutResultHeader } from "../domain/tools/result-marker.js";
 import { unreadableBanner } from "../domain/agent/turn-policy.js";
 import { bareToolName } from "../domain/tools/names.js";
@@ -23,7 +24,8 @@ export class SessionStarter {
    *   skills: { load: () => Promise<void> },
    *   workspace: { refresh: () => Promise<void>, choose?: () => Promise<{ path?: string, none?: boolean, cancelled?: boolean, error?: string }> },
    *     // refresh learns which folder is the workspace (the prompt names it); choose settles which folder THIS chat works in, asking the user when VS Code has several
-   *   startMessage: (parts: { commands: string, tree: string }) => string,
+   *   contextFiles?: () => Promise<string[]>,        // instruction files to look for, in order; the first one found is read
+   *   startMessage: (parts: { commands: string, tree: string, context?: { name: string, text: string } | null }) => string,
    *   chat: { submit: (text: string) => Promise<*>, next: (base: *) => Promise<object> },
    *   runner: { run: (call: object) => Promise<string> },
    *   initialContext?: { limit: () => number },        // when present, the project tree is part of the start message (within this message size)
@@ -90,6 +92,16 @@ export class SessionStarter {
         return false;
       }
       this._tree = typeof probe.text === "string" ? probe.text.trim() : "";
+
+      this._context = null; // a next start in another folder (or with the file gone) must not reuse this chat's instructions
+      const contextNames = this._d.contextFiles ? await this._d.contextFiles() : [];
+      for (const name of contextNames) {
+        const result = await this._d.callTool("read_files", { paths: [name], max_total_chars: 10000 }, 3000);
+        if (result && result.ok && typeof result.text === "string" && !result.text.includes("File not found")) {
+          this._context = { name, text: cleanContext(result.text) };
+          break;
+        }
+      }
     }
 
     const mode = await page.ensureComposerReady("startup");
@@ -123,7 +135,7 @@ export class SessionStarter {
     if (handshakeUnavailable(listed)) { view.banner("warn", `${target.name()} unavailable`, "Is the server online?"); return false; }
     if (!alive()) return false;
 
-    const message = this._d.startMessage({ commands: withoutResultHeader(listed), tree: this._treeBlock() });
+    const message = this._d.startMessage({ commands: withoutResultHeader(listed), tree: this._treeBlock(), context: this._context });
     const base = await chat.submit(message);
     this._diag("start.sent", { chars: message.length, tree: this._tree.length });
     if (!alive()) return false;

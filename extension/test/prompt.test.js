@@ -22,6 +22,12 @@ test("the start message holds the prompt, the commands and the tree, and asks fo
   assert.match(start, /reply "understood"/);
 });
 test("a start message without a tree leaves that part out", () => assert.ok(!ZS.buildStartMessage({ prompt: "P", commands: "c" }).includes("project looks like")));
+const withContext = ZS.buildStartMessage({ prompt: "P", commands: "c", context: { name: "AGENTS.md", text: "use pnpm" } });
+test("a found instruction file goes into the start message, before the commands", () => {
+  assert.ok(withContext.includes("Project instructions from AGENTS.md:\n\nuse pnpm"));
+  assert.ok(withContext.indexOf("use pnpm") < withContext.indexOf("These are the commands"));
+});
+test("without one, the start message says nothing about project instructions", () => assert.ok(!ZS.buildStartMessage({ prompt: "P", commands: "c" }).includes("Project instructions")));
 
 const skilled = ZS.buildSystemPrompt({ skills: [{ name: "commit", description: "write commits" }] });
 test("skills listed", () => assert.ok(skilled.includes("- commit: write commits")));

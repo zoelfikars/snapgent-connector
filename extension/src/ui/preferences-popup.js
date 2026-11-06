@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The preferences panel: message size, commands per reply, and the folders left out of the attachable files. Each change is saved as it
-// is made. Opened from the menu behind the "switch AI" pill.
+// The preferences panel: message size, commands per reply, the folders left out of the attachable files, and the project instruction
+// files the agent reads at a start. Each change is saved as it is made. Opened from the menu behind the "switch AI" pill.
 
 import { MAX_BATCH_CALLS, MAX_PROMPT_CHARS, MIN_BATCH_CALLS, MIN_PROMPT_CHARS } from "../domain/prompt/budget.js";
+import { DEFAULT_CONTEXT_FILES } from "../domain/prompt/context-file.js";
 import { parseFolderNames } from "../domain/prompt/excluded-folders.js";
 import { escapeHtml as esc } from "./html.js";
 import { closeButton, mountPopup } from "./popup.js";
@@ -21,11 +22,13 @@ const slider = (id, label, min, max, step, note) =>
 
 /**
  * @param {{ document: Document,
- *           values: { chars: number, calls: number, folders: string[] },
- *           defaults: { folders: string[] },
- *           save: { chars: (value: number) => void, calls: (value: number) => void, folders: (list: string[]) => void } }} deps
+ *           values: { chars: number, calls: number, folders: string[], contextFiles?: string[] },
+ *           defaults: { folders: string[], contextFiles?: string[] },
+ *           save: { chars: (value: number) => void, calls: (value: number) => void, folders: (list: string[]) => void, contextFiles?: (list: string[]) => void } }} deps
  */
 export function openPreferences({ document, values, defaults, save, corner = "bottom", actions = {} }) {
+  const contextFiles = values.contextFiles || [];
+  const defaultContextFiles = defaults.contextFiles || DEFAULT_CONTEXT_FILES;
   const { pop, close } = mountPopup(document);
   const row = (id, title, note = "") =>
     `<button class="zs-site-opt" id="${id}" type="button"><span class="zs-site-name"><span>${title}</span>` +
@@ -58,6 +61,10 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     `aria-label="Folders left out of attachments">${esc(values.folders.join("\n"))}</textarea>` +
     `<div class="zs-mcp-pop-note">One folder name per line (or separated by commas): a folder of that name is skipped wherever it is, in the <code>@</code> list and in the Files menu. ` +
     `In a git project the project's own <code>.gitignore</code> already applies on top.</div></div>` +
+    `<div class="zs-pref"><div style="font-weight:600">Project instruction files</div>` +
+    `<textarea id="zs-pref-context" rows="4" spellcheck="false" style="width:100%;box-sizing:border-box;margin-top:8px;${MONO};background:transparent;color:inherit;${BOX};padding:6px" ` +
+    `aria-label="Project instruction files">${esc(contextFiles.join("\n"))}</textarea>` +
+    `<div class="zs-mcp-pop-note">One file name per line. The first one found in the workspace is sent to the AI as project instructions when a session starts (usually <code>AGENTS.md</code>).</div></div>` +
     barSection + siteSection +
     `</div>` +
     `<div class="zs-mcp-pop-foot"><button id="zs-pref-reset" class="zs-mcp-pop-btn zs-mcp-pop-btn-block">Restore the defaults</button></div></div>`;
@@ -78,6 +85,10 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
   // Typing here must not trigger the site's own keyboard shortcuts.
   for (const type of ["keydown", "keyup", "keypress"]) folders.addEventListener(type, (event) => event.stopPropagation());
   folders.addEventListener("change", () => save.folders(parseFolderNames(folders.value)));
+
+  const contextBox = pop.querySelector("#zs-pref-context");
+  for (const type of ["keydown", "keyup", "keypress"]) contextBox.addEventListener(type, (event) => event.stopPropagation());
+  contextBox.addEventListener("change", () => { if (save.contextFiles) save.contextFiles(contextBox.value.split("\n").map((s) => s.trim()).filter(Boolean)); });
   const action = (id, fn) => { const el = pop.querySelector(`#${id}`); if (el && fn) el.addEventListener("click", () => { close(); fn(); }); };
   action("zs-bar-corner", actions.onToggleCorner);
   action("zs-bar-hide", actions.onHideBar);
@@ -91,5 +102,9 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
   pop.querySelector("#zs-pref-reset").addEventListener("click", () => {
     folders.value = defaults.folders.join("\n");
     save.folders(defaults.folders);
+    if (save.contextFiles) {
+      contextBox.value = defaultContextFiles.join("\n");
+      save.contextFiles(defaultContextFiles);
+    }
   });
 }

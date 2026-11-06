@@ -1,6 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
+import { DEFAULT_CONTEXT_FILES, clampContextFiles } from "../src/domain/prompt/context-file.js";
 import { DEFAULT_EXCLUDED_FOLDERS, clampExcludedFolders, parseFolderNames } from "../src/domain/prompt/excluded-folders.js";
 import { createPreferences, KEYS } from "../src/page/preferences.js";
 import { openPreferences } from "../src/ui/preferences-popup.js";
@@ -37,6 +38,14 @@ describe("excluded folders", () => {
   });
 });
 
+describe("project instruction files", () => {
+  test("a typed list becomes clean names: no ./ or slashes around, no empties, no repeats, at most 20; nothing usable means the defaults", () => {
+    assert.deepEqual(clampContextFiles(["./AGENTS.md", "AGENTS.md/", "", "CLAUDE.md", "AGENTS.md"]), ["AGENTS.md", "CLAUDE.md"]);
+    assert.deepEqual(clampContextFiles(undefined), DEFAULT_CONTEXT_FILES);
+    assert.deepEqual(clampContextFiles("junk"), DEFAULT_CONTEXT_FILES);
+  });
+});
+
 describe("preferences", () => {
   test("start as the defaults, are saved in storage, and a change of the folders marks the file list as out of date", async () => {
     const storage = fakeStorage();
@@ -63,9 +72,18 @@ describe("preferences", () => {
     assert.ok(state.filesChangedAt > 0);
   });
 
+  test("project instruction files: the defaults until changed, then saved as a clean list", async () => {
+    const storage = fakeStorage();
+    const preferences = createPreferences({ storage, state: {} });
+    await flush();
+    assert.deepEqual(preferences.contextFiles(), DEFAULT_CONTEXT_FILES);
+    preferences.setContextFiles(["./AGENTS.md", "AGENTS.md", "CLAUDE.md", "  ", "docs/GEMINI.md"]);
+    assert.deepEqual(storage.data[KEYS.contextFiles], ["AGENTS.md", "CLAUDE.md", "docs/GEMINI.md"]);
+  });
+
   test("read() gives what the panel shows", async () => {
     const preferences = createPreferences({ storage: fakeStorage({ [KEYS.chars]: 150000, [KEYS.calls]: 12 }), state: {} });
-    assert.deepEqual(await preferences.read(), { chars: 150000, calls: 12, folders: DEFAULT_EXCLUDED_FOLDERS });
+    assert.deepEqual(await preferences.read(), { chars: 150000, calls: 12, folders: DEFAULT_EXCLUDED_FOLDERS, contextFiles: DEFAULT_CONTEXT_FILES });
   });
 });
 
@@ -107,6 +125,24 @@ describe("preferences panel", () => {
     w.document.addEventListener("keydown", () => { reached = true; });
     $("#zs-pref-folders").dispatchEvent(new w.KeyboardEvent("keydown", { key: "a", bubbles: true }));
     assert.equal(reached, false);
+  });
+
+  test("project instruction files: shown, saved as a clean list, and reset with the defaults", () => {
+    const w = new JSDOM("<!doctype html><body></body>").window;
+    const saved = [];
+    openPreferences({
+      document: w.document, values: { chars: 100000, calls: 8, folders: [], contextFiles: ["AGENTS.md"] },
+      defaults: { folders: [], contextFiles: ["AGENTS.md", "CLAUDE.md", "GEMINI.md"] },
+      save: { chars() {}, calls() {}, folders() {}, contextFiles: (list) => saved.push(list) },
+    });
+    const $ = (selector) => w.document.querySelector(selector);
+    assert.equal($("#zs-pref-context").value, "AGENTS.md");
+    $("#zs-pref-context").value = " AGENTS.md \n\nCLAUDE.md";
+    $("#zs-pref-context").dispatchEvent(new w.Event("change", { bubbles: true }));
+    assert.deepEqual(saved, [["AGENTS.md", "CLAUDE.md"]]);
+    $("#zs-pref-reset").click();
+    assert.equal($("#zs-pref-context").value, "AGENTS.md\nCLAUDE.md\nGEMINI.md");
+    assert.deepEqual(saved, [["AGENTS.md", "CLAUDE.md"], ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]]);
   });
 
   test("bar and calibration actions are offered and wired", () => {

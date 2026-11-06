@@ -28,8 +28,8 @@ export function createBarSettings({ document, root, settings, serverDirectory, t
 
   async function openPreferencesDialog() {
     openPreferences({
-      document, values: await preferences.read(), defaults: { folders: preferences.defaultFolders() },
-      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders },
+      document, values: await preferences.read(), defaults: { folders: preferences.defaultFolders(), contextFiles: preferences.defaultContextFiles() },
+      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders, contextFiles: preferences.setContextFiles },
       corner: barPrefs.get().corner, actions: actions(),
     });
   }

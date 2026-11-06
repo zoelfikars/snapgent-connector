@@ -73,7 +73,7 @@ const budget = createMessageBudget({ storage, hostname: location.hostname, provi
 const resend = createPromptResend({ provider, state, storage, systemPrompt: tools.systemPrompt, limit: budget.limit, chat, diag });
 const parts = new PartQueue();
 const loop = createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs: createBatchJobs({ storage, provider, turnKey }), resend, parts, diag });
-session = createSession({ state, provider, tools, chat, bar, reminder: loop.reminder, limit: budget.limit, storage, settings, serverDirectory, diag });
+session = createSession({ state, provider, tools, chat, bar, reminder: loop.reminder, limit: budget.limit, storage, settings, serverDirectory, preferences, diag });
 stop = createStop({ document, state, provider, bar, diag });
 
 let userInput;

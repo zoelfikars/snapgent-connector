@@ -195,6 +195,77 @@ describe("choosing the folder of the chat", () => {
   });
 });
 
+describe("project instruction files in the start message", () => {
+  const found = (name, body) => ({ ok: true, text: `===== ${name} =====\n${body.map((line, i) => `${i + 1}: ${line}`).join("\n")}\n` });
+  const notFound = (name) => ({ ok: true, text: `===== ${name} =====\nERROR: File not found: ${name}\n` });
+
+  function withFiles(files) {
+    const reads = [];
+    const t = setup({
+      state: { responses: [ready, ready] },
+      deps: {
+        contextFiles: async () => ["AGENTS.md", "CLAUDE.md", "GEMINI.md"],
+        callTool: async (name, args) => {
+          if (name !== "read_files") return { ok: true, text: "root" };
+          const path = args.paths[0];
+          reads.push(path);
+          return files[path] ? found(path, files[path].split("\n")) : notFound(path);
+        },
+        startMessage: ({ commands, tree, context }) => `START|${commands}|${tree}|${context ? `${context.name}: ${context.text.trim()}` : "no context"}`,
+      },
+    });
+    return { ...t, reads };
+  }
+
+  const submitTexts = async (t) => {
+    const submitted = [];
+    t.starter._d.chat.submit = async (text) => { submitted.push(text); return "base"; };
+    return submitted;
+  };
+
+  test("the first file that exists is cleaned and goes into the message; nothing else is read", async () => {
+    const t = withFiles({ "AGENTS.md": "# Project\nuse pnpm" });
+    const submitted = await submitTexts(t);
+    await t.starter.start();
+    assert.deepEqual(t.reads, ["AGENTS.md"]);
+    assert.ok(submitted[0].endsWith("|AGENTS.md: # Project\nuse pnpm"), submitted[0]);
+    assert.ok(!submitted[0].includes("====="));
+  });
+
+  test("a missing first file falls through to the next one", async () => {
+    const t = withFiles({ "CLAUDE.md": "claude rules" });
+    const submitted = await submitTexts(t);
+    await t.starter.start();
+    assert.deepEqual(t.reads, ["AGENTS.md", "CLAUDE.md"]);
+    assert.ok(submitted[0].endsWith("|CLAUDE.md: claude rules"));
+  });
+
+  test("none of the files exists: the start message carries no instructions", async () => {
+    const t = withFiles({});
+    const submitted = await submitTexts(t);
+    await t.starter.start();
+    assert.deepEqual(t.reads, ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]);
+    assert.ok(submitted[0].endsWith("|no context"));
+  });
+
+  test("the instructions of the last chat are not reused when the next chat has none", async () => {
+    let exists = true;
+    const t = withFiles({});
+    t.starter._d.callTool = async (name, args) => {
+      if (name !== "read_files") return { ok: true, text: "root" };
+      const path = args.paths[0];
+      t.reads.push(path);
+      return exists && path === "AGENTS.md" ? found(path, ["# Project"]) : notFound(path);
+    };
+    const submitted = await submitTexts(t);
+    await t.starter.start();
+    assert.ok(submitted[0].endsWith("|AGENTS.md: # Project"));
+    exists = false;
+    await t.starter.start();
+    assert.ok(submitted[1].endsWith("|no context"));
+  });
+});
+
 describe("start preconditions", () => {
   const base = { target: "vscode", targetName: "VS Code", bridgeConnected: true, serverAlive: true, toolNames: ["tree"] };
   test("ready when the probe tool exists", () => assert.equal(checkStartPreconditions(base), null));

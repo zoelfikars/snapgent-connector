@@ -11,7 +11,7 @@ import { waitFor } from "./visibility.js";
  * @param {{ state: object, provider: object, tools: object, chat: object, bar: object, reminder: object, limit: () => number,
  *           storage: object, settings: object, serverDirectory: object, diag: Function }} deps
  */
-export function createSession({ state, provider, tools, chat, bar, reminder, limit, storage, settings, serverDirectory, diag }) {
+export function createSession({ state, provider, tools, chat, bar, reminder, limit, storage, settings, serverDirectory, preferences, diag }) {
   const tracker = new SessionTracker({ store: storage });
 
   const lifecycle = {
@@ -66,7 +66,7 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
     callTool: (name, args, timeout) => tools.bridge.callTool({ name, arguments: tools.workspace.withRoot(args), timeout }),
     skills: tools.skills,
     workspace: tools.workspace,
-    startMessage: ({ commands, tree }) => buildStartMessage({ prompt: tools.systemPrompt(), commands, tree }),
+    startMessage: ({ commands, tree, context }) => buildStartMessage({ prompt: tools.systemPrompt(), commands, tree, context }),
     chat: chat.turns,
     runner: tools.runner,
     initialContext: { limit },
@@ -77,6 +77,7 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
       describe: chat.describeLayout,
     },
     isStopped: () => state.stop,
+    contextFiles: async () => { const values = await preferences.read(); return values.contextFiles; },
     diag,
   });
 
