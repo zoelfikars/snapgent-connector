@@ -5,7 +5,7 @@
 
 export const DEFAULT_PROMPT_CHARS = 100000;
 export const MIN_PROMPT_CHARS = 20000;
-export const MAX_PROMPT_CHARS = 400000;
+export const MAX_PROMPT_CHARS = 1100000;
 /** A command is only worth running when at least this much room is left for its output. */
 export const MIN_CALL_CHARS = 2000;
 /** The name line and separators around each result. */

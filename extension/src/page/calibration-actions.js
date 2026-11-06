@@ -7,6 +7,7 @@ import { SITE_LINKS, siteFor } from "../sites/registry.js";
 import { createCalibrationWizard, openCalibrationImport } from "../ui/index.js";
 import { learnProfile, profileProblems, updateProfile, createCalibratedProvider } from "../infrastructure/calibration/index.js";
 import { describeElement } from "../infrastructure/chat/index.js";
+import { loremIpsum } from "../domain/prompt/lorem.js";
 
 /** @param {{ document: Document, location: Location, provider: object, state: object, storage: object, settings: object, toast: (text: string) => void }} deps */
 export function createCalibrationActions({ document, location, provider, state, storage, settings, toast }) {
@@ -100,6 +101,15 @@ export function createCalibrationActions({ document, location, provider, state, 
     if (!saved.ok) toast(saved.error);
   }
 
+  /** Filler text of an exact size on the clipboard, to paste into the chat when finding out how much one message it accepts. */
+  async function copyTestText(chars) {
+    const text = loremIpsum(chars);
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(`Copied ${text.length.toLocaleString("en-US")} characters of test text to the clipboard.`);
+    } catch { toast("Could not copy to the clipboard."); }
+  }
+
   async function remove() {
     await store.remove(location.hostname);
     toast("Calibration removed.");
@@ -127,5 +137,5 @@ export function createCalibrationActions({ document, location, provider, state, 
   // undefined: not calibrated, so nothing to keep them in; null: calibrated, no values of its own.
   const limits = () => (provider.needsCalibration ? undefined : provider.limits || null);
 
-  return { limits, setLimits, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
+  return { limits, setLimits, copyTestText, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
 }
