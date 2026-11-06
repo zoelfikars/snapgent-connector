@@ -46,11 +46,23 @@ function sendTo(message) {
   });
 }
 
-function tabFor(entry) {
-  return new Promise((resolve) => chrome.tabs.query({}, (tabs) => {
+// The popup belongs to the tab the user is looking at: another window's Claude tab is not this page.
+function activeTab() {
+  return new Promise((resolve) => chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     void chrome.runtime.lastError;
-    resolve(matchingTab(entry, tabs));
+    resolve((tabs && tabs[0]) || null);
   }));
+}
+
+async function tabFor(entry) {
+  const tab = await activeTab();
+  return matchingTab(entry, tab ? [tab] : []);
+}
+
+/** The registry entry of a tab, or null (a chrome:// page, an unsupported site, a missing url). */
+function siteOfTab(tab) {
+  if (!tab || !tab.url) return null;
+  try { return siteFor(new URL(tab.url).hostname) || null; } catch { return null; }
 }
 
 function drawAccounts() {
@@ -173,24 +185,26 @@ $("acc-diag").addEventListener("click", async () => {
   const reply = await sendTo({ type: "accounts_inspect", site: accounts.site, hosts: accounts.hosts });
   out.hidden = false;
   out.textContent = reply.ok
-    ? reply.hosts.map((host) => `${host.host}\n  ${host.names.length ? host.names.join(", ") : "(no cookies)"}`).join("\n") + `\nsaved: ${accounts.list.map((a) => `${a.name} (${a.cookies})`).join(", ") || "none"}\nin use: ${accounts.active || "unknown"}`
+    ? reply.hosts.map((host) => `${host.host}\n  ${host.names.length ? host.names.join(", ") : "(no cookies)"}`).join("\n") + `\nsaved: ${accounts.list.map((a) => `${a.name} (${a.cookies})`).join(", ") || "none"}\nin use: ${accounts.active || "unknown"}\npage storage: ${(reply.storage || []).join(", ") || "(none)"}`
     : `Could not inspect: ${reply.error || "unknown error"}`;
 });
 
 $("user").addEventListener("click", () => { $("accounts").hidden = !$("accounts").hidden; });
 
+// Accounts are offered by the site of THIS tab, never by one that merely happens to be open elsewhere: on DeepSeek's page the
+// section stays hidden even while a Claude tab is open in another window.
 function setupAccounts() {
-  return new Promise((resolve) => chrome.tabs.query({}, (tabs) => {
-    const supported = tabs.map((tab) => (tab.url ? siteFor(new URL(tab.url).hostname) : null)).find((site) => site && site.accounts);
-    if (!supported) { drawAccounts(); resolve(); return; }
+  return activeTab().then((tab) => {
+    const site = siteOfTab(tab);
+    if (!site || !site.accounts) { drawAccounts(); return; }
     accounts.supported = true;
-    accounts.site = supported.id;
-    accounts.entry = supported;
-    accounts.hosts = accountHostsOf(supported);
-    $("user-name").textContent = supported.name;
+    accounts.site = site.id;
+    accounts.entry = site;
+    accounts.hosts = accountHostsOf(site);
+    $("user-name").textContent = site.name;
     drawAccounts();
-    loadAccounts().then(resolve);
-  }));
+    return loadAccounts();
+  });
 }
 
 function refresh() {

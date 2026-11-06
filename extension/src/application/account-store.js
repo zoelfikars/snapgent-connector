@@ -48,12 +48,12 @@ export class AccountStore {
   }
 
   /** Store these cookies under a name; an existing name (same id) is replaced. */
-  async save(site, name, cookies) {
+  async save(site, name, cookies, storage = {}) {
     const problem = nameProblem(name);
     if (problem) return { ok: false, error: problem };
     const id = accountId(name);
     const { active, accounts } = await this._site(site);
-    await this._write(site, { active, accounts: { ...accounts, [id]: { id, name: String(name).trim(), savedAt: Date.now(), cookies } } });
+    await this._write(site, { active, accounts: { ...accounts, [id]: { id, name: String(name).trim(), savedAt: Date.now(), cookies, storage } } });
     return { ok: true, id };
   }
 

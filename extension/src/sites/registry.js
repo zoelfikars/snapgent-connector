@@ -12,13 +12,14 @@
  * @property {string[]} [extraHosts] Extra host permissions beyond `matches`.
  * @property {boolean} [accounts]  The user may keep several logins and switch between them (cookie snapshot and swap).
  * @property {string[]} [accountHosts] The host names whose cookies are that login (default: the match hosts).
+ * @property {string[]} [accountStorage] localStorage keys that are also part of that login (DeepSeek keeps its token there).
  */
 
 /** @type {Site[]} */
 export const SITES = [
-  { id: "deepseek", name: "DeepSeek", url: "https://chat.deepseek.com/", matches: ["https://chat.deepseek.com/*"], extraHosts: ["https://deepseek.com/*"] },
+  { id: "deepseek", name: "DeepSeek", url: "https://chat.deepseek.com/", matches: ["https://chat.deepseek.com/*"], extraHosts: ["https://deepseek.com/*"], accounts: true, accountHosts: ["deepseek.com"], accountStorage: ["userToken"] },
   { id: "chatgpt", name: "ChatGPT", url: "https://chatgpt.com/", matches: ["https://chatgpt.com/*", "https://chat.openai.com/*"] },
-  // Accounts (cookie snapshot and swap) are offered for Claude only, for now: a site gets them once its cookies are known to
+  // Accounts (cookie snapshot and swap, plus the localStorage keys a login also lives in) are offered for Claude and DeepSeek: a site gets them once its cookies are known to
   // be all a login lives in.
   { id: "claude", name: "Claude", url: "https://claude.ai/new", matches: ["https://claude.ai/*"], accounts: true, accountHosts: ["claude.ai", "anthropic.com"] },
   { id: "gemini", name: "Gemini", url: "https://gemini.google.com/app", matches: ["https://gemini.google.com/*"] },
@@ -60,3 +61,6 @@ export const accountSiteFor = (hostname) => {
 
 /** The host names a site's cookies live on. */
 export const accountHostsOf = (site) => site.accountHosts || site.matches.map(hostnameOf);
+
+/** The localStorage keys that are part of a site's login (none for most sites). */
+export const accountStorageOf = (site) => site.accountStorage || [];

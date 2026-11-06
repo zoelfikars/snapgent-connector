@@ -4,6 +4,7 @@
 
 import { AccountStore } from "../application/account-store.js";
 import { AccountSwitcher } from "../application/account-switcher.js";
+import { SITES, accountStorageOf } from "../sites/registry.js";
 
 // chrome.* answers through a callback in older Firefox builds and through a promise in Chrome: take whichever comes.
 const call = (fn, arg) => new Promise((resolve, reject) => {
@@ -43,9 +44,38 @@ function reloadTabs(hosts) {
   });
 }
 
+// The page-storage half of a login is only reachable through the site's own tab (a content script), and only for the keys the
+// registry names for that site: the popup never says which keys.
+const storageKeysOf = (siteId) => accountStorageOf(SITES.find((site) => site.id === siteId) || {});
+
+const tabsOf = (hosts) => new Promise((resolve) => {
+  try { chrome.tabs.query({ url: hosts.map((host) => `*://*.${host.replace(/^\./, "")}/*`) }, (tabs) => resolve(tabs || [])); } catch { resolve([]); }
+});
+
+const askTab = (tabId, message) => new Promise((resolve) => {
+  try { chrome.tabs.sendMessage(tabId, message, (reply) => { void (chrome.runtime && chrome.runtime.lastError); resolve(reply || null); }); } catch { resolve(null); }
+});
+
+function pageStorage(hosts, keys) {
+  return {
+    read: async () => {
+      if (!keys.length) return {};
+      for (const tab of await tabsOf(hosts)) {
+        const reply = await askTab(tab.id, { type: "zs-account-storage-read", keys });
+        if (reply && reply.ok) return reply.values || {};
+      }
+      return {};
+    },
+    write: async (entries) => {
+      if (!keys.length || !Object.keys(entries).length) return;
+      for (const tab of await tabsOf(hosts)) await askTab(tab.id, { type: "zs-account-storage-write", entries });
+    },
+  };
+}
+
 function switcherFor(site, hosts) {
   return new AccountSwitcher({
-    store: new AccountStore({ store: localStore }), cookies: cookieJar, hosts,
+    store: new AccountStore({ store: localStore }), cookies: cookieJar, hosts, pageStorage: pageStorage(hosts, storageKeysOf(site)),
     reloadTabs: () => reloadTabs(hosts), log: (message) => console.warn("[zs-bg]", message),
   });
 }
@@ -80,7 +110,7 @@ export async function handleAccountMessage(msg) {
       case "accounts_signout":
         return switcherFor(msg.site, msg.hosts).clear(msg.site);
       case "accounts_inspect":
-        return { ok: true, hosts: await switcherFor(msg.site, msg.hosts).inspect() };
+        { const switcher = switcherFor(msg.site, msg.hosts); return { ok: true, hosts: await switcher.inspect(), storage: await switcher.inspectStorage() }; }
       default:
         return { ok: false, error: "unknown account message" };
     }

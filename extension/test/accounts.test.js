@@ -77,6 +77,12 @@ describe("accounts: which tab the switch reloads", () => {
     assert.equal(matchingTab(entry, [tab("https://claude.ai/chat/1", false)]), null, "a background tab is not the page the user is on");
   });
 
+  test("a tab of another site never matches, so its page shows no accounts", () => {
+    const deepseek = { id: 3, active: true, url: "https://chat.deepseek.com/a/chat" };
+    assert.equal(matchingTab(entry, [deepseek]), null, "Claude's accounts are not offered on DeepSeek's page");
+    assert.equal(siteFor("chat.deepseek.com").accounts, true, "DeepSeek has its own accounts, apart from Claude's");
+  });
+
   test("an id is not a site entry, and a site that is not open has no tab", () => {
     assert.equal(matchingTab("claude", [tab("https://claude.ai/")]), null, "the popup once passed the id here: that must fail quietly, not hang");
     assert.equal(matchingTab(entry, []), null);

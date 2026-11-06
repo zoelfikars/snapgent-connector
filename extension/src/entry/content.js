@@ -5,6 +5,7 @@
 import { PartQueue, ServerDirectory } from "../application/index.js";
 import defaultCalibrations from "../../profiles/default-calibrations.json";
 import { createAccountScope } from "../page/account-scope.js";
+import { createAccountStorage } from "../page/account-storage.js";
 import { createAttachments } from "../page/attachments.js";
 import { createAtPopup } from "../page/at-popup.js";
 import { createAutoResume } from "../page/auto-resume.js";
@@ -31,7 +32,7 @@ import { createTools } from "../page/tools.js";
 import { createTurns } from "../page/turns.js";
 import { installUserInput } from "../page/user-input.js";
 import { createVisibility } from "../page/visibility.js";
-import { accountSiteFor } from "../sites/registry.js";
+import { accountSiteFor, accountStorageOf } from "../sites/registry.js";
 
 const storage = createStorage();
 const state = createState();
@@ -51,6 +52,8 @@ const settings = createSettings({ storage, location, onChange: redraw });
 // The login in use, so one account's chats do not inherit another's folders. Empty on a site without accounts.
 const accountSite = accountSiteFor(location.hostname);
 const accounts = createAccountScope({ storage, site: accountSite ? accountSite.id : "" });
+// The login keys a site keeps in localStorage (DeepSeek's token): the background reads and writes them through this, nothing else.
+const accountStorage = createAccountStorage({ area: window.localStorage, allowed: accountSite ? accountStorageOf(accountSite) : [] });
 // The terminal panel lives from page load on: it must be listening before the first command starts.
 const terminal = createTerminal({ document, diag, onChange: redraw });
 terminal.start();
@@ -90,6 +93,8 @@ startPageWatch({ document, window, provider, session, bar });
 // The popup asks before it switches logins: a running agent would be left talking to a session that is no longer there.
 try {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message && message.type === "zs-account-storage-read") { sendResponse({ ok: true, values: accountStorage.read(message.keys) }); return undefined; }
+    if (message && message.type === "zs-account-storage-write") { sendResponse({ ok: true, written: accountStorage.write(message.entries) }); return undefined; }
     if (!message || message.type !== "zs-account-status") return undefined;
     sendResponse({ ok: true, supported: !!accountSite, account: accounts.id(), busy: !!(state.running || state.starting) });
     return undefined;
