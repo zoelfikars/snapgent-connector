@@ -240,6 +240,10 @@ function handleBridgeMessage(msg) {
       : { ok: false, error: msg.error });
     return;
   }
+  if (msg.type === "tool_stream") {
+    forwardStream(msg); // no id to resolve: the terminal panel picks it up in the content script
+    return;
+  }
   if (msg.type === "error") {
     resolvePending(msg.id, { ok: false, error: msg.error });
     return;
@@ -252,6 +256,13 @@ function resolvePending(id, value) {
   clearTimeout(p.timer);
   pending.delete(id);
   p.resolve(value);
+}
+
+/** A running command's live output has no away-and-back semantics: push it to every provider tab now. */
+function forwardStream(msg) {
+  chrome.tabs.query({ url: PROVIDER_URLS }, (tabs) => {
+    for (const t of tabs) chrome.tabs.sendMessage(t.id, msg).catch(() => {});
+  });
 }
 
 function failAllPending(reason) {

@@ -14,6 +14,7 @@ import { FEEDBACK } from "../domain/prompt/feedback.js";
 import { JOB_ARGUMENT, JOB_OP_ARGUMENT, MODE_ARGUMENT, RESERVED_ARGUMENT, ROOT_ARGUMENT, declinedFeedback, needsApproval, unavailableFeedback, withoutReserved } from "../domain/tools/confirmation.js";
 import { isolationError } from "../domain/tools/isolation.js";
 import { toFeedback } from "../domain/tools/result-feedback.js";
+import { runningDetail } from "../domain/tools/result-summary.js";
 import { LIST_SERVERS, isListCommands, renderCommandList, renderServerList } from "../domain/tools/virtual-commands.js";
 import { bareToolName } from "../domain/tools/names.js";
 import { callWithGuards } from "./call-guard.js";
@@ -141,16 +142,43 @@ export class ToolRunner {
     Promise.resolve(this._bridge.callTool({ name, arguments: cancel, timeout: 5000, server: target })).catch(() => {});
   }
 
+  /** Stop from the terminal panel: the same cancellation as the loop's Stop, named after that one tab. */
+  cancelJob(jobKey, name, target = "vscode") {
+    this._cancelJob(name, target, jobKey);
+  }
+
+  _terminalBegin(jobKey, name, args, target) {
+    if (!jobKey || target !== "vscode") return; // only VS Code commands stream; other servers have no terminal
+    try {
+      this._sink.terminal && this._sink.terminal.begin({ key: jobKey, name, label: runningDetail({ arguments: args }) });
+    } catch { /* the panel must never break a command */ }
+  }
+
+  _terminalEnd(jobKey, status) {
+    if (!jobKey) return;
+    try {
+      this._sink.terminal && this._sink.terminal.finish(jobKey, status);
+    } catch { /* ditto */ }
+  }
+
   async _execute(name, args, target, jobKey) {
-    let result = await this._callBridge(name, args, target, jobKey);
-    if (result && result.kind === "stopped") { this._cancelJob(name, target, jobKey); return "(stopped by user)"; }
+    this._terminalBegin(jobKey, name, args, target);
+    let result;
+    try {
+      result = await this._callBridge(name, args, target, jobKey);
+    } catch (error) {
+      this._terminalEnd(jobKey, "failed");
+      throw error;
+    }
+    if (result && result.kind === "stopped") { this._terminalEnd(jobKey, "stopped"); this._cancelJob(name, target, jobKey); return "(stopped by user)"; }
     if (needsApproval(result)) {
       const refusal = await this._askUser(result.confirmation);
-      if (refusal) return refusal;
+      if (refusal) { this._terminalEnd(jobKey, "failed"); return refusal; }
       // Repeat the very same call, now carrying the one-time token only the extension was given.
       result = await this._callBridge(name, { ...args, [RESERVED_ARGUMENT]: result.confirmation.token }, target, jobKey);
-      if (result && result.kind === "stopped") { this._cancelJob(name, target, jobKey); return "(stopped by user)"; }
+      if (result && result.kind === "stopped") { this._terminalEnd(jobKey, "stopped"); this._cancelJob(name, target, jobKey); return "(stopped by user)"; }
     }
+    this._terminalEnd(jobKey, result && result.ok ? "success" : (result && result.kind === "cancelled" ? "stopped" : "failed"));
 
     const feedback = toFeedback(result, {
       name,

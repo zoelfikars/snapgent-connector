@@ -6,7 +6,7 @@ import signal
 import sys
 from typing import Any, Dict, Optional
 
-from . import BRIDGE_VERSION, settings
+from . import BRIDGE_VERSION, settings, protocol
 from .config import ConfigStore
 from .logs import configure as configure_logging, log, notice
 from .mcp_client import MCPServer
@@ -40,6 +40,8 @@ class BridgeServer:
         self.clients = set()
         self._lock_: Optional[asyncio.Lock] = None
         self.router = RequestRouter(registry, config, self.broadcast, BRIDGE_VERSION, log_fn)
+        # A running command's live output comes from the MCP server as a notification: forward it to the extension.
+        self.registry.on_notification = self._mcp_notification
 
     @property
     def _lock(self) -> asyncio.Lock:
@@ -65,6 +67,18 @@ class BridgeServer:
             clients = list(self.clients)
         if clients:
             await asyncio.gather(*(self._send(client, message) for client in clients), return_exceptions=True)
+
+    def _mcp_notification(self, message: Dict[str, Any]) -> None:
+        """A server's own message: only live command output is forwarded, and never on the reader's thread."""
+        if message.get("method") != "snapgent/tool_stream":
+            return
+        params = message.get("params")
+        if not isinstance(params, dict):
+            return
+        try:
+            asyncio.get_running_loop().create_task(self.broadcast(protocol.tool_stream(None, params)))
+        except RuntimeError:  # no loop (shutting down): nothing to forward to
+            pass
 
     async def handle_client(self, websocket: Any, _path: Optional[str] = None) -> None:
         origin = request_origin(websocket)

@@ -13,9 +13,10 @@ import { createWorkspaceBinding } from "./workspace-binding.js";
 
 /**
  * @param {{ send: Function, provider: object, state: object, settings: object, serverDirectory: object, visibility: object,
- *           storage: object, diag: Function, banner: Function }} deps  `banner(level, title, text)` shows the user a notice
+ *           storage: object, diag: Function, banner: Function, terminal?: object }} deps  `banner(level, title, text)`
+ *   shows the user a notice; `terminal` receives the live output of commands (see page/terminal.js)
  */
-export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner }) {
+export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner, terminal = null }) {
   const bridge = {
     listTools: () => send({ type: "list_tools" }),
     callTool: (request) => send({ type: "call_tool", ...request }),
@@ -28,7 +29,14 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
     isStopped: () => state.stop,
   };
   // Images are not carried back to the model (supportsVision is false everywhere), so a tool that returns one only gets an error text.
-  const sink = { images() {}, staleExtension: () => banner("warn", "Reload page", "Updated. Press F5."), diag };
+  // `terminal` is the page's terminal panel: a run_command tab opens the moment its call is made, and
+  // live output arrives through the background's `tool_stream` pushes (see page/terminal.js).
+  const sink = {
+    images() {},
+    staleExtension: () => banner("warn", "Reload page", "Updated. Press F5."),
+    diag,
+    terminal: terminal ? { begin: terminal.begin, finish: terminal.finish } : null,
+  };
   const catalogue = new ToolCatalogue({ bridge, session, diag });
   // Risky actions need the user's approval: a top-layer dialog in a closed shadow root that ignores synthetic clicks.
   const confirm = createConfirmDialog();

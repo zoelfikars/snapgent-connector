@@ -15,12 +15,14 @@ import { createSiteMenu } from "./site-menu.js";
 
 const GITHUB_URL = "https://github.com/zoelfikarshomelab/snapgent-connector";
 const BOLT = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>`;
+const TERM = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`;
 const pill = (id, nameId, label, title = "", popup) => pillHtml({ id, nameId, label, title, popup });
 const TEMPLATE = `
   <div id="zs-bar">
     <span id="zs-state"></span>
     <button id="zs-action"></button>
     <button id="zs-stop" hidden>■ Stop</button>
+    <button id="zs-term-btn" type="button" aria-label="Terminal: commands running in this chat" title="Terminal: see what the running command prints, and stop it">${TERM}<span id="zs-term-badge" hidden></span></button>
     ${pill("zs-mode-btn", "zs-mode-name", "Choose how risky actions are approved", "Plan: read only. Manual: asks first. Auto: never asks.")}
     ${pill("zs-ws-btn", "zs-ws-name", "Choose the workspace folder", "Which folder the agent works in")}
     ${pill("zs-files-btn", "zs-files-name", "Tag files in your message", "Pick files: their contents go with your next message")}
@@ -35,7 +37,7 @@ const TEMPLATE = `
  * @param {{ document: Document, window: Window, provider: object, state: object, settings: object, serverDirectory: object, tools: object,
  *           monitor: object, storage: object, preferences: object, send: Function, calibration: object, files: object, onStart: () => void, onStop: () => void }} deps
  */
-export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, preferences, send, calibration, files, onStart, onStop }) {
+export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, preferences, send, calibration, terminal, files, onStart, onStop }) {
   const root = document.createElement("div");
   root.id = "zs-root";
   const notifications = createNotifications({ root });
@@ -75,9 +77,18 @@ export function createBar({ document, window, provider, state, settings, serverD
 
   // ── what the bar says ──
   let lastSignature = "";
+  let lastTermCount = -1;
   function render() {
     menus.sync();
     filesMenu.sync();
+    // The terminal pill carries a count of the commands still running, however the bar otherwise looks.
+    const running = terminal ? terminal.runningCount() : 0;
+    if (running !== lastTermCount) {
+      const badge = $("#zs-term-badge");
+      badge.hidden = running === 0;
+      badge.textContent = running ? String(running) : "";
+      lastTermCount = running;
+    }
     const view = computeBarView({
       staleExtension: state.staleExtension, starting: state.starting, started: state.started, running: state.running, parked: state.parked,
       blankChat: !state.started && !state.starting && !state.staleExtension && (provider.isFreshChat() || provider.chatIsEmpty()),
@@ -111,6 +122,8 @@ export function createBar({ document, window, provider, state, settings, serverD
       calibration.open(problem && ["composer", "send"].includes(problem.role) ? problem.role : null);
     }
   });
+  el.term = $("#zs-term-btn");
+  el.term.addEventListener("click", (event) => { event.stopPropagation(); if (terminal) terminal.toggle(); });
   el.stop.addEventListener("click", onStop);
   el.stopFloat.addEventListener("click", (event) => { event.stopPropagation(); el.stop.click(); }); // the same Stop, reachable while the bar is hidden
 

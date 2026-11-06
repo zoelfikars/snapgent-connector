@@ -34,6 +34,13 @@ def tool_error(request_id: Any, error: str, kind: Optional[str] = None) -> Dict[
     return message
 
 
+def tool_stream(request_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Live output of a running command, forwarded to the extension as it arrives."""
+    message: Dict[str, Any] = {"type": "tool_stream"}
+    message.update(params or {})
+    return message
+
+
 def mcp_status_message(request_id: Any, ok: bool, alive: bool, tools: Optional[list] = None,
                        servers: Optional[list] = None, error: Optional[str] = None) -> Dict[str, Any]:
     message: Dict[str, Any] = {"type": "mcp_status", "id": request_id, "ok": ok, "alive": alive}
@@ -116,12 +123,16 @@ def split_content(result: Dict[str, Any]) -> Tuple[str, List[Dict[str, str]]]:
 def tool_result_message(request_id: Any, result: Dict[str, Any]) -> Tuple[Dict[str, Any], str]:
     """The reply for a finished tool call, and the text for the log."""
     text, images = split_content(result)
-    confirmation = (result.get("structuredContent") or {}).get("confirmation")
+    structured = result.get("structuredContent") or {}
+    confirmation = structured.get("confirmation")
     if result.get("isError") and isinstance(confirmation, dict):
         # The server wants the USER's approval. The token travels in this field for the extension only.
         message = tool_error(request_id, text or "Confirmation required.", "confirmation_required")
         message["confirmation"] = confirmation
         return message, text
+    if result.get("isError") and structured.get("cancelled"):
+        # The user stopped the command from the terminal panel: it is not a failure to work around.
+        return tool_error(request_id, text or "The command was stopped.", "cancelled"), text
     if result.get("isError"):
         return tool_error(request_id, text or "MCP tool failed."), text
     return {"type": "tool_result", "id": request_id, "ok": True, "text": text, "images": images}, text

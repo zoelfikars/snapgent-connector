@@ -63,6 +63,13 @@ describe("toFeedback", () => {
     assert.match(toFeedback({ ok: false, kind: "timeout", error: "slow" }, { ...opts, timeoutSeconds: 5 }).text, /timed out after 5s/);
   });
 
+  test("a cancellation from the terminal reads as one, not as an error to fix", () => {
+    const feedback = toFeedback({ ok: false, kind: "cancelled", error: "The command was cancelled by the user before it finished." }, opts);
+    assert.match(feedback.text, /⏹/);
+    assert.match(feedback.text, /cancelled by the user/);
+    assert.doesNotMatch(feedback.text, /^ERROR/);
+  });
+
   test("no result at all means the bridge is offline", () => {
     assert.match(toFeedback(undefined, opts).text, /bridge is unreachable/);
   });

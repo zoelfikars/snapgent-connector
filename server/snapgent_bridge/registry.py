@@ -22,12 +22,16 @@ class ServerRegistry:
         self._log = log
         self.servers: Dict[str, MCPServer] = {}
         self.catalog: List[Dict[str, Any]] = []
+        # Where a server's own messages (a running command's live output) go; set by the bridge.
+        self.on_notification: Optional[Callable[[Dict[str, Any]], None]] = None
 
     # ── lifecycle ──────────────────────────────────────────────────────────
 
     async def start_all(self, configs: Dict[str, Dict[str, Any]]) -> None:
         self.servers = {server_id: self._factory(server_id, config) for server_id, config in configs.items()}
         for server in self.servers.values():
+            if self.on_notification is not None:  # a server may be given its own listener (tests, custom stacks)
+                server.on_notification = self.on_notification
             await server.start()
         self.rebuild_catalog()
         self.log_health()

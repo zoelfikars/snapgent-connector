@@ -25,6 +25,7 @@ import { createSettings } from "../page/settings.js";
 import { createState } from "../page/state.js";
 import { createStop } from "../page/stop.js";
 import { createStorage } from "../page/storage.js";
+import { createTerminal } from "../page/terminal.js";
 import { createTools } from "../page/tools.js";
 import { createTurns } from "../page/turns.js";
 import { installUserInput } from "../page/user-input.js";
@@ -45,9 +46,13 @@ const notify = (level, title, text) => bar.banner(level, title, text);
 
 const send = createExtensionBridge();
 const settings = createSettings({ storage, location, onChange: redraw });
+// The terminal panel lives from page load on: it must be listening before the first command starts.
+const terminal = createTerminal({ document, diag, onChange: redraw });
+terminal.start();
 const serverDirectory = new ServerDirectory({ store: storage, liveServers: () => state.bridge.servers || [], onChange: redraw, log: (...args) => console.warn("[snapgentV3]", ...args) });
 const visibility = createVisibility({ document, state, diag, onParkChange: redraw });
-const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify });
+const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal });
+terminal.setCancel((jobKey, name) => tools.runner.cancelJob(jobKey, name));
 const bridgeStatus = createBridgeStatus({ state, settings, tools, send, bar: () => bar, diag });
 const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, toast: (text) => bar.toast(text) });
 
@@ -56,7 +61,7 @@ let stop;
 let session;
 let attachments;
 bar = createBar({
-  document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, preferences, send, calibration,
+  document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, preferences, send, calibration, terminal,
   files: { list: () => attachments.listFiles(), insert: (paths) => attachments.insert(paths), canList: () => attachments.canList() },
   onStart: () => session.start(),
   onStop: () => stop.stopLoop(),

@@ -14,6 +14,8 @@ export { createSetupCard, shouldShowSetup } from "./setup-card.js";
 export { APPROVAL_MODES, atPopupHtml, fileRowsHtml, filesMenuHtml, modeMenuHtml, switchMenuHtml, targetMenuHtml, workspaceLabel, workspaceMenuHtml } from "./menu-html.js";
 export { createBarPlacer } from "./bar-placer.js";
 export { createInputCover } from "./input-cover.js";
+export { createTerminalPanel } from "./terminal-panel.js";
+export { classesOf, feed, lineHtml, segmentHtml } from "./ansi.js";
 export { createCalibrationWizard } from "./calibration-wizard.js";
 export { createPicker } from "./picker.js";
 export { pillHtml } from "./pill.js";

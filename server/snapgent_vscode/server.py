@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, Optional, TextIO
 
 from . import SERVER_NAME, SERVER_VERSION, protocol
 from .context import Context
-from .jobs import JOB_ARGUMENT, JOB_OP_ARGUMENT, JobStore
+from .jobs import CANCELLED_MESSAGE, JOB_ARGUMENT, JOB_OP_ARGUMENT, JobStore
 from .security import CONFIRM, DENY, MODE_ARGUMENT, RESERVED_ARGUMENT, ConfirmationStore, Policy, SessionState, decide, policy_for_call, policy_from_env
 from .tools import registry
 from .tools.registry import READ
@@ -27,6 +27,10 @@ class McpServer:
         self._confirmations = confirmations or ConfirmationStore()
         self._session = SessionState()
         self._jobs = JobStore()
+        # Set by serve(): where a running command's live output is written (None when nothing listens).
+        self._notify: Optional[Callable[[Dict[str, Any]], None]] = None
+        self._stream_sequence: Dict[str, int] = {}
+        self._stream_lock = threading.Lock()
 
     def handle(self, request: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """The reply to one request, or None when none is due (notifications)."""
@@ -62,6 +66,24 @@ class McpServer:
         except Exception as error:  # a bad path is an answer for the user, not a crash
             return protocol.error(request_id, protocol.INTERNAL_ERROR, str(error))
 
+    def _streamer(self, job_key: str) -> Callable[[str, str], None]:
+        """The live-output callback for one job: numbers its messages so the page can keep them in order."""
+        def send(stream: str, text: str) -> None:
+            notify = self._notify
+            if notify is None or not text:
+                return
+            with self._stream_lock:
+                self._stream_sequence[job_key] = self._stream_sequence.get(job_key, 0) + 1
+                sequence = self._stream_sequence[job_key]
+            notify(protocol.stream_notification(job_key, sequence, stream, text))
+        return send
+
+    def _forget_stream(self, job_key: Optional[str]) -> None:
+        if not job_key:
+            return
+        with self._stream_lock:
+            self._stream_sequence.pop(job_key, None)
+
     def _tools_call(self, request_id: Any, params: Dict[str, Any]) -> Dict[str, Any]:
         name = params.get("name", "")
         arguments = dict(params.get("arguments") or {})
@@ -80,7 +102,9 @@ class McpServer:
                 # The same call again (the page was reloaded): answer from the job, never run it twice or ask the user again.
                 return protocol.result(request_id, protocol.tool_output(existing.wait()))
             root = self._workspace.root_for(bound_root) if isinstance(bound_root, str) and bound_root.strip() else self._workspace.root()
-            ctx = Context(root=root, policy=policy, session=self._session)
+            # A running command reports its output while it runs; a call with no job has nobody to show it to.
+            ctx = Context(root=root, policy=policy, session=self._session,
+                          stream=self._streamer(job_key) if job_key else None)
             definition = registry.get(name)
             decision = decide(policy, name, definition.risk, arguments, self._session)
             if decision.verdict == DENY:
@@ -94,40 +118,53 @@ class McpServer:
                 output = self._call(ctx, name, arguments)
             return protocol.result(request_id, protocol.tool_output(output))
         except Exception as error:  # every failure becomes a reply the model can read
+            if isinstance(error, RuntimeError) and str(error) == CANCELLED_MESSAGE:
+                return protocol.result(request_id, protocol.cancelled_output(str(error)))
             return protocol.error(request_id, protocol.INTERNAL_ERROR, str(error))
+        finally:
+            self._forget_stream(job_key)
 
     def serve(self, stdin: TextIO, stdout: TextIO) -> None:
         """Answer requests as they come. A tool call may take minutes, so each one gets its own thread: the page can ask
         about (or cancel) a job while it runs. Everything else is quick and answered in order."""
         write_lock = threading.Lock()
+
+        def write(message: Dict[str, Any]) -> None:
+            with write_lock:
+                stdout.write(protocol.encode(message) + "\n")
+                stdout.flush()
+
+        # A running command's live output is a notification: written while its call is still unanswered.
+        self._notify = write
         workers = []
 
         def answer(request: Dict[str, Any]) -> None:
             reply = self.handle(request)
             if reply is not None:
-                with write_lock:
-                    stdout.write(protocol.encode(reply) + "\n")
-                    stdout.flush()
+                write(reply)
 
-        for line in stdin:
-            stripped = line.strip()
-            if not stripped:
-                continue
-            try:
-                request = json.loads(stripped)
-            except json.JSONDecodeError:
-                continue
-            if not isinstance(request, dict):
-                continue
-            if request.get("method") == "tools/call":
-                worker = threading.Thread(target=answer, args=(request,), daemon=True)
-                worker.start()
-                workers.append(worker)
-                workers[:] = [w for w in workers if w.is_alive()]
-            else:
-                answer(request)
-        for worker in workers:  # input closed: let the calls in flight finish writing their answers
-            worker.join(timeout=5)
+        try:
+            for line in stdin:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    request = json.loads(stripped)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(request, dict):
+                    continue
+                if request.get("method") == "tools/call":
+                    worker = threading.Thread(target=answer, args=(request,), daemon=True)
+                    worker.start()
+                    workers.append(worker)
+                    workers[:] = [w for w in workers if w.is_alive()]
+                else:
+                    answer(request)
+            for worker in workers:  # input closed: let the calls in flight finish writing their answers
+                worker.join(timeout=5)
+        finally:
+            self._notify = None
 
 
 def main() -> None:

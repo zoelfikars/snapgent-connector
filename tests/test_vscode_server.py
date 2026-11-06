@@ -100,6 +100,46 @@ class ServerTests(WorkspaceCase):
         replies = [json.loads(line) for line in out.getvalue().splitlines()]
         self.assertEqual(replies, [{"jsonrpc": "2.0", "id": 1, "result": {}}])
 
+    def test_a_running_command_reports_its_output_as_notifications(self):
+        server = self.server()
+        pushed = []
+        server._notify = pushed.append  # what serve() would wire to stdout
+        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "run_command",
+            "arguments": {"command": sys.executable,
+                          "args": ["-c", "import time; print('live', flush=True); time.sleep(1.0)"],
+                          "__snapgent_mode": "auto", "__snapgent_job": "job-1"}}}
+        server.handle(request)
+        streams = [message for message in pushed if message.get("method") == "snapgent/tool_stream"]
+        self.assertTrue(streams, "the running command's output must be published before the call finishes")
+        self.assertEqual([message["params"]["jobKey"] for message in streams], ["job-1"] * len(streams))
+        self.assertEqual([message["params"]["seq"] for message in streams], sorted(m["params"]["seq"] for m in streams))
+        self.assertTrue(any("live" in message["params"]["text"] for message in streams))
+        # The stream's tracker is released when the call is over, so a reload does not leak one per job.
+        self.assertNotIn("job-1", server._stream_sequence)
+
+    def test_no_notifications_without_a_watcher(self):
+        pushed = []
+        request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
+            "name": "run_command", "arguments": {"command": sys.executable, "args": ["-c", "print('quiet')"],
+                                          "__snapgent_mode": "auto"}}}
+        response = self.server().handle(request)
+        self.assertEqual(response["result"]["content"][0]["text"], "quiet")
+
+    def test_a_user_stop_is_marked_cancelled_not_errored(self):
+        from snapgent_vscode.jobs import CANCELLED_MESSAGE
+
+        def cancelled(*_args):
+            raise RuntimeError(CANCELLED_MESSAGE)
+
+        server = McpServer(Workspace(lambda: self.root), call=cancelled)
+        request = {"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {
+            "name": "run_command", "arguments": {"command": "x", "__snapgent_mode": "auto", "__snapgent_job": "job-2"}}}
+        reply = server.handle(request)
+        self.assertNotIn("error", reply)
+        self.assertTrue(reply["result"]["structuredContent"]["cancelled"])
+        self.assertIn("cancelled by the user", reply["result"]["content"][0]["text"])
+
 
 class EntryPointTests(unittest.TestCase):
     def test_snapgent_py_vscode_mcp_speaks_mcp_over_stdio(self):

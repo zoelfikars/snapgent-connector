@@ -40,5 +40,24 @@ def confirmation_required(description: str, token: str, tool: str, risk: str) ->
     }
 
 
+def cancelled_output(text: str) -> Dict[str, Any]:
+    """A command the user stopped. Structured data marks it, so the page can report it as a stop
+    (not as a failure the model should retry or explain away)."""
+    return {
+        "isError": True,
+        "content": [{"type": "text", "text": text}],
+        "structuredContent": {"cancelled": True},
+    }
+
+
+def stream_notification(job_key: str, sequence: int, stream: str, text: str) -> Dict[str, Any]:
+    """Live output of a running command, sent to the bridge while the tool call is still unanswered."""
+    return {
+        "jsonrpc": "2.0",
+        "method": "snapgent/tool_stream",
+        "params": {"jobKey": job_key, "seq": sequence, "stream": stream, "text": text},
+    }
+
+
 def encode(message: Dict[str, Any]) -> str:
     return json.dumps(message, separators=(",", ":"), ensure_ascii=False)

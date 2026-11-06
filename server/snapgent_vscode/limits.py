@@ -22,3 +22,9 @@ SAFE_PROJECT_SCRIPTS = frozenset({"build", "check", "format", "lint", "test", "t
 COMMAND_TIMEOUT_SECONDS = 120  # as long as the bridge waits for one tool call (builds, installs)
 SCRIPT_TIMEOUT_SECONDS = 300
 COMMIT_TIMEOUT_SECONDS = 120
+
+# Live command output: a running command reports what it prints while it runs (the terminal panel).
+STREAM_MAX_CHUNKS = 5_000      # live messages per command; past this the stream says so and goes quiet (the full output is still kept)
+STREAM_MAX_CHARS = 1_000_000   # live characters per command, same deal
+STREAM_TAIL_CHARS = 2_000      # how much of a cancelled command's output travels with the cancellation
+TERMINAL_TABS_KEPT = 20        # finished commands remembered per page before the oldest is dropped

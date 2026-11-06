@@ -5,6 +5,7 @@ import unittest
 from unittest import mock
 
 from snapgent_vscode import limits
+from snapgent_vscode.context import Context
 from snapgent_vscode.tools import all_tools, call, get, registry, schemas
 from snapgent_vscode.tools import commands, editing, git as git_tools, project, reading
 from tests.vscode_support import WorkspaceCase, git
@@ -320,6 +321,22 @@ class CommandTests(WorkspaceCase):
 
     def test_run_command_runs_in_the_workspace(self):
         self.assertEqual(commands.run_command(self.ctx, sys.executable, ["-c", "import os; print(os.getcwd())"]), str(self.root))
+
+    def test_run_command_reports_its_output_while_it_runs(self):
+        seen = []
+        ctx = Context(root=self.root, stream=lambda window, text: seen.append((window, text)))
+        output = commands.run_command(ctx, sys.executable,
+                                      ["-c", "import time; print('live', flush=True); time.sleep(0.8); print('after', flush=True)"])
+        self.assertEqual(output, "live\nafter")
+        printers = [text for window, text in seen if window == "stdout"]
+        self.assertTrue(any("live" in text for text in printers), seen)
+
+    def test_a_command_without_a_watcher_streams_nothing(self):
+        seen = []
+        ctx = Context(root=self.root, stream=None)
+        output = commands.run_command(ctx, sys.executable, ["-c", "print('quiet')"])
+        self.assertEqual(output, "quiet")
+        self.assertEqual(seen, [])
 
     def test_run_tests_without_any_setup(self):
         with self.assertRaisesRegex(FileNotFoundError, "No supported test setup"):

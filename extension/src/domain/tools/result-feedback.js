@@ -42,6 +42,11 @@ export function toFeedback(result, { name, supportsVision, timeoutSeconds = 120 
 
   // A page reload is the only cure for an orphaned content script: say exactly that.
   if (result.kind === "stale-extension") return { text: FEEDBACK.staleExtension, event: "stale-extension" };
+  // The user stopped the command from the terminal panel: say so plainly, without scaring the model.
+  if (result.kind === "cancelled") {
+    const note = result.error && result.error.trim() ? result.error.trim() : "The command was stopped by the user before it finished.";
+    return { text: `⏹ ${note}\n(The command was stopped from the terminal panel; its last output is there. Ask the user how they want to proceed.)` };
+  }
   if (result.kind === "disconnected") return { text: FEEDBACK.bridgeOffline };
   if (result.kind === "timeout") {
     return { text: `ERROR: tool '${name}' timed out after ${timeoutSeconds}s.\n${result.error}\nTry a shorter/simpler call.` };

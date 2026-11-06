@@ -10,7 +10,7 @@ from typing import List, Optional
 from ..context import Context
 from ..limits import COMMAND_TIMEOUT_SECONDS, MAX_OUTPUT_CHARS, SAFE_PROJECT_SCRIPTS, SCRIPT_TIMEOUT_SECONDS
 from ..outputs import CACHE
-from ..process import run_process
+from ..process import run_process_streaming
 from ..security.commands import unsafe_for_cmd
 from .registry import EXECUTE, READ, tool
 from .schema import STR, STR_LIST, integer
@@ -56,8 +56,8 @@ def shell_wrap(command: List[str], windows: Optional[bool] = None) -> List[str]:
 def run_command(ctx: Context, command: str, args: Optional[List[str]] = None, max_output_chars: Optional[int] = None) -> str:
     if not command.strip():
         raise ValueError("Command cannot be empty.")
-    return run_process(shell_wrap([command, *(args or [])]), ctx.root, timeout=COMMAND_TIMEOUT_SECONDS,
-                       max_output_chars=max_output_chars)
+    return run_process_streaming(shell_wrap([command, *(args or [])]), ctx.root, timeout=COMMAND_TIMEOUT_SECONDS,
+                                 max_output_chars=max_output_chars, on_chunk=ctx.stream)
 
 
 def script_command(script: str, root: Path) -> List[str]:
@@ -78,8 +78,8 @@ def script_command(script: str, root: Path) -> List[str]:
 @tool("run_project_script", "Run a named safe script (build, check, format, lint, test, typecheck) from package.json.",
       {"script": STR, "max_output_chars": OUTPUT_CHARS}, ["script"], risk=EXECUTE)
 def run_project_script(ctx: Context, script: str, max_output_chars: Optional[int] = None) -> str:
-    return run_process(script_command(script, ctx.root), ctx.root, timeout=SCRIPT_TIMEOUT_SECONDS,
-                       max_output_chars=max_output_chars)
+    return run_process_streaming(script_command(script, ctx.root), ctx.root, timeout=SCRIPT_TIMEOUT_SECONDS,
+                                 max_output_chars=max_output_chars, on_chunk=ctx.stream)
 
 
 @tool("run_tests", "Run the workspace test script, pytest, or .NET tests when configured.",
@@ -89,10 +89,11 @@ def run_tests(ctx: Context, max_output_chars: Optional[int] = None) -> str:
     if (root / "package.json").is_file():
         return run_project_script(ctx, "test", max_output_chars)
     if (root / "pyproject.toml").is_file() or (root / "pytest.ini").is_file():
-        return run_process([python_interpreter(), "-m", "pytest"], root, timeout=SCRIPT_TIMEOUT_SECONDS,
-                           max_output_chars=max_output_chars)
+        return run_process_streaming([python_interpreter(), "-m", "pytest"], root, timeout=SCRIPT_TIMEOUT_SECONDS,
+                                     max_output_chars=max_output_chars, on_chunk=ctx.stream)
     if any(root.glob("*.sln")) or any(root.glob("*.csproj")):
-        return run_process(["dotnet", "test"], root, timeout=SCRIPT_TIMEOUT_SECONDS, max_output_chars=max_output_chars)
+        return run_process_streaming(["dotnet", "test"], root, timeout=SCRIPT_TIMEOUT_SECONDS,
+                                     max_output_chars=max_output_chars, on_chunk=ctx.stream)
     raise FileNotFoundError("No supported test setup found (package.json, pytest, or .NET project).")
 
 

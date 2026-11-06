@@ -153,3 +153,45 @@ describe("ToolRunner.run — hidden tab and stop", () => {
     assert.equal(await pending, "(stopped by user)");
   });
 });
+
+describe("ToolRunner — the terminal panel follows the job", () => {
+  function setupTerminal({ tools = [tool("run_command", { command: { type: "string" } })], results, jobKey } = {}) {
+    const timers = fakeTimers();
+    const bridge = fakeBridge({ tools, results });
+    const sess = fakeSession();
+    const catalogue = new ToolCatalogue({ bridge, session: sess, now: timers.now });
+    const calls = [];
+    const sink = {
+      images: () => {},
+      staleExtension: () => {},
+      diag: () => {},
+      terminal: {
+        begin: (job) => calls.push(["begin", job]),
+        finish: (key, status) => calls.push(["finish", { key, status }]),
+      },
+    };
+    const runner = new ToolRunner({ bridge, catalogue, session: sess, visibility: fakeVisibility(), sink, timers });
+    return { runner, calls };
+  }
+
+  test("a call with a job key opens a tab named after the command, and settles it with the answer", async () => {
+    const { runner, calls } = setupTerminal({ results: { run_command: { ok: true, text: "done" } } });
+    await runner.run({ tool: "run_command", arguments: { command: "npm", args: ["test"] } }, { jobKey: "k1" });
+    assert.deepEqual(calls[0], ["begin", { key: "k1", name: "run_command", label: "npm test" }]);
+    assert.deepEqual(calls[1], ["finish", { key: "k1", status: "success" }]);
+  });
+
+  test("a call without a job key opens no tab", async () => {
+    const { runner, calls } = setupTerminal();
+    await runner.run({ tool: "run_command", arguments: { command: "ls" } });
+    assert.deepEqual(calls, []);
+  });
+
+  test("a cancelled call settles the tab as stopped and reads as one", async () => {
+    const { runner, calls } = setupTerminal({ results: { run_command: { ok: false, kind: "cancelled", error: "stopped by user" } } });
+    const text = await runner.run({ tool: "run_command", arguments: { command: "sleep", args: ["99"] } }, { jobKey: "k1" });
+    assert.match(text, /⏹/);
+    assert.match(text, /stopped by user/);
+    assert.deepEqual(calls[1], ["finish", { key: "k1", status: "stopped" }]);
+  });
+});

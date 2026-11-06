@@ -12,12 +12,15 @@ from .settings import MAX_LOG_CHARS, MCP_PROTOCOL_VERSION, MCP_STDOUT_LIMIT
 
 class MCPServer:
     def __init__(self, server_id: str, config: Dict[str, Any], *, cwd: Path, client_version: str,
-                 log: Callable[[str], None]) -> None:
+                 log: Callable[[str], None],
+                 on_notification: Optional[Callable[[Dict[str, Any]], None]] = None) -> None:
         self.server_id = server_id
         self.config = config
         self._cwd = cwd
         self._client_version = client_version
         self._log = log
+        # Server-initiated messages (no id): live command output, and whatever else MCP adds later.
+        self.on_notification = on_notification
         self.process: Optional[asyncio.subprocess.Process] = None
         self.tools: List[Dict[str, Any]] = []
         self._next_id = 1
@@ -218,6 +221,14 @@ class MCPServer:
                     future = self._pending.get(request_id)
                     if future and not future.done():
                         future.set_result(message)
+                    continue
+                # No id: a notification from the server (a running command's live output).
+                handler = self.on_notification
+                if handler is not None and message.get("method"):
+                    try:
+                        handler(message)
+                    except Exception as error:  # a bad listener must not kill the reader
+                        self._log(f"[{self.server_id}] notification dropped: {error}")
         except asyncio.CancelledError:
             raise
         except (ValueError, asyncio.LimitOverrunError) as error:
