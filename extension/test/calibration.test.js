@@ -214,6 +214,47 @@ describe("what the reply read includes", () => {
   });
 });
 
+describe("a thinking part inside the same turn as the answer (z.ai)", () => {
+  const PAGE = `<html><body><div class='turn-user'>hello</div><div class='turn-assistant'><div class='thinking-chain'><blockquote class='thought'><p>THINK-ONLY words</p></blockquote></div><p class='prose'>ANSWER-ONLY words</p><pre>CODE-BLOCK</pre></div><div id='box' contenteditable='true'></div></body></html>`;
+  function on(pick) {
+    const { document, window } = pageWith(PAGE, "https://x.test/");
+    const learned = learnProfile({ hostname: "x.test", name: "X", picks: { composer: document.getElementById("box"), send: null, assistant: document.querySelector("pre"), user: document.querySelector(".turn-user"), assistantThinking: pick(document) } });
+    assert.equal(learned.error, undefined, learned.error);
+    return { learned, provider: createCalibratedProvider({ document, location: window.location, profile: learned.profile }) };
+  }
+
+  test("the thinking part is learned from a click inside it", () => {
+    const { learned } = on((d) => d.querySelector(".thought p"));
+    assert.equal(learned.profile.assistant.thinking, ".thought");
+    assert.deepEqual(learned.warnings, []);
+  });
+
+  test("the reply holds the answer and the code, the thinking is kept apart", () => {
+    const { provider } = on((d) => d.querySelector(".thought p"));
+    const { reply, thinking } = provider.readAssistant();
+    assert.ok(reply.includes("ANSWER-ONLY") && reply.includes("CODE-BLOCK"));
+    assert.ok(!reply.includes("THINK-ONLY"));
+    assert.ok(thinking.includes("THINK-ONLY"));
+  });
+
+  test("the thinking still counts as growth of the reply", () => {
+    const { provider } = on((d) => d.querySelector(".thought p"));
+    assert.ok(provider.streamLen() > provider.itemText(provider.lastAssistant()).length);
+  });
+
+  test("without a pick nothing changes: the thinking is read with the reply", () => {
+    const { learned, provider } = on(() => null);
+    assert.equal("thinking" in learned.profile.assistant, false);
+    assert.ok(provider.readAssistant().reply.includes("THINK-ONLY"));
+  });
+
+  test("a pick that cannot be described is reported and ignored", () => {
+    const { learned } = on((d) => d.querySelector("pre"));
+    assert.equal("thinking" in learned.profile.assistant, false);
+    assert.equal(learned.warnings.length, 1);
+  });
+});
+
 describe("conversation identity", () => {
   test("a chat with no turns has no identity yet, whatever its URL says (Gemini's fresh chat is /app)", () => {
     const { provider, window } = calibrated(SITES.gemini);

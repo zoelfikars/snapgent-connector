@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as ZS from "../src/domain/index.js";
+import { cleanContext } from "../src/domain/prompt/context-file.js";
 
 const workspace = { name: "snapgent-connector", path: "/home/me/snapgent-connector", git: true };
 const prompt = ZS.buildSystemPrompt({ workspace, targetName: "VS Code" });
@@ -31,5 +32,14 @@ test("without one, the start message says nothing about project instructions", (
 
 const skilled = ZS.buildSystemPrompt({ skills: [{ name: "commit", description: "write commits" }] });
 test("skills listed", () => assert.ok(skilled.includes("- commit: write commits")));
+
+const clean = (text) => cleanContext(text);
+test("a file reference in an instruction file stays a plain path, without its @", () => {
+  assert.equal(clean("see @docs/ARCHITECTURE.md and @./a.md, also @src/"), "see docs/ARCHITECTURE.md and ./a.md, also src/");
+});
+test("an @ that is not a path is still defused, an address is left alone", () => {
+  assert.equal(clean("@import rules\nmail a@b.com, ask @john."), "[at]import rules\nmail a@b.com, ask [at]john.");
+});
+test("the read_files wrapping is removed", () => assert.equal(clean("===== AGENTS.md =====\n1: use pnpm\n2: @docs/x.md"), "use pnpm\ndocs/x.md"));
 
 test("parse-error falls back to malformed", () => assert.ok(ZS.FEEDBACK.parseError("nope").includes("could not be parsed")));

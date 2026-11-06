@@ -122,6 +122,22 @@ export function learnTurnSelectors(assistantPick, userPick, keepOut = []) {
 }
 
 /**
+ * The reasoning part of a reply that shares its turn with the answer, from a click inside it; null when none can be described. The part
+ * must be found again by its selector, and no match may hold a code block: commands live in the answer, and a part that swallowed one
+ * would hide it from the agent.
+ */
+export function learnThinkingSelector(turn, inner) {
+  if (!inner || inner === turn || !turn.contains(inner)) return null;
+  for (let el = inner; el && el !== turn; el = el.parentElement) {
+    const selector = learnSelector(el, { scope: turn });
+    if (!selector) continue;
+    const found = all(turn, selector);
+    if (found.includes(el) && !found.some((match) => match.querySelector("pre"))) return selector;
+  }
+  return null;
+}
+
+/**
  * The part of a reply to read, from a click inside it; null when the turn itself is the body. A part that leaves out one of
  * the reply's code blocks is grown until it holds them all: the commands the agent must read live in code blocks, and a click
  * deep inside the prose would otherwise cut them off.

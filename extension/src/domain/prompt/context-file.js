@@ -16,9 +16,11 @@ export function clampContextFiles(value) {
   return names;
 }
 
-/** The file as the model should read it: without the `read_files` wrapping (the `===== name =====` line and the line numbers), and with
- * every `@` a plain word, so the model does not read it as a file to attach. */
+/** The file as the model should read it: without the `read_files` wrapping (the `===== name =====` line and the line numbers).
+ * Only an `@` that starts a word could be read as a file to attach (an address like a@b.com never is). One followed by a path
+ * (`@docs/x.md`) loses its `@`, so the reference stays a plain path the model can read with `read_files`; any other (`@import`) becomes a plain word. */
 export const cleanContext = (text) => String(text)
   .replace(/^=+ .+? =+\r?\n/, "") // the header of the one file that was read
   .replace(/^\d+: /gm, "") // the line numbers read_files puts in front of every line
-  .replace(/@/g, "[at]");
+  .replace(/(^|\s)@(?=[\w.~-]*(?:\/|\.\w))/gm, "$1")
+  .replace(/(^|\s)@/gm, "$1[at]");

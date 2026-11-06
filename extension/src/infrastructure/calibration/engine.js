@@ -81,11 +81,22 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     const matches = outermost([...item.querySelectorAll(profile.assistant.body)]);
     return matches.length ? matches[matches.length - 1] : item;
   };
-  const bodyText = (item) => remembered(item, () => readText(bodyOf(item)));
+  // The reasoning of a turn (when the profile names it) is not part of the reply: it may hold text that looks like a command.
+  const thinkingParts = (item) => {
+    if (!profile.assistant.thinking) return [];
+    try { return outermost([...item.querySelectorAll(profile.assistant.thinking)]); } catch { return []; }
+  };
+  const bodyText = (item) => remembered(item, () => readText(bodyOf(item), profile.assistant.thinking));
+  const thinkingKeys = new WeakMap();
+  const thinkingText = (item) => {
+    if (!item || !profile.assistant.thinking) return "";
+    if (!thinkingKeys.has(item)) thinkingKeys.set(item, {});
+    return remembered(thinkingKeys.get(item), () => thinkingParts(item).map((part) => readText(part)).join("\n"));
+  };
   const itemText = (item) => (item ? (isAssistantItem(item) ? bodyText(item) : readText(item)) : "");
   const readAssistant = () => {
     const item = lastAssistant();
-    return { present: !!item, reply: item ? bodyText(item).trim() : "", thinking: "", item };
+    return { present: !!item, reply: item ? bodyText(item).trim() : "", thinking: item ? thinkingText(item).trim() : "", item };
   };
   // A chat has begun when a message of the user's is on the page: the home page's cards, a greeting or an overlay that happens
   // to look like an AI turn do not make an empty chat look started.
@@ -343,7 +354,11 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   }
 
   // ── generation ────────────────────────────────────────────────────────────
-  const streamLen = (item) => (item === undefined ? itemText(lastAssistant()) : itemText(item)).length;
+  // Reasoning counts as growth: without a stop button, a model that thinks for a long time must not look finished.
+  const streamLen = (item) => {
+    const turn = item === undefined ? lastAssistant() : item;
+    return itemText(turn).length + thinkingText(turn).length;
+  };
   const isHardGenerating = () => !!stopButton();
   // A stop button seen on THIS reply is a trustworthy signal: when it goes, the reply is over (a short grace covers a button that
   // blinks between the thinking and the answer). Only a reply that never showed one falls back on "the text grew in the last 2 s".
@@ -363,7 +378,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     const body = last ? bodyOf(last) : null;
     const codeBlocks = last ? [...last.querySelectorAll("pre")] : [];
     return {
-      users: userTurns(), assistants: assistantTurns(), body: body && body !== last ? body : null, card: composerFrame(), composer: getEditor(), send: sendButton(),
+      users: userTurns(), assistants: assistantTurns(), thinking: last ? thinkingParts(last) : [], body: body && body !== last ? body : null, card: composerFrame(), composer: getEditor(), send: sendButton(),
       codeBlocks: codeBlocks.length, codeBlocksRead: body ? codeBlocks.filter((el) => body.contains(el)).length : codeBlocks.length,
     };
   }

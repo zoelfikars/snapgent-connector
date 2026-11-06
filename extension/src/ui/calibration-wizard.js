@@ -49,7 +49,7 @@ export function createCalibrationWizard({
     const def = STEPS[name_];
     const buttons = [{ label: "Cancel", action: "cancel" }];
     if (name_ === "send") buttons.unshift({ label: "Enter sends", action: "enter-sends" });
-    if (index > 0 && name_ !== "answer" && name_ !== "card") buttons.unshift({ label: "Back", action: "back" });
+    if (index > 0 && name_ !== "answer" && name_ !== "thinking" && name_ !== "card") buttons.unshift({ label: "Back", action: "back" });
     render({ text: def.text, hint: def.hint || "", buttons });
     stopPicking = picker.start({
       // our own panel and the control bar are not part of the page being taught
@@ -62,6 +62,7 @@ export function createCalibrationWizard({
         error = "";
         if (name_ === "card") { picks.card = el; const u = calibration.updateProfile(draft, "card", { card: el }); if (u.error) { error = u.error; render({ text: def.text, hint: def.hint || "", buttons }); return; } draft = u.profile; error = ""; preview(); return; }
         if (name_ === "answer") { picks.assistantInner = el; panel.mark("answer", el, MARK_LABELS.answer); relearn(); return; }
+        if (name_ === "thinking") { picks.assistantThinking = el; relearn(); return; }
         picks[name_] = el;
         panel.mark(name_, el, MARK_LABELS[name_]);
         advance();
@@ -79,7 +80,7 @@ export function createCalibrationWizard({
   function relearn() {
     stopPicking();
     let learned;
-    const forReply = { assistant: picks.reply, user: picks.message, assistantInner: picks.assistantInner || null };
+    const forReply = { assistant: picks.reply, user: picks.message, assistantInner: picks.assistantInner || null, assistantThinking: picks.assistantThinking || null };
     if (flow === "all") {
       learned = calibration.learnProfile({ hostname, name, picks: { composer: picks.composer, send: picks.send || null, ...forReply } });
     } else if (flow === "reply") {
@@ -111,6 +112,7 @@ export function createCalibrationWizard({
       buttons: [
         { label: "Looks right", action: "looks-right", primary: !!review.read && !review.warnings.length },
         { label: "Pick just the answer", action: "pick-answer" },
+        { label: "Pick the thinking part", action: "pick-thinking" },
         { label: "Redo the reply", action: "redo-reply" },
         { label: "Cancel", action: "cancel" },
       ],
@@ -185,7 +187,8 @@ export function createCalibrationWizard({
     if (action === "looks-right") { panel.unmarkMatching("rv:"); check(); return; }
     if (action === "pick-card") { error = ""; panel.unmarkMatching("rv:"); pickStep("card"); return; }
     if (action === "pick-answer") { error = ""; pickStep("answer"); return; }
-    if (action === "redo-reply") { for (const name_ of ["reply", "message", "answer"]) panel.unmark(name_); picks.assistantInner = null; index = steps.indexOf("reply"); error = ""; pickStep("reply"); return; }
+    if (action === "pick-thinking") { error = ""; pickStep("thinking"); return; }
+    if (action === "redo-reply") { for (const name_ of ["reply", "message", "answer"]) panel.unmark(name_); picks.assistantInner = null; picks.assistantThinking = null; index = steps.indexOf("reply"); error = ""; pickStep("reply"); return; }
     if (action === "redo-composer") { flow = "composer"; steps = ["composer"]; index = 0; error = ""; pickStep("composer"); return; }
     if (action === "save") { save(); return; }
   }

@@ -60,6 +60,7 @@ export const STEPS = {
     accept: (el, picks) => (picks.reply && (picks.reply === el || picks.reply.contains(el) || el.contains(picks.reply)) ? "That is part of the reply. Click one of your own messages." : null),
   },
   answer: { text: "Click just the part of the AI reply that is the answer itself (not its labels or buttons)." },
+  thinking: { text: "Click on the words of the AI's thinking (the “Thought process” box that sits inside the same reply)." },
   card: {
     text: "Click the box that holds the text box together with its buttons (attach, mode, microphone, send).",
     hint: "The bar is placed inside this box. Click its empty border or background, not the text box itself.",
@@ -69,4 +70,4 @@ export const STEPS = {
 
 
 /** The label drawn on the page next to what was clicked at each step. */
-export const MARK_LABELS = { composer: "1 · Text box", send: "2 · Send button", reply: "3 · AI reply", message: "4 · Your message", answer: "Answer part", card: "Box around the text box" };
+export const MARK_LABELS = { composer: "1 · Text box", send: "2 · Send button", reply: "3 · AI reply", message: "4 · Your message", answer: "Answer part", thinking: "Thinking", card: "Box around the text box" };

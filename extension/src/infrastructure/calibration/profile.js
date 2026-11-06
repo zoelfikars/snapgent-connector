@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // A site profile: everything the extension knows about one chat site, as data. Built from what the user clicked.
 
-import { learnBodySelector, learnSelector, learnTurnSelectors } from "./selector-learning.js";
+import { learnBodySelector, learnSelector, learnThinkingSelector, learnTurnSelectors } from "./selector-learning.js";
 
 export const PROFILE_VERSION = 1;
 
@@ -12,7 +12,7 @@ export const PROFILE_VERSION = 1;
  * @property {string} name
  * @property {{ selector: string }} composer
  * @property {{ selector?: string, enter?: boolean }} send
- * @property {{ turn: string, body: string|null }} assistant
+ * @property {{ turn: string, body: string|null, thinking?: string }} assistant   `thinking`: the reasoning inside the same turn, left out of the reply
  * @property {{ turn: string }} user
  * @property {{ selector: string }|null} stop    optional; otherwise found by label next to the composer
  * @property {{ selector: string }|null} [card]   optional: the box around the text box and its buttons; otherwise found by looking
@@ -41,6 +41,8 @@ export function learnProfile({ hostname, name, picks }) {
   if (turns.error) return { error: turns.error };
   const body = learnBodySelector(turns.assistantTurn, picks.assistantInner || null);
   if (picks.assistantInner && !body) warnings.push("Could not describe the part of the reply you chose; the whole reply is read.");
+  const thinking = learnThinkingSelector(turns.assistantTurn, picks.assistantThinking || null);
+  if (picks.assistantThinking && !thinking) warnings.push("Could not describe the thinking part you chose; it is read as part of the reply.");
 
   let card = null;
   if (picks.card) {
@@ -52,7 +54,7 @@ export function learnProfile({ hostname, name, picks }) {
     profile: {
       version: PROFILE_VERSION, site: hostname, name,
       composer: { selector: composer }, send,
-      assistant: { turn: turns.assistant, body }, user: { turn: turns.user },
+      assistant: { turn: turns.assistant, body, ...(thinking ? { thinking } : {}) }, user: { turn: turns.user },
       stop: null, card,
     },
     warnings,
@@ -82,7 +84,9 @@ export function updateProfile(profile, role, picks) {
     if (turns.error) return { error: turns.error };
     const body = learnBodySelector(turns.assistantTurn, picks.assistantInner || null);
     if (picks.assistantInner && !body) warnings.push("Could not describe the part of the reply you chose; the whole reply is read.");
-    return { profile: { ...profile, assistant: { turn: turns.assistant, body }, user: { turn: turns.user } }, warnings };
+    const thinking = learnThinkingSelector(turns.assistantTurn, picks.assistantThinking || null);
+    if (picks.assistantThinking && !thinking) warnings.push("Could not describe the thinking part you chose; it is read as part of the reply.");
+    return { profile: { ...profile, assistant: { turn: turns.assistant, body, ...(thinking ? { thinking } : {}) }, user: { turn: turns.user } }, warnings };
   }
   if (role === "card") {
     const selector = learnSelector(picks.card, { onlyVisible: true });

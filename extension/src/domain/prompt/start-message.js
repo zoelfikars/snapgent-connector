@@ -5,7 +5,7 @@
 /** @param {{ prompt: string, commands: string, tree?: string, context?: { name: string, text: string } | null }} parts */
 export function buildStartMessage({ prompt, commands, tree = "", context = null }) {
   const parts = [prompt];
-  if (context) parts.push(`Project instructions from ${context.name}:\n\n${context.text.trim()}`);
+  if (context) parts.push(`Project instructions from ${context.name}:\n\n${context.text.trim()}\n\n(Files this text mentions are not included here: read them with read_files when they matter.)`);
   parts.push(`These are the commands you can use here:\n\n${commands.trim()}`);
   if (tree.trim()) parts.push(`This is what the project looks like (folders such as node_modules and .git are left out):\n\n${tree.trim()}`);
   parts.push('If that is all clear, just reply "understood" and wait. Do not run anything yet: I will tell you what I want to do.');

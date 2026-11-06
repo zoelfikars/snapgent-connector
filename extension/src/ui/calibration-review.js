@@ -32,6 +32,7 @@ export function reviewOf(provider) {
     ...info.users.slice(0, MAX_MARKED).map((el, i) => ({ name: `rv:user${i}`, el, label: "You", kind: "user" })),
     ...info.assistants.slice(0, MAX_MARKED).map((el, i) => ({ name: `rv:ai${i}`, el, label: "AI reply", kind: "ai" })),
   ];
+  info.thinking.forEach((el, i) => marks.push({ name: `rv:thinking${i}`, el, label: "Thinking (not read)", kind: "body" }));
   if (info.body) marks.push({ name: "rv:body", el: info.body, label: "Read from here", kind: "body" });
 
   const codeLine = info.codeBlocks ? `\nCode blocks in the last reply: ${info.codeBlocks} (${info.codeBlocksRead} read)` : "";
