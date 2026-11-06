@@ -8,6 +8,7 @@
 // even when the bridge is offline. The agentic loop must never hang waiting.
 
 import { BRIDGE_PORT as PORT, allMatches } from "../sites/registry.js";
+import { handleAccountMessage } from "./background-accounts.js";
 
 const BRIDGE_URL = `ws://127.0.0.1:${PORT}`;
 
@@ -288,6 +289,12 @@ function broadcastStatus() {
 // ── messages from content.js / popup.js ─────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
+    // Saved logins live here, not in the page: only the background may touch a site's cookies.
+    const account = await handleAccountMessage(msg);
+    if (account !== undefined) {
+      sendResponse(account);
+      return;
+    }
     switch (msg.type) {
       case "status":
         if (!connected) connect(); // self-heal after a worker wake-up

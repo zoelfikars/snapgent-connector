@@ -18,4 +18,7 @@ export { TurnMemory } from "./turn-memory.js";
 export { SessionTracker, textShowsSession } from "./session-tracker.js";
 export { BridgeMonitor } from "./bridge-monitor.js";
 export { ProfileStore } from "./profile-store.js";
+export { AccountStore } from "./account-store.js";
+export { matchingTab } from "./account-tab.js";
+export { AccountSwitcher } from "./account-switcher.js";
 export { PartQueue } from "./part-queue.js";

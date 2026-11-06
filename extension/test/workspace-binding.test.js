@@ -33,6 +33,22 @@ describe("the folder a chat works in", () => {
     assert.equal(binding.current(), "/work/portofolio", "back in the first chat: its own folder");
   });
 
+  test("the folder is kept per login: the same chat URL under another account does not inherit it", async () => {
+    const storage = store();
+    const provider = { conversationKey: () => "/chat/abc" };
+    let account = "work";
+    const binding = createWorkspaceBinding({ storage, provider, accountKey: () => account });
+    binding.bind("/work/portofolio");
+    assert.equal(binding.current(), "/work/portofolio");
+    account = "home";
+    assert.equal(binding.current(), null, "another login's chat has no folder yet");
+    binding.bind("/work/home-project");
+    account = "work";
+    assert.equal(binding.current(), "/work/portofolio", "each login keeps its own folder");
+    account = "";
+    assert.equal(binding.current(), null, "with no account the plain chat key is used, and it is empty");
+  });
+
   test("it survives a reload: a new instance reads what was stored", async () => {
     const provider = { conversationKey: () => "/c/AAA" };
     const binding = createWorkspaceBinding({ storage: store({ "/c/AAA": "/work/portofolio" }), provider });

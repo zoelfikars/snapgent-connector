@@ -44,6 +44,30 @@
       justify-content: space-between;
       gap: 8px;
     }
+    .head-actions { display: flex; align-items: center; gap: 6px; }
+    .icon-btn { width: 30px; min-height: 30px; padding: 0; border-radius: 8px; font-size: 14px; }
+
+    /* Accounts */
+    .acc-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--border); }
+    .acc-row:first-child { border-top: 0; }
+    .acc-row.is-active .acc-name { color: var(--ok); }
+    .acc-name { font-size: 12.5px; font-weight: 600; overflow-wrap: anywhere; }
+    .acc-meta { font-size: 10.5px; color: var(--muted); grid-column: 1; }
+    .acc-row button { width: auto; min-height: 28px; padding: 4px 8px; font-size: 11px; }
+    .acc-none { margin: 6px 0 0; font-size: 11px; color: var(--muted); }
+    #acc-status { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: var(--muted); min-height: 1em; }
+    #acc-status[data-kind="ok"] { color: var(--ok); }
+    #acc-status[data-kind="warn"] { color: var(--warn); }
+    #acc-status[data-kind="bad"] { color: var(--bad); }
+    #acc-save { display: flex; gap: 6px; margin-top: 8px; }
+    #acc-save input { flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); color: var(--text); font: inherit; font-size: 12px; }
+    /* The shared `button { width: 100% }` rule would make Save fill the row and squeeze the name field. */
+    #acc-save button { width: auto; flex: none; }
+    .acc-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .acc-actions #acc-other { flex: 1; }
+    .acc-actions #acc-diag { width: auto; flex: none; }
+    #acc-diag-out { margin: 8px 0 0; font: 10.5px ui-monospace, monospace; line-height: 1.6; color: var(--muted); white-space: pre-wrap; word-break: break-word; }
+    #acc-busy { margin: 6px 0 0; font-size: 11px; color: var(--accent); }
     h1 {
       display: flex;
       align-items: baseline;
@@ -184,6 +208,9 @@
     <header>
       <h1>snapgentV3 <span class="ver" id="ver"></span></h1>
       <!-- <span class="badge">DeepSeek</span> --> <!-- DeepSeek hidden (disabled, not deleted) -->
+      <div class="head-actions">
+        <button class="icon-btn" id="user" title="Accounts: which login this site uses" aria-label="Accounts" hidden>☺</button>
+      </div>
     </header>
 
     <section class="card">
@@ -197,10 +224,18 @@
       <div id="servers"></div>
     </section>
 
-    <section class="card">
-      <div class="limit-head"><span>Max message size</span><span id="limit-value"></span></div>
-      <input type="range" id="limit" aria-label="Maximum characters in one message sent to the chat" />
-      <p class="limit-note">One message to the chat (command results, with any reminder) never goes past this. Longer output is cut in the middle, and files that do not fit are listed as not read. About 4 characters per token.</p>
+    <section class="card" id="accounts" hidden>
+      <div class="limit-head"><span>Accounts · <span id="user-name"></span></span></div>
+      <div id="acc-list"></div>
+      <form id="acc-save"><input id="acc-name" type="text" placeholder="Name this login (e.g. Work)" autocomplete="off" maxlength="40" aria-label="Name this login" /><button type="submit">Save</button></form>
+      <div class="acc-actions">
+        <button type="button" id="acc-other">Sign in with another account</button>
+        <button type="button" id="acc-diag" title="What the background can see, to diagnose a switch">?</button>
+      </div>
+      <p id="acc-busy" hidden>Working…</p>
+      <p id="acc-status"></p>
+      <pre id="acc-diag-out" hidden></pre>
+      <p class="limit-note">Switching puts another saved login's cookies back, so the other account is never signed out. Only the page you are on is reloaded.</p>
     </section>
 
     <div class="actions">
@@ -210,7 +245,7 @@
     </div>
 
     <p class="hint">
-      Start <code>snapgent</code> (<code>snapgent.exe</code> on Windows).
+      Message size is in Preferences. Start <code>snapgent</code> (<code>snapgent.exe</code> on Windows).
     </p>
   </div>
   <script src="popup.js"></script>

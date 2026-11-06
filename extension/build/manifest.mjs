@@ -2,6 +2,9 @@
 // Pure manifest generation: base.json + the site registry + per-browser deltas.
 import { SITES, allMatches } from "../src/sites/registry.js";
 
+// Reading and writing a site's cookies is what makes switching logins possible: only asked for when a site offers accounts.
+const needsCookies = (sites) => (sites.some((site) => site.accounts) ? ["cookies"] : []);
+
 export const TARGETS = ["chrome", "firefox"];
 const GECKO_ID = "snapgent@herdodp.github.io";
 const FIREFOX_MIN_VERSION = "128.0"; // first release with MV3 `world: "MAIN"` content scripts
@@ -18,13 +21,17 @@ export function contentScripts(sites = SITES) {
 
 export function hostPermissions(sites = SITES) {
   const extra = sites.flatMap((site) => site.extraHosts || []);
-  return [...new Set([...allMatches(), ...extra]), "http://127.0.0.1/*", "ws://127.0.0.1/*"];
+  // A login may live on host names beyond the ones a content script runs on (Claude's session also touches anthropic.com):
+  // without permission for them the cookies cannot be read or written, and a switch would silently do nothing.
+  const accountHosts = sites.flatMap((site) => (site.accountHosts || []).map((host) => `https://*.${host}/*`));
+  return [...new Set([...allMatches(), ...extra, ...accountHosts, "http://127.0.0.1/*", "ws://127.0.0.1/*"])];
 }
 
 export function buildManifest(base, { target, version }) {
   if (!TARGETS.includes(target)) throw new Error(`Unknown target "${target}"`);
   const manifest = {
     ...base,
+    permissions: [...new Set([...(base.permissions || []), ...needsCookies(SITES)])],
     version,
     host_permissions: hostPermissions(),
     content_scripts: contentScripts(),

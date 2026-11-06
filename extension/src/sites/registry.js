@@ -10,13 +10,17 @@
  * @property {string[]} matches      Content-script URL match patterns.
  * @property {string}   url         Where the "switch AI" menu sends the user.
  * @property {string[]} [extraHosts] Extra host permissions beyond `matches`.
+ * @property {boolean} [accounts]  The user may keep several logins and switch between them (cookie snapshot and swap).
+ * @property {string[]} [accountHosts] The host names whose cookies are that login (default: the match hosts).
  */
 
 /** @type {Site[]} */
 export const SITES = [
   { id: "deepseek", name: "DeepSeek", url: "https://chat.deepseek.com/", matches: ["https://chat.deepseek.com/*"], extraHosts: ["https://deepseek.com/*"] },
   { id: "chatgpt", name: "ChatGPT", url: "https://chatgpt.com/", matches: ["https://chatgpt.com/*", "https://chat.openai.com/*"] },
-  { id: "claude", name: "Claude", url: "https://claude.ai/new", matches: ["https://claude.ai/*"] },
+  // Accounts (cookie snapshot and swap) are offered for Claude only, for now: a site gets them once its cookies are known to
+  // be all a login lives in.
+  { id: "claude", name: "Claude", url: "https://claude.ai/new", matches: ["https://claude.ai/*"], accounts: true, accountHosts: ["claude.ai", "anthropic.com"] },
   { id: "gemini", name: "Gemini", url: "https://gemini.google.com/app", matches: ["https://gemini.google.com/*"] },
   { id: "kimi", name: "Kimi", url: "https://www.kimi.ai/", matches: ["https://www.kimi.ai/*", "https://kimi.ai/*"] },
   { id: "glm", name: "GLM", url: "https://chat.z.ai/", matches: ["https://chat.z.ai/*"] },
@@ -47,3 +51,12 @@ const hostnameOf = (pattern) => new URL(pattern.replace("*", "x")).hostname;
 
 /** The registry entry whose match patterns cover this host name, or undefined. */
 export const siteFor = (hostname) => SITES.find((site) => site.matches.some((pattern) => hostnameOf(pattern) === hostname));
+
+/** The site whose logins can be switched (an account entry), or undefined. */
+export const accountSiteFor = (hostname) => {
+  const site = siteFor(hostname);
+  return site && site.accounts ? site : undefined;
+};
+
+/** The host names a site's cookies live on. */
+export const accountHostsOf = (site) => site.accountHosts || site.matches.map(hostnameOf);

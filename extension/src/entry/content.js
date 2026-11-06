@@ -4,6 +4,7 @@
 
 import { PartQueue, ServerDirectory } from "../application/index.js";
 import defaultCalibrations from "../../profiles/default-calibrations.json";
+import { createAccountScope } from "../page/account-scope.js";
 import { createAttachments } from "../page/attachments.js";
 import { createAtPopup } from "../page/at-popup.js";
 import { createAutoResume } from "../page/auto-resume.js";
@@ -30,6 +31,7 @@ import { createTools } from "../page/tools.js";
 import { createTurns } from "../page/turns.js";
 import { installUserInput } from "../page/user-input.js";
 import { createVisibility } from "../page/visibility.js";
+import { accountSiteFor } from "../sites/registry.js";
 
 const storage = createStorage();
 const state = createState();
@@ -46,12 +48,15 @@ const notify = (level, title, text) => bar.banner(level, title, text);
 
 const send = createExtensionBridge();
 const settings = createSettings({ storage, location, onChange: redraw });
+// The login in use, so one account's chats do not inherit another's folders. Empty on a site without accounts.
+const accountSite = accountSiteFor(location.hostname);
+const accounts = createAccountScope({ storage, site: accountSite ? accountSite.id : "" });
 // The terminal panel lives from page load on: it must be listening before the first command starts.
 const terminal = createTerminal({ document, diag, onChange: redraw });
 terminal.start();
 const serverDirectory = new ServerDirectory({ store: storage, liveServers: () => state.bridge.servers || [], onChange: redraw, log: (...args) => console.warn("[snapgentV3]", ...args) });
 const visibility = createVisibility({ document, state, diag, onParkChange: redraw });
-const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal });
+const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id });
 terminal.setCancel((jobKey, name) => tools.runner.cancelJob(jobKey, name));
 const bridgeStatus = createBridgeStatus({ state, settings, tools, send, bar: () => bar, diag });
 const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, toast: (text) => bar.toast(text) });
@@ -82,6 +87,14 @@ userInput = installUserInput({ document, state, provider, bar, resend, loop, tak
 createAtPopup({ document, window, root: bar.root, state, settings, provider, attachments, preferences, calibration, toast: bar.toast, diag });
 createAutoResume({ document, state, provider, executed, loop, diag });
 startPageWatch({ document, window, provider, session, bar });
+// The popup asks before it switches logins: a running agent would be left talking to a session that is no longer there.
+try {
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (!message || message.type !== "zs-account-status") return undefined;
+    sendResponse({ ok: true, supported: !!accountSite, account: accounts.id(), busy: !!(state.running || state.starting) });
+    return undefined;
+  });
+} catch { /* no extension messaging here */ }
 resend.hydrate();
 settings.ready.then(bridgeStatus.start);
 console.log(`[snapgentV3] content script ready (provider: ${provider.id})`);

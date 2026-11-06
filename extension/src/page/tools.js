@@ -13,10 +13,10 @@ import { createWorkspaceBinding } from "./workspace-binding.js";
 
 /**
  * @param {{ send: Function, provider: object, state: object, settings: object, serverDirectory: object, visibility: object,
- *           storage: object, diag: Function, banner: Function, terminal?: object }} deps  `banner(level, title, text)`
+ *           storage: object, diag: Function, banner: Function, terminal?: object, accountKey?: () => string }} deps  `banner(level, title, text)`
  *   shows the user a notice; `terminal` receives the live output of commands (see page/terminal.js)
  */
-export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner, terminal = null }) {
+export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner, terminal = null, accountKey = () => "" }) {
   const bridge = {
     listTools: () => send({ type: "list_tools" }),
     callTool: (request) => send({ type: "call_tool", ...request }),
@@ -40,7 +40,7 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
   const catalogue = new ToolCatalogue({ bridge, session, diag });
   // Risky actions need the user's approval: a top-layer dialog in a closed shadow root that ignores synthetic clicks.
   const confirm = createConfirmDialog();
-  const bindings = createWorkspaceBinding({ storage, provider });
+  const bindings = createWorkspaceBinding({ storage, provider, accountKey });
   const choice = createChoiceDialog();
   const runner = new ToolRunner({ bridge, catalogue, session, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current });
   const skills = new SkillsService({
