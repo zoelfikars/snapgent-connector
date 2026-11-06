@@ -52,28 +52,57 @@ export function workspaceMenuHtml({ active, open, pinned }) {
     `<button type="submit" class="zs-ws-use">Use</button></form><div class="zs-ws-error" hidden></div></section>`;
 }
 
-/** The files menu: a search box over the workspace's files, the list, and the button that tags the chosen ones. */
+/** The files window's body: a search box over the workspace's files, the list, the actions, and the folders left out. */
 export const filesMenuHtml = () =>
-  `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Attach files</span></div>` +
-  `<input class="zs-files-search" type="search" placeholder="Search files…" autocomplete="off" spellcheck="false" aria-label="Search files">` +
+  `<input class="zs-files-search" type="search" placeholder="Filter files..." autocomplete="off" spellcheck="false" aria-label="Search files">` +
   `<div class="zs-files-list"></div>` +
-  `<div class="zs-files-foot"><span class="zs-files-count"></span><button type="button" class="zs-files-insert">Insert</button></div>` +
-  `<label class="zs-files-toggle"><input type="checkbox" class="zs-files-at"> Open this list when I type @ in the message</label></section>`;
+  `<div class="zs-files-foot"><span class="zs-files-count"></span>` +
+  `<span class="zs-files-actions"><button type="button" class="zs-files-refresh" title="Fetch the list again" aria-label="Refresh the list">&#8635;</button>` +
+  `<button type="button" class="zs-files-gear" title="Preferences: the folders left out" aria-label="Preferences">&#9881;</button>` +
+  `<button type="button" class="zs-files-insert">Insert</button></span></div>` +
+  `<div class="zs-files-ignored"><span class="zs-files-ignored-label"></span></div>` +
+  `<label class="zs-files-toggle"><input type="checkbox" class="zs-files-at"> Open this list when I type @ in the message</label>`;
 
 /**
  * The rows of a file list, the one markup behind both the Files menu and the popup beside the composer. With `chosen` (a Set) every row
  * has a tick and the chosen ones are marked; with `active` the row at that index is highlighted. At most `max` rows are drawn.
  */
-export function fileRowsHtml(paths, { chosen = null, active = -1, max = 200 } = {}) {
-  if (!paths.length) return `<div class="zs-files-more">No file matches</div>`;
-  const rows = paths.slice(0, max).map((path, index) => {
-    const slash = path.lastIndexOf("/", path.length - 2); // a folder ends with a slash that belongs to its name
-    const on = chosen ? chosen.has(path) : index === active;
-    return `<div class="zs-file-row${path.endsWith("/") ? " zs-file-folder" : ""}${chosen && on ? " zs-file-chosen" : ""}${index === active ? " zs-file-active" : ""}" data-path="${escapeHtml(path)}" role="option" aria-selected="${on}">` +
-      `${chosen ? `<span class="zs-file-tick">${on ? "✓" : ""}</span>` : ""}` +
-      `<span class="zs-file-path"><span class="zs-file-dir">${escapeHtml(path.slice(0, slash + 1))}</span>${escapeHtml(path.slice(slash + 1))}</span>${path.endsWith("/") ? `<span class="zs-file-kind">folder</span>` : ""}</div>`;
-  });
-  if (paths.length > max) rows.push(`<div class="zs-files-more">${paths.length - max} more: type to narrow the search</div>`);
+export function fileRowsHtml(tree, { chosen = null, activePath = null, max = 200 } = {}) {
+  const rows = [];
+  let count = 0;
+  function walk(node, depth) {
+    const keys = Object.keys(node.children).sort((a, b) => {
+      const aFolder = node.children[a].isFolder;
+      const bFolder = node.children[b].isFolder;
+      if (aFolder !== bFolder) return aFolder ? -1 : 1;
+      return a.localeCompare(b);
+    });
+    for (const key of keys) {
+      if (count >= max) return;
+      const child = node.children[key];
+      const on = chosen ? chosen.has(child.path) : child.path === activePath;
+      const isFolder = child.isFolder;
+      
+      const indent = `<span class="zs-file-indent" style="width:${depth * 14}px"></span>`;
+      const icon = isFolder
+        ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`
+        : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+
+      const caret = isFolder ? `<span class="zs-file-caret">${child.expanded ? "▼" : "▶"}</span>` : `<span class="zs-file-caret"></span>`;
+
+      rows.push(`<div class="zs-file-row${isFolder ? " zs-file-folder" : ""}${chosen && on ? " zs-file-chosen" : ""}${child.path === activePath ? " zs-file-active" : ""}" data-path="${escapeHtml(child.path)}" role="option" aria-selected="${on}">` +
+        `${chosen ? `<span class="zs-file-tick" data-path="${escapeHtml(child.path)}">${on ? "✓" : ""}</span>` : ""}` +
+        `${indent}${caret}<span class="zs-file-icon">${icon}</span><span class="zs-file-path">${escapeHtml(child.name)}</span></div>`);
+      count++;
+      
+      if (isFolder && child.expanded) {
+        walk(child, depth + 1);
+      }
+    }
+  }
+  walk(tree, 0);
+  if (count === 0) return `<div class="zs-files-more">No file matches</div>`;
+  if (count >= max) rows.push(`<div class="zs-files-more">Showing first ${max} files…</div>`);
   return rows.join("");
 }
 
@@ -81,8 +110,10 @@ export function fileRowsHtml(paths, { chosen = null, active = -1, max = 200 } = 
 export const atPopupHtml = () =>
   `<div class="zs-at-head"><span class="zs-at-title">Attach a file or folder</span>` +
   `<span class="zs-at-hint">↑↓ choose · Enter insert · Esc close</span>` +
+  `<button type="button" class="zs-at-gear" title="Preferences: the folders left out" aria-label="Preferences">&#9881;</button>` +
   `<button type="button" class="zs-at-off" title="Stop opening this list when I type @">Turn off</button>` +
-  `<button type="button" class="zs-at-x" aria-label="Close">✕</button></div><div class="zs-at-list"></div>`;
+  `<button type="button" class="zs-at-x" aria-label="Close">✕</button></div><div class="zs-at-list"></div>` +
+  `<div class="zs-at-ignored"><span class="zs-at-ignored-label"></span></div>`;
 
 /** What the workspace pill shows. */
 export const workspaceLabel = (pinned) => (pinned ? folderName(pinned) : "Auto");

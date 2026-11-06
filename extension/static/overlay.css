@@ -697,23 +697,47 @@ html.zs-light #zs-mode-btn[data-mode="auto"] { color: #b91c1c; }
 html.zs-light .zs-ws-input { background: rgba(0, 0, 0, 0.04); border-color: rgba(0, 0, 0, 0.2); }
 html.zs-light .zs-ws-error { color: #b91c1c; }
 
-/* The Files menu: a search box over the workspace's files, ticked rows, and the Insert button. */
-#zs-files-menu { width: min(340px, calc(100vw - 16px)); overflow: hidden; display: flex; flex-direction: column; max-height: min(420px, calc(100vh - 32px)); }
+/* The Files menu: a VS Code-like tree view. */
+#zs-files-menu { width: min(340px, calc(100vw - 16px)); overflow: hidden; display: flex; flex-direction: column; max-height: min(420px, calc(100vh - 32px)); background: #1e1e1e; border: 1px solid #3c3c3c; color: #cccccc; }
 #zs-files-menu[hidden] { display: none; }
-#zs-files-menu .zs-menu-sec { display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 6px; }
-.zs-files-search { box-sizing: border-box; width: 100%; height: 30px; padding: 0 9px; margin-bottom: 8px; border-radius: 8px; font: inherit; font-size: 12px;
-  color: inherit; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.18); outline: none; }
-.zs-files-search:focus { border-color: rgba(234, 179, 8, 0.8); }
-.zs-files-list { overflow-y: auto; min-height: 60px; max-height: 280px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; }
-.zs-file-row { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; color: inherit; font-size: 12px; text-align: left; cursor: pointer; }
-.zs-file-row:hover { background: rgba(255, 255, 255, 0.07); }
-.zs-file-tick { flex: none; width: 14px; height: 14px; line-height: 13px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 4px; font-size: 10px; }
-.zs-file-chosen .zs-file-tick { background: #eab308; border-color: #eab308; color: #111; }
+#zs-files-menu .zs-menu-sec { display: flex; flex-direction: column; min-height: 0; padding: 8px 8px 6px; }
+.zs-files-search { box-sizing: border-box; width: 100%; height: 26px; padding: 0 8px; margin-bottom: 6px; border-radius: 2px; font: inherit; font-size: 12px;
+  color: #cccccc; background: #3c3c3c; border: 1px solid transparent; outline: none; }
+.zs-files-search:focus { border-color: #007fd4; }
+.zs-files-search::placeholder { color: #8c8c8c; }
+.zs-files-list { overflow-y: auto; min-height: 60px; max-height: 280px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.22) transparent; padding-bottom: 4px; }
+.zs-file-row { display: flex; align-items: center; height: 24px; padding: 0 4px; border-radius: 0; color: #cccccc; font-size: 12.5px; text-align: left; cursor: pointer; }
+.zs-file-row:hover { background: #2a2d2e; }
+.zs-file-tick { flex: none; width: 16px; display: flex; justify-content: center; align-items: center; font-size: 10px; color: transparent; }
+.zs-file-chosen .zs-file-tick { color: #ffffff; }
+.zs-file-chosen { background: #04395e; color: #ffffff; }
+.zs-file-chosen:hover { background: #04395e; }
+.zs-file-indent { flex: none; display: inline-block; }
+.zs-file-caret { flex: none; display: inline-flex; justify-content: center; align-items: center; width: 16px; font-size: 8px; color: #858585; }
+.zs-file-folder .zs-file-caret { cursor: pointer; }
+.zs-file-folder .zs-file-caret:hover { color: #ffffff; }
+html.zs-light .zs-file-folder .zs-file-caret:hover { color: #000000; }
+.zs-file-icon { flex: none; display: inline-flex; justify-content: center; align-items: center; width: 18px; margin-right: 4px; color: #858585; }
+.zs-file-folder .zs-file-icon { color: #dcb67a; }
+.zs-file-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; flex: 1; }
 .zs-file-active { background: rgba(234, 179, 8, 0.2); }
-.zs-file-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.zs-file-dir { opacity: 0.55; }
-.zs-file-kind { margin-left: auto; padding-left: 8px; font-size: 10px; opacity: 0.6; text-transform: uppercase; letter-spacing: 0.04em; }
-.zs-file-folder .zs-file-path { font-weight: 600; }
+.zs-files-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0 4px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; }
+.zs-files-count { opacity: 0.7; font-size: 11px; }
+.zs-files-insert { height: 26px; padding: 0 14px; border-radius: 4px; border: 0; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; color: #111; background: #eab308; }
+.zs-files-insert:disabled { opacity: 0.4; cursor: default; }
+.zs-files-toggle { display: flex; align-items: center; gap: 6px; padding: 4px 0 2px; opacity: 0.65; font-size: 11px; cursor: pointer; }
+
+html.zs-light #zs-files-menu { background: #f3f3f3; color: #333333; border-color: #cecece; }
+html.zs-light .zs-files-search { background: #ffffff; border: 1px solid #cecece; color: #333333; }
+html.zs-light .zs-files-search::placeholder { color: #999999; }
+html.zs-light .zs-file-row:hover { background: #e8e8e8; }
+html.zs-light .zs-file-chosen { background: #cce5ff; color: #000000; }
+html.zs-light .zs-file-chosen:hover { background: #cce5ff; }
+html.zs-light .zs-file-chosen .zs-file-tick { color: #000000; }
+html.zs-light .zs-file-icon { color: #6e6e6e; }
+html.zs-light .zs-file-folder .zs-file-icon { color: #a68b5b; }
+html.zs-light .zs-file-caret { color: #6e6e6e; }
+html.zs-light .zs-files-foot { border-top-color: rgba(0,0,0,0.08); }
 .zs-files-more { padding: 8px 6px; opacity: 0.65; }
 .zs-files-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0 4px; }
 .zs-files-count { opacity: 0.7; }
@@ -728,7 +752,14 @@ html.zs-light .zs-file-tick { border-color: rgba(0, 0, 0, 0.35); }
   position: fixed; z-index: 2147483647; box-sizing: border-box; width: min(360px, calc(100vw - 16px));
   background: #161618; color: #ececee; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.5); font-size: 12px; animation: zs-pop 0.12s ease-out; overflow: hidden;
+  display: flex; flex-direction: column;
 }
+#zs-at-popup .zs-at-list { flex: 1; min-height: 0; }
+.zs-at-gear, .zs-at-off, .zs-at-x { flex: none; border: 0; background: transparent; color: inherit; font: inherit; font-size: 11px; opacity: 0.65; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.zs-at-gear:hover, .zs-at-off:hover, .zs-at-x:hover { opacity: 1; background: rgba(255, 255, 255, 0.08); }
+.zs-at-ignored { flex: none; padding: 5px 10px; border-top: 1px solid rgba(255, 255, 255, 0.07); font-size: 10px; opacity: 0.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zs-at-ignored-label { display: block; overflow: hidden; text-overflow: ellipsis; }
+html.zs-light .zs-at-ignored { border-top-color: rgba(0, 0, 0, 0.08); }
 #zs-at-popup[hidden] { display: none; }
 .zs-at-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
 .zs-at-title { font-weight: 700; }
@@ -833,6 +864,53 @@ html.zs-light #zs-prefs-btn, html.zs-light #zs-files-btn { background: rgba(0, 0
 }
 #zs-term.zs-t-resizing { user-select: none; }
 @keyframes zs-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ── the reusable floating window (Files) ──────────────────────────────── */
+.zs-float-win {
+  position: fixed; z-index: 2147483646; right: 14px; top: 14px;
+  display: flex; flex-direction: column; box-sizing: border-box;
+  min-width: 320px; min-height: 220px; overflow: hidden;
+  background: rgba(16, 17, 22, 0.985); color: #dde0ea;
+  border: 1px solid rgba(129, 140, 248, 0.28); border-radius: 13px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); backdrop-filter: blur(10px);
+  font: 12px ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.zs-float-win[hidden] { display: none; }
+.zs-fw-head { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); flex: none; }
+.zs-fw-title { flex: 1; min-width: 0; font-weight: 700; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zs-fw-close { border: 0; background: transparent; color: inherit; font: inherit; opacity: 0.65; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.zs-fw-close:hover { opacity: 1; background: rgba(255, 255, 255, 0.08); }
+.zs-fw-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.zs-fw-drag {
+  position: absolute; right: 6px; bottom: 6px; width: 18px; height: 18px; padding: 0;
+  border: 0; border-radius: 4px; background: transparent; color: inherit; opacity: 0.4;
+  font-size: 13px; line-height: 1; cursor: move; touch-action: none;
+}
+.zs-fw-drag:hover { opacity: 0.9; background: rgba(255, 255, 255, 0.1); }
+.zs-fw-grip {
+  position: absolute; left: 1px; bottom: 1px; width: 13px; height: 13px;
+  cursor: nesw-resize; touch-action: none; opacity: 0.65;
+  border-left: 2px solid rgba(255, 255, 255, 0.3); border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+  border-bottom-left-radius: 12px; transition: border-color 0.15s ease, opacity 0.15s ease;
+}
+.zs-fw-grip:hover { opacity: 1; border-color: rgba(129, 140, 248, 0.9); }
+html.zs-light .zs-float-win { background: rgba(252, 252, 253, 0.99); color: #26282f; border-color: rgba(99, 102, 241, 0.3); box-shadow: 0 18px 50px rgba(15, 23, 42, 0.2); }
+html.zs-light .zs-fw-head { border-bottom-color: rgba(0, 0, 0, 0.08); }
+html.zs-light .zs-fw-grip { border-color: rgba(0, 0, 0, 0.25); }
+html.zs-light .zs-fw-drag:hover { background: rgba(0, 0, 0, 0.06); }
+
+/* the Files window's body: search on top, the tree filling the middle, the actions under it */
+.zs-files-win .zs-files-search { flex: none; margin: 8px 8px 6px; width: calc(100% - 16px); }
+.zs-files-win .zs-files-list { flex: 1; min-height: 0; max-height: none; overflow-y: auto; padding: 0 4px 4px; }
+.zs-files-win .zs-files-foot { flex: none; border-top: 1px solid rgba(255, 255, 255, 0.08); margin-top: 0; padding: 8px 10px; }
+.zs-files-actions { display: inline-flex; align-items: center; gap: 6px; }
+.zs-files-refresh, .zs-files-gear { height: 26px; min-width: 26px; padding: 0 7px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.06); color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+.zs-files-refresh:hover, .zs-files-gear:hover { background: rgba(255,255,255,0.12); }
+.zs-files-clear { cursor: pointer; text-decoration: underline dotted; }
+.zs-files-ignored { flex: none; padding: 5px 10px 0; font-size: 10px; opacity: 0.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zs-files-win .zs-files-toggle { flex: none; padding: 4px 10px 8px; }
+html.zs-light .zs-files-win .zs-files-foot { border-top-color: rgba(0,0,0,0.08); }
+html.zs-light .zs-files-refresh, html.zs-light .zs-files-gear { border-color: rgba(0,0,0,0.14); background: rgba(0,0,0,0.05); }
 
 /* ANSI colours: the palette the parser's classes name (normal, then bright) */
 .zs-a-fg0 { color: #5c6078; } .zs-a-fg1 { color: #e05561; } .zs-a-fg2 { color: #8cc265; } .zs-a-fg3 { color: #d5b878; }

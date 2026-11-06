@@ -143,5 +143,8 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, p
   /** The tool the menu needs is advertised by this server. */
   const canList = () => tools.catalogue.active().some((tool) => bareToolName(tool.name) === "find_files");
 
-  return { listFiles, insert, replaceTag, takeOver, canList };
+  /** Forget the cached listing and fetch it again: the Preferences may have just changed what is ignored. */
+  async function refresh() { files = null; return listFiles(); }
+
+  return { listFiles, refresh, insert, replaceTag, takeOver, canList };
 }

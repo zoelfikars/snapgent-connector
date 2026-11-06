@@ -43,6 +43,33 @@ export function foldersOf(paths) {
 
 const BINARY = /\.(png|jpe?g|gif|webp|bmp|ico|icns|svgz|pdf|zip|gz|tgz|bz2|xz|7z|rar|jar|war|exe|dll|so|dylib|a|o|obj|class|pyc|wasm|bin|dat|db|sqlite3?|woff2?|ttf|otf|eot|mp[34]|mov|avi|mkv|webm|wav|ogg|flac|psd|ai|lock|sum)$/i;
 
+/** Builds a nested tree from a flat list of file and folder paths. */
+export function buildFileTree(paths) {
+  const root = { name: "", children: {}, isFolder: true, expanded: true, path: "" };
+  for (const path of paths) {
+    const isFolder = path.endsWith("/");
+    const clean = isFolder ? path.slice(0, -1) : path;
+    const parts = clean.split("/");
+    let current = root;
+    let currentPath = "";
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      currentPath += (currentPath ? "/" : "") + part;
+      if (!current.children[part]) {
+        current.children[part] = {
+          name: part,
+          children: {},
+          isFolder: (i < parts.length - 1) || isFolder,
+          expanded: true,
+          path: currentPath + ((i < parts.length - 1) || isFolder ? "/" : "")
+        };
+      }
+      current = current.children[part];
+    }
+  }
+  return root;
+}
+
 /** Worth reading as text when a whole folder is attached (images, archives, binaries and lock files are not). */
 export const isTextFile = (path) => !BINARY.test(path);
 

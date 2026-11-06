@@ -6,14 +6,14 @@
 // Only the tag at the END of the text is looked at: the caret position inside a site's editor cannot be read reliably.
 
 import { matchPaths, trailingTag } from "../domain/prompt/file-tags.js";
-import { applyMenuPlacement, atPopupHtml, computeMenuPlacement, viewportOf } from "../ui/index.js";
+import { applyMenuPlacement, atPopupHtml, computeMenuPlacement, openPreferences, viewportOf } from "../ui/index.js";
 import { createFileList } from "./file-list.js";
 
 const SHOWN = 60;
 const PREFETCH_MS = 2500;
 
 /** @param {{ document: Document, window: Window, root: HTMLElement, state: object, settings: object, provider: object, attachments: object, toast: (text: string) => void, diag: Function }} deps */
-export function createAtPopup({ document, window, root, state, settings, provider, attachments, toast, diag }) {
+export function createAtPopup({ document, window, root, state, settings, provider, attachments, preferences, calibration, barPrefs, toast, diag }) {
   const el = document.createElement("div");
   el.id = "zs-at-popup";
   el.hidden = true;
@@ -33,10 +33,41 @@ export function createAtPopup({ document, window, root, state, settings, provide
     if (el.hidden) return;
     const anchor = provider.composerFrame() || provider.getEditor();
     if (!anchor) return;
-    applyMenuPlacement(el, computeMenuPlacement({
-      anchor: anchor.getBoundingClientRect(), menuWidth: el.offsetWidth, defaultWidth: 360, viewport: viewportOf(document, window), align: "left", roomAbove: 240,
-    }));
+    // The list opens exactly as wide as the composer: it reads as part of the input, not as a floating menu.
+    const rect = anchor.getBoundingClientRect();
+    const viewport = viewportOf(document, window);
+    const width = Math.min(rect.width, viewport.width - 16);
+    const placement = computeMenuPlacement({
+      anchor: rect, menuWidth: width, defaultWidth: width, viewport, align: "left", roomAbove: 240,
+    });
+    applyMenuPlacement(el, placement);
+    el.style.width = `${Math.round(width)}px`;
     window.requestAnimationFrame(place);
+  }
+
+  function showIgnored() {
+    const label = el.querySelector(".zs-at-ignored-label");
+    if (!label) return;
+    const names = preferences && preferences.excludedFolders ? preferences.excludedFolders() : [];
+    label.textContent = names.length ? `Ignored: ${names.join(", ")}` : "Nothing is ignored";
+  }
+
+  async function openPrefs() {
+    close(false);
+    openPreferences({
+      document, values: await preferences.read(), defaults: { folders: preferences.defaultFolders() },
+      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders },
+      corner: barPrefs ? barPrefs.get().corner : "bottom",
+      actions: {
+        onCalibrate: () => calibration && calibration.open(null),
+        onExportCal: calibration && calibration.exportProfile,
+        onImportCal: calibration && calibration.importProfile,
+        onCopyDiag: calibration && calibration.copyDiagnostics,
+        onRemoveCal: calibration && calibration.remove,
+        onExportAll: calibration && calibration.exportAll,
+        onImportAll: calibration && calibration.importAll,
+      },
+    });
   }
   function close(forThisTag) {
     if (forThisTag && tag) dismissed = { start: tag.start, before: text.slice(0, tag.start) };
@@ -68,6 +99,7 @@ export function createAtPopup({ document, window, root, state, settings, provide
     }
     list.set(matchPaths(paths, tag.query));
     el.hidden = false;
+    showIgnored();
     if (opening) window.requestAnimationFrame(place);
   }
 
@@ -104,6 +136,7 @@ export function createAtPopup({ document, window, root, state, settings, provide
 
   el.addEventListener("mousedown", (event) => event.preventDefault()); // the composer keeps the focus
   el.querySelector(".zs-at-x").addEventListener("click", () => close(true));
+  el.querySelector(".zs-at-gear").addEventListener("click", openPrefs);
   el.querySelector(".zs-at-off").addEventListener("click", () => {
     close(false);
     settings.setAtPopup(false);

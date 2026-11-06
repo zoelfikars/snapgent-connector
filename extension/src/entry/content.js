@@ -62,7 +62,7 @@ let session;
 let attachments;
 bar = createBar({
   document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, preferences, send, calibration, terminal,
-  files: { list: () => attachments.listFiles(), insert: (paths) => attachments.insert(paths), canList: () => attachments.canList() },
+  files: { list: () => attachments.listFiles(), refresh: () => attachments.refresh(), insert: (paths) => attachments.insert(paths), canList: () => attachments.canList() },
   onStart: () => session.start(),
   onStop: () => stop.stopLoop(),
 });
@@ -79,7 +79,7 @@ stop = createStop({ document, state, provider, bar, diag });
 let userInput;
 attachments = createAttachments({ provider, state, tools, chat, bar, budget, parts, preferences, startTurn: (base) => userInput.startTurn(base), diag });
 userInput = installUserInput({ document, state, provider, bar, resend, loop, takeOver: attachments.takeOver, diag });
-createAtPopup({ document, window, root: bar.root, state, settings, provider, attachments, toast: bar.toast, diag });
+createAtPopup({ document, window, root: bar.root, state, settings, provider, attachments, preferences, calibration, toast: bar.toast, diag });
 createAutoResume({ document, state, provider, executed, loop, diag });
 startPageWatch({ document, window, provider, session, bar });
 resend.hydrate();

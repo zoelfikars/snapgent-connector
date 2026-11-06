@@ -60,7 +60,28 @@ export function createBar({ document, window, provider, state, settings, serverD
 
   const group = createMenuGroup();
   const menus = createBarMenus({ document, root, group, settings, serverDirectory, send, confirm: tools.confirm, catalogue: tools.catalogue, workspace: tools.workspace, monitor, toast: notifications.toast });
-  const filesMenu = createFilesMenu({ document, root, group, state, settings, files, toast: notifications.toast });
+  // Preferences is opened from the gear and from the Files window: the bar's own options and this site's calibration live there.
+  const prefsActions = () => ({
+    onToggleCorner: () => barPrefs.set({ corner: prefs.corner === "top" ? "bottom" : "top" }),
+    onHideBar: () => barPrefs.set({ hidden: true }),
+    onCalibrate: () => calibration.open(null),
+    onExportCal: calibration.exportProfile,
+    onImportCal: calibration.importProfile,
+    onCopyDiag: calibration.copyDiagnostics,
+    onRemoveCal: calibration.remove,
+    onExportAll: calibration.exportAll,
+    onImportAll: calibration.importAll,
+  });
+  const prefsValues = () => preferences.read();
+  const filesMenu = createFilesMenu({
+    document, root, group, state, settings, files, preferences, toast: notifications.toast,
+    openPreferences: async () => openPreferences({
+      document, values: await prefsValues(), defaults: { folders: preferences.defaultFolders() },
+      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders },
+      corner: prefs.corner,
+      actions: prefsActions(),
+    }),
+  });
   const siteMenu = createSiteMenu({
     document, window, menu: el.menu, button: $("#zs-switch"), group, provider, settings, serverDirectory, skills: tools.skills, calibration, barPrefs, preferences,
     refreshTarget: () => menus.sync(),
@@ -132,26 +153,12 @@ export function createBar({ document, window, provider, state, settings, serverD
   el.stop.addEventListener("click", onStop);
   el.stopFloat.addEventListener("click", (event) => { event.stopPropagation(); el.stop.click(); }); // the same Stop, reachable while the bar is hidden
 
-  // The gear opens Preferences, where the bar's own options and this site's calibration now live.
   $("#zs-prefs-btn").addEventListener("click", async (event) => {
     event.stopPropagation();
     openPreferences({
-      document,
-      values: await preferences.read(),
-      defaults: { folders: preferences.defaultFolders() },
+      document, values: await prefsValues(), defaults: { folders: preferences.defaultFolders() },
       save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders },
-      corner: prefs.corner,
-      actions: {
-        onToggleCorner: () => barPrefs.set({ corner: prefs.corner === "top" ? "bottom" : "top" }),
-        onHideBar: () => barPrefs.set({ hidden: true }),
-        onCalibrate: () => calibration.open(null),
-        onExportCal: calibration.exportProfile,
-        onImportCal: calibration.importProfile,
-        onCopyDiag: calibration.copyDiagnostics,
-        onRemoveCal: calibration.remove,
-        onExportAll: calibration.exportAll,
-        onImportAll: calibration.importAll,
-      },
+      corner: prefs.corner, actions: prefsActions(),
     });
   });
 
