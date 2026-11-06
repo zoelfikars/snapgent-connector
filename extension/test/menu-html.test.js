@@ -1,7 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
-import { switchMenuHtml, targetMenuHtml } from "../src/ui/menu-html.js";
+import { switchMenuHtml, targetMenuHtml, workspaceMenuHtml } from "../src/ui/menu-html.js";
 
 const parse = (html) => new JSDOM(`<body>${html}</body>`).window.document;
 const NASTY = { id: 'a"><img src=x onerror=1>', name: "<b>Bold</b> & 'quotes'" };
@@ -33,6 +33,30 @@ describe("switch AI menu", () => {
     const doc = parse(switchMenuHtml([{ name: "Odd", url: "not a url" }], undefined));
     assert.equal(doc.querySelector(".zs-site-host").textContent, "");
     assert.equal(doc.querySelectorAll(".zs-site-here").length, 0);
+  });
+});
+
+describe("the workspace menu", () => {
+  const rows = (doc) => [...doc.querySelectorAll(".zs-ws-opt")].map((row) => row.dataset.path);
+
+  test("the folders used lately are listed after the open ones, once each, under their own heading", () => {
+    const doc = parse(workspaceMenuHtml({ active: null, open: ["/work/a"], pinned: null, recent: ["/work/a", "/work/r1"] }));
+    assert.deepEqual(rows(doc), ["", "/work/a", "/work/r1"], "\"\" is Auto; the folder already open is not listed twice");
+    assert.match(doc.body.textContent, /Used lately/);
+    assert.equal(doc.querySelector(".zs-ws-opt[data-path='/work/r1'] .zs-site-host").textContent, "/work/r1");
+  });
+
+  test("with nothing used lately there is no 'Used lately' heading", () => {
+    const doc = parse(workspaceMenuHtml({ active: "/work/a", open: ["/work/a"], pinned: null }));
+    assert.deepEqual(rows(doc), ["", "/work/a"]);
+    assert.doesNotMatch(doc.body.textContent, /Used lately/);
+  });
+
+  test("the folder this chat already uses is not repeated among the recent ones", () => {
+    const doc = parse(workspaceMenuHtml({ active: null, open: [], pinned: null, recent: ["/work/r1", "/work/r2"] }));
+    const doc2 = parse(workspaceMenuHtml({ active: null, open: [], pinned: "/work/r1", recent: ["/work/r1", "/work/r2"] }));
+    assert.deepEqual(rows(doc), ["", "/work/r1", "/work/r2"]);
+    assert.deepEqual(rows(doc2), ["", "/work/r1", "/work/r2"], "the pinned one is shown once, among the recent");
   });
 });
 

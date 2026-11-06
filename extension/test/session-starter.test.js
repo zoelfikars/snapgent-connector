@@ -2,6 +2,7 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { SessionStarter } from "../src/application/session-starter.js";
 import { checkStartPreconditions, handshakeUnavailable, probeSucceeded } from "../src/domain/agent/session-start.js";
+import { chooseWorkspace } from "../src/application/workspace-choice.js";
 
 const tool = (name) => ({ name });
 const WORKSPACE = { title: "Workspace required", text: "Open a project folder in your editor, or choose the folder for this chat in the bar's folder menu, then try again." };
@@ -183,6 +184,32 @@ describe("choosing the folder of the chat", () => {
     await t.starter.start();
     assert.ok(t.log.includes("toast:Start cancelled."));
     assert.equal(t.log.some((e) => typeof e === "string" && (e.startsWith("submit:") || e === "markStarted" || e.startsWith("probe:"))), false);
+  });
+
+  test("with no editor open the folders used lately are offered, and the start goes ahead in the one picked", async () => {
+    // The real chooseWorkspace over a listing with no open folders: the recent ones are what there is to pick from.
+    const offered = [];
+    const listing = { ok: true, open: [], recent: ["/work/portofolio", "/work/snapgent-connector"] };
+    const t = setup({ state: { responses: [ready] }, deps: { workspace: {
+      refresh: async () => {},
+      choose: async () => chooseWorkspace(listing, async (options) => { offered.push(...options); return "/work/snapgent-connector"; }),
+    } } });
+    await t.starter.start();
+    assert.deepEqual(offered, ["/work/portofolio", "/work/snapgent-connector"]);
+    assert.ok(t.log.includes("diag:start.workspace"), "the picked folder is settled before anything is read");
+    assert.equal(banners(t.log).length, 0, "nothing to fix: the chat has a folder");
+    assert.ok(t.log.includes("markStarted"));
+  });
+
+  test("with no editor open and nothing used lately, the workspace banner says how to choose a folder", async () => {
+    const t = setup({ state: { responses: [ready] }, deps: { workspace: {
+      refresh: async () => {},
+      choose: async () => chooseWorkspace({ ok: true, open: [], recent: [] }, async () => { throw new Error("nobody to ask"); }),
+    } } });
+    await t.starter.start();
+    assert.deepEqual(banners(t.log), [["banner", WORKSPACE.title, WORKSPACE.text]]);
+    assert.ok(!t.log.includes("markStarted"));
+    assert.equal(t.log.some((e) => typeof e === "string" && e.startsWith("submit:")), false);
   });
 
   test("VS Code with no folder open is the workspace banner; a bridge that cannot be reached says so", async () => {
