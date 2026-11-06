@@ -36,7 +36,7 @@ export function createSiteMenu({ document, window, menu, button, group, provider
   }
 
   function fill() {
-    menu.innerHTML = switchMenuHtml(SITE_LINKS, provider.displayName, { calibration: true, corner: barPrefs.get().corner });
+    menu.innerHTML = switchMenuHtml(SITE_LINKS, provider.displayName);
     menu.querySelectorAll("button.zs-site-opt[data-u], .zs-tip-opt[data-u]").forEach((link) => link.addEventListener("click", () => {
       try { window.open(link.dataset.u, "_blank", "noopener"); } catch { /* popups blocked */ }
       close();
@@ -49,17 +49,20 @@ export function createSiteMenu({ document, window, menu, button, group, provider
     on("#zs-prefs", async () => openPreferences({
       document, values: await preferences.read(), defaults: { folders: preferences.defaultFolders() },
       save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders },
+      corner: barPrefs.get().corner,
+      actions: {
+        onToggleCorner: () => barPrefs.set({ corner: barPrefs.get().corner === "top" ? "bottom" : "top" }),
+        onHideBar: () => barPrefs.set({ hidden: true }),
+        onCalibrate: () => calibration.open(null),
+        onExportCal: calibration.exportProfile,
+        onImportCal: calibration.importProfile,
+        onCopyDiag: calibration.copyDiagnostics,
+        onRemoveCal: calibration.remove,
+        onExportAll: calibration.exportAll,
+        onImportAll: calibration.importAll,
+      },
     }));
     on("#zs-skills-settings", () => openSkillsSettings({ document, skills, maxFileBytes: SKILL_MAX_BYTES, loadOnOpen: settings.target() === "vscode" }));
-    on("#zs-bar-corner", () => barPrefs.set({ corner: barPrefs.get().corner === "top" ? "bottom" : "top" }));
-    on("#zs-bar-hide", () => barPrefs.set({ hidden: true }));
-    on("#zs-cal-start", () => calibration.open(null));
-    on("#zs-cal-export", calibration.exportProfile);
-    on("#zs-cal-import", calibration.importProfile);
-    on("#zs-cal-diag", calibration.copyDiagnostics);
-    on("#zs-cal-remove", calibration.remove);
-    on("#zs-cal-export-all", calibration.exportAll);
-    on("#zs-cal-import-all", calibration.importAll);
   }
 
   /** `toSupport` scrolls the panel to its last section (the support links); otherwise it opens at the top. */

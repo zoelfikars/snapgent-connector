@@ -108,6 +108,25 @@ describe("preferences panel", () => {
     $("#zs-pref-folders").dispatchEvent(new w.KeyboardEvent("keydown", { key: "a", bubbles: true }));
     assert.equal(reached, false);
   });
+
+  test("bar and calibration actions are offered and wired", () => {
+    const w = new JSDOM("<!doctype html><body></body>").window;
+    const called = [];
+    openPreferences({
+      document: w.document, values: { chars: 100000, calls: 8, folders: [] }, defaults: { folders: [] },
+      save: { chars() {}, calls() {}, folders() {} }, corner: "bottom",
+      actions: { onToggleCorner: () => called.push("corner"), onCalibrate: () => called.push("cal"), onExportAll: () => called.push("all") },
+    });
+    const corner = w.document.querySelector("#zs-bar-corner");
+    const start = w.document.querySelector("#zs-cal-start");
+    const all = w.document.querySelector("#zs-cal-export-all");
+    assert.match(corner.textContent, /top right corner/);
+    // Clicking a row closes the popup, so the references are taken before the first click.
+    corner.click();
+    start.click();
+    all.click();
+    assert.deepEqual(called, ["corner", "cal", "all"]);
+  });
 });
 
 describe("the attachable files follow the preference", () => {

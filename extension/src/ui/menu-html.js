@@ -87,32 +87,10 @@ export const atPopupHtml = () =>
 /** What the workspace pill shows. */
 export const workspaceLabel = (pinned) => (pinned ? folderName(pinned) : "Auto");
 
-const CALIBRATION_SECTION = `
-         <section class="zs-menu-sec">
-           <div class="zs-sec-label"><span>This site</span></div>
-           <button class="zs-site-opt" id="zs-cal-start" type="button"><span class="zs-site-name"><span>Calibrate this site</span><span class="zs-site-host">teach it where the text box, send button and replies are</span></span></button>
-           <button class="zs-site-opt" id="zs-cal-export" type="button"><span class="zs-site-name"><span>Export calibration</span></span></button>
-           <button class="zs-site-opt" id="zs-cal-import" type="button"><span class="zs-site-name"><span>Import calibration</span></span></button>
-           <button class="zs-site-opt" id="zs-cal-diag" type="button"><span class="zs-site-name"><span>Copy diagnostics</span><span class="zs-site-host">what it finds on this page, no text of the chat</span></span></button>
-           <button class="zs-site-opt" id="zs-cal-remove" type="button"><span class="zs-site-name"><span>Remove calibration</span></span></button>
-         </section>
-         <section class="zs-menu-sec">
-           <div class="zs-sec-label"><span>All sites</span></div>
-           <button class="zs-site-opt" id="zs-cal-export-all" type="button"><span class="zs-site-name"><span>Export all calibrations</span><span class="zs-site-host">one file, kept apart per AI</span></span></button>
-           <button class="zs-site-opt" id="zs-cal-import-all" type="button"><span class="zs-site-name"><span>Import calibrations…</span><span class="zs-site-host">choose which AIs to take from the files</span></span></button>
-         </section>`;
-
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; } };
 
 /** The Switch AI pop-over: every supported site, the current one badged instead of linked. */
-export function switchMenuHtml(sites, currentName, { calibration = false, corner = "bottom" } = {}) {
-  const other = corner === "top" ? "bottom right" : "top right";
-  const barSection = `
-         <section class="zs-menu-sec">
-           <div class="zs-sec-label"><span>This bar</span></div>
-           <button class="zs-site-opt" id="zs-bar-corner" type="button"><span class="zs-site-name"><span>Move to the ${other} corner</span></span></button>
-           <button class="zs-site-opt" id="zs-bar-hide" type="button"><span class="zs-site-name"><span>Hide the bar</span><span class="zs-site-host">the small button in the corner shows it again</span></span></button>
-         </section>`;
+export function switchMenuHtml(sites, currentName) {
   const here = String(currentName || "").toLowerCase();
   const grid = sites.map((site) => {
     const label = `<span class="zs-site-name"><span>${escapeHtml(site.name)}</span><span class="zs-site-host">${escapeHtml(hostOf(site.url))}</span></span>`;
@@ -124,5 +102,5 @@ export function switchMenuHtml(sites, currentName, { calibration = false, corner
          <section class="zs-menu-sec">
            <div class="zs-sec-label zs-sec-label-row"><span>Switch AI</span><span><button id="zs-prefs" class="zs-gear" title="Preferences" aria-label="Preferences">&#9776;</button><button id="zs-skills-settings" class="zs-gear" title="Skills" aria-label="Skills">&#9733;</button><button id="zs-mcp-settings" class="zs-gear" title="MCP settings" aria-label="MCP settings">&#9881;</button></span></div>
            <div class="zs-site-grid">${grid}</div>
-         </section>${barSection}${calibration ? CALIBRATION_SECTION : ""}`;
+         </section>`;
 }

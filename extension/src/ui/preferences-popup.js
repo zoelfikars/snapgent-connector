@@ -25,8 +25,27 @@ const slider = (id, label, min, max, step, note) =>
  *           defaults: { folders: string[] },
  *           save: { chars: (value: number) => void, calls: (value: number) => void, folders: (list: string[]) => void } }} deps
  */
-export function openPreferences({ document, values, defaults, save }) {
+export function openPreferences({ document, values, defaults, save, corner = "bottom", actions = {} }) {
   const { pop, close } = mountPopup(document);
+  const row = (id, title, note = "") =>
+    `<button class="zs-site-opt" id="${id}" type="button"><span class="zs-site-name"><span>${title}</span>` +
+    (note ? `<span class="zs-site-host">${note}</span>` : "") + `</span></button>`;
+  const otherCorner = corner === "top" ? "bottom right" : "top right";
+  const barSection = actions.onToggleCorner
+    ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>This bar</span></div>` +
+      row("zs-bar-corner", `Move to the ${otherCorner} corner`) +
+      row("zs-bar-hide", "Hide the bar", "the small button in the corner shows it again") + `</section>`
+    : "";
+  const siteSection = actions.onCalibrate
+    ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>This site</span></div>` +
+      row("zs-cal-start", "Calibrate this site", "teach it where the text box, send button and replies are") +
+      row("zs-cal-export", "Export calibration") + row("zs-cal-import", "Import calibration") +
+      row("zs-cal-diag", "Copy diagnostics", "what it finds on this page, no text of the chat") +
+      row("zs-cal-remove", "Remove calibration") + `</section>` +
+      `<section class="zs-menu-sec"><div class="zs-sec-label"><span>All sites</span></div>` +
+      row("zs-cal-export-all", "Export all calibrations", "one file, kept apart per AI") +
+      row("zs-cal-import-all", "Import calibrations…", "choose which AIs to take from the files") + `</section>`
+    : "";
   pop.innerHTML =
     `<div class="zs-mcp-pop-card" role="dialog" aria-label="Preferences"><div class="zs-mcp-pop-head"><span>Preferences</span>${closeButton}</div>` +
     `<div class="zs-mcp-pop-body">` +
@@ -39,6 +58,7 @@ export function openPreferences({ document, values, defaults, save }) {
     `aria-label="Folders left out of attachments">${esc(values.folders.join("\n"))}</textarea>` +
     `<div class="zs-mcp-pop-note">One folder name per line (or separated by commas): a folder of that name is skipped wherever it is, in the <code>@</code> list and in the Files menu. ` +
     `In a git project the project's own <code>.gitignore</code> already applies on top.</div></div>` +
+    barSection + siteSection +
     `</div>` +
     `<div class="zs-mcp-pop-foot"><button id="zs-pref-reset" class="zs-mcp-pop-btn zs-mcp-pop-btn-block">Restore the defaults</button></div></div>`;
   pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
@@ -58,6 +78,16 @@ export function openPreferences({ document, values, defaults, save }) {
   // Typing here must not trigger the site's own keyboard shortcuts.
   for (const type of ["keydown", "keyup", "keypress"]) folders.addEventListener(type, (event) => event.stopPropagation());
   folders.addEventListener("change", () => save.folders(parseFolderNames(folders.value)));
+  const action = (id, fn) => { const el = pop.querySelector(`#${id}`); if (el && fn) el.addEventListener("click", () => { close(); fn(); }); };
+  action("zs-bar-corner", actions.onToggleCorner);
+  action("zs-bar-hide", actions.onHideBar);
+  action("zs-cal-start", actions.onCalibrate);
+  action("zs-cal-export", actions.onExportCal);
+  action("zs-cal-import", actions.onImportCal);
+  action("zs-cal-diag", actions.onCopyDiag);
+  action("zs-cal-remove", actions.onRemoveCal);
+  action("zs-cal-export-all", actions.onExportAll);
+  action("zs-cal-import-all", actions.onImportAll);
   pop.querySelector("#zs-pref-reset").addEventListener("click", () => {
     folders.value = defaults.folders.join("\n");
     save.folders(defaults.folders);

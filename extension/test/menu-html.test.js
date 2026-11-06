@@ -37,11 +37,13 @@ describe("switch AI menu", () => {
   });
 });
 
-describe("calibration entries in the switch menu", () => {
-  test("only when asked for, and with the four actions the page wires up", () => {
+describe("what the switch AI menu leaves out", () => {
+  test("only the AI list and the settings gears: the bar and calibration rows live in Preferences", () => {
     const sites = [{ name: "ChatGPT", url: "https://chatgpt.com/" }];
-    assert.equal(parse(switchMenuHtml(sites, "chatgpt")).querySelector("#zs-cal-start"), null);
-    const doc = parse(switchMenuHtml(sites, "chatgpt", { calibration: true }));
-    for (const id of ["zs-cal-start", "zs-cal-export", "zs-cal-import", "zs-cal-remove"]) assert.ok(doc.querySelector(`#${id}`), id);
+    const doc = parse(switchMenuHtml(sites, "chatgpt"));
+    assert.ok(doc.querySelector(".zs-site-grid"));
+    for (const id of ["zs-bar-corner", "zs-bar-hide", "zs-cal-start", "zs-cal-export-all"]) {
+      assert.equal(doc.querySelector(`#${id}`), null, id);
+    }
   });
 });

@@ -96,13 +96,16 @@ describe("content script on a supported site that is not calibrated yet", () => 
     }
   });
 
-  test("the menu offers calibrating, exporting, importing and removing this site's calibration", async () => {
+  test("calibration lives in Preferences now, and the bar's own options with it", async () => {
     const page = await startOn("<html><body><main><p>a chat page</p></main></body></html>");
     try {
-      page.document.getElementById("zs-switch").click();
+      page.document.getElementById("zs-prefs-btn").click();
       await new Promise((resolve) => setTimeout(resolve, 100));
-      const menu = page.document.getElementById("zs-menu");
-      for (const id of ["zs-cal-start", "zs-cal-export", "zs-cal-import", "zs-cal-remove", "zs-cal-export-all", "zs-cal-import-all"]) assert.ok(menu.querySelector(`#${id}`), id);
+      const pop = page.document.getElementById("zs-mcp-pop");
+      assert.ok(pop, "the preferences dialog opened");
+      for (const id of ["zs-bar-corner", "zs-bar-hide", "zs-cal-start", "zs-cal-export", "zs-cal-import", "zs-cal-remove", "zs-cal-export-all", "zs-cal-import-all"]) {
+        assert.ok(pop.querySelector(`#${id}`), id);
+      }
     } finally {
       page.window.close();
     }

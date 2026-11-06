@@ -27,8 +27,13 @@ export function createFilesMenu({ document, root, group, state, settings, files,
     menu.querySelector(".zs-files-insert").disabled = !chosen.size;
     showName();
   }
-  // The pill's own text: set when it is made, not only when the menu is opened.
-  function showName() { root.querySelector("#zs-files-name").textContent = chosen.size ? `Files (${chosen.size})` : "Files"; }
+  // The badge on the icon: set when it is made, not only when the menu is opened.
+  function showName() {
+    const badge = root.querySelector("#zs-files-badge");
+    if (!badge) return;
+    badge.hidden = chosen.size === 0;
+    badge.textContent = chosen.size ? String(chosen.size) : "";
+  }
   showName();
 
   const pill = createPillMenu({

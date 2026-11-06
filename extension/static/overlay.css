@@ -655,6 +655,7 @@ html.zs-light .zs-site-go { color: #9ca3af; }
   font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
 }
 #zs-stop-float[hidden] { display: none; }
+#zs-stop-float { width: 34px; padding: 0; font-size: 14px; }
 #zs-stop-float:hover { background: #facc15; }
 #zs-stop-float[data-state="stopping"] { cursor: progress; opacity: 0.6; }
 html.zs-light #zs-toggle { background: rgba(255, 255, 255, 0.97); color: #3730a3; }
@@ -672,6 +673,12 @@ html #zs-bar {
 html #zs-bar #zs-state { order: 0; flex: none; min-height: 0; white-space: normal; font-size: 11.5px; line-height: 1.35; }
 html #zs-bar #zs-action, html #zs-bar #zs-stop { order: 1; flex: none; width: 100%; max-width: none; min-height: 32px; justify-content: center; }
 html #zs-bar .zs-pill { order: 2; flex: none; }
+
+/* Stop is icon-only: a compact square in the tool row. */
+html #zs-bar #zs-tools #zs-stop {
+  flex: none; width: 30px; height: 30px; min-height: 0; padding: 0;
+  font-size: 14px; border-radius: 9px; box-sizing: border-box;
+}
 
 /* Auto removes the safety net, so its pill looks different. */
 #zs-mode-btn[data-mode="auto"] { border-color: rgba(248, 113, 113, 0.85); color: #fca5a5; }
@@ -740,20 +747,28 @@ html.zs-light .zs-file-active { background: rgba(234, 179, 8, 0.28); }
 .zs-cal-import-go:disabled { opacity: 0.4; cursor: default; }
 
 /* ── terminal pill + panel ─────────────────────────────────────────────── */
-#zs-term-btn {
-  flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-  width: 30px; height: 30px; border-radius: 9px; border: 1px solid transparent;
+html #zs-bar #zs-tools {
+  order: 1; flex: none; display: flex; flex-direction: row; align-items: center; gap: 6px;
+}
+#zs-term-btn, #zs-files-btn, #zs-prefs-btn {
+  flex: none; position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; box-sizing: border-box; padding: 0;
+  border-radius: 9px; border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.07); color: #c7d2fe; cursor: pointer;
   transition: background 0.15s ease;
 }
-#zs-term-btn:hover { background: rgba(255, 255, 255, 0.13); }
-#zs-term-badge {
-  min-width: 14px; height: 14px; padding: 0 3px; border-radius: 8px;
+#zs-term-btn:hover, #zs-files-btn:hover, #zs-prefs-btn:hover { background: rgba(255, 255, 255, 0.13); }
+#zs-files-btn[hidden] { display: none; }
+#zs-term-badge, #zs-files-badge {
+  position: absolute; top: -4px; right: -4px;
+  min-width: 14px; height: 14px; padding: 0 3px; box-sizing: border-box; border-radius: 8px;
   background: #22c55e; color: #08130a; font-size: 9.5px; font-weight: 700;
   display: inline-flex; align-items: center; justify-content: center;
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
 }
-#zs-term-badge[hidden] { display: none; }
+#zs-files-badge { background: #818cf8; color: #0b0c14; box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.3); }
+#zs-term-badge[hidden], #zs-files-badge[hidden] { display: none; }
+html.zs-light #zs-prefs-btn, html.zs-light #zs-files-btn { background: rgba(0, 0, 0, 0.05); color: #3730a3; }
 
 #zs-term {
   position: fixed; z-index: 2147483646; right: 14px; top: 14px;
