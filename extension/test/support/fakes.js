@@ -54,7 +54,7 @@ export function fakeBridge({ tools = [], results = {} } = {}) {
 }
 
 export function fakeSession(overrides = {}) {
-  const state = { target: "vscode", enabled: new Set(["vscode"]), servers: [{ id: "vscode", alive: true, tools: 2 }], vision: false, stopped: false };
+  const state = { target: "snapgent", enabled: new Set(["snapgent"]), servers: [{ id: "snapgent", alive: true, tools: 2 }], vision: false, stopped: false };
   Object.assign(state, overrides);
   return {
     state,

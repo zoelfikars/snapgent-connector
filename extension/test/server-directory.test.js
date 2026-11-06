@@ -44,7 +44,7 @@ describe("ServerDirectory", () => {
   test("lists the bridge's servers except the built-in one, using cached names", async () => {
     const { dir } = await directory({
       stored: { zsCustomMcpServers: [{ id: "git", name: "Git helper", command: "uvx" }] },
-      live: [{ id: "vscode", alive: true }, { id: "git", alive: true, tools: [1] }],
+      live: [{ id: "snapgent", alive: true }, { id: "git", alive: true, tools: [1] }],
     });
     assert.deepEqual(dir.servers(), [{ id: "git", name: "Git helper", command: "uvx", alive: true, tools: [1] }]);
   });
@@ -65,18 +65,18 @@ describe("ServerDirectory", () => {
 
   test("names: the built-in one, a known one, and an unknown id as itself", async () => {
     const { dir } = await directory({ stored: { zsCustomMcpServers: [{ id: "a", name: "Alpha" }] }, live: [{ id: "a" }] });
-    assert.deepEqual(["vscode", "a", "zzz"].map((id) => dir.name(id)), ["Snapgent MCP", "Alpha", "zzz"]);
+    assert.deepEqual(["snapgent", "a", "zzz"].map((id) => dir.name(id)), ["Snapgent MCP", "Alpha", "zzz"]);
   });
 
   test("the dropdown offers only enabled servers but never loses the current target", async () => {
     const { dir } = await directory({ stored: { zsMcpEnabled: { a: false } }, live: [{ id: "a" }, { id: "b" }] });
-    assert.deepEqual(dir.targetOptions("vscode").map((o) => o.id), ["vscode", "b"]);
-    assert.deepEqual(dir.targetOptions("a").map((o) => o.id), ["vscode", "b", "a"]);
-    assert.deepEqual(dir.allOptions().map((o) => o.id), ["vscode", "a", "b"], "the settings popup lists disabled ones too");
+    assert.deepEqual(dir.targetOptions("snapgent").map((o) => o.id), ["snapgent", "b"]);
+    assert.deepEqual(dir.targetOptions("a").map((o) => o.id), ["snapgent", "b", "a"]);
+    assert.deepEqual(dir.allOptions().map((o) => o.id), ["snapgent", "a", "b"], "the settings popup lists disabled ones too");
   });
 
   test("firstEnabled is what the page falls back to when the active target is switched off", async () => {
-    const { dir } = await directory({ stored: { zsMcpEnabled: { vscode: false, a: false } }, live: [{ id: "a" }, { id: "b" }] });
+    const { dir } = await directory({ stored: { zsMcpEnabled: { snapgent: false, a: false } }, live: [{ id: "a" }, { id: "b" }] });
     assert.equal(dir.firstEnabled().id, "b");
     dir.setEnabled("b", false);
     assert.equal(dir.firstEnabled(), null);

@@ -18,7 +18,7 @@ def tearDownModule():
 
 
 def make(servers=None, config_path=None):
-    registry = fake_registry(servers or {"vscode": fake_server("vscode", ["read_file", "git_status"])})
+    registry = fake_registry(servers or {"snapgent": fake_server("snapgent", ["read_file", "git_status"])})
     broadcasts = Recorder()
     logs = []
     tmp = None
@@ -46,7 +46,7 @@ class BasicRequestTests(unittest.IsolatedAsyncioTestCase):
         [reply] = await ask(router, {"type": "list_tools", "id": 2})
         self.assertEqual((reply["type"], reply["id"], reply["bridge_version"], reply["mcp_alive"]), ("tools", 2, "9.9", True))
         self.assertEqual([t["name"] for t in reply["tools"]], ["read_file", "git_status"])
-        self.assertEqual(reply["servers"], [{"id": "vscode", "alive": True, "tools": 2}])
+        self.assertEqual(reply["servers"], [{"id": "snapgent", "alive": True, "tools": 2}])
 
     async def test_unknown_request_types_are_reported(self):
         router, *_ = make()
@@ -70,7 +70,7 @@ class CallToolTests(unittest.IsolatedAsyncioTestCase):
                 raise error
             return result
 
-        registry.servers["vscode"].call_tool = call_tool
+        registry.servers["snapgent"].call_tool = call_tool
         return calls
 
     async def test_success_returns_text(self):
@@ -106,11 +106,11 @@ class CallToolTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(calls, [])
 
     async def test_unknown_tool_and_wrong_server_are_refused_before_calling(self):
-        router, registry, *_ = make({"vscode": fake_server("vscode", ["read_file"]), "other": fake_server("other", ["secret"])})
+        router, registry, *_ = make({"snapgent": fake_server("snapgent", ["read_file"]), "other": fake_server("other", ["secret"])})
         calls = self.stub(registry, {"content": []})
         [unknown] = await ask(router, {"type": "call_tool", "id": 1, "name": "nope"})
         self.assertEqual((unknown["kind"], unknown["ok"]), ("unknown_tool", False))
-        [isolated] = await ask(router, {"type": "call_tool", "id": 2, "name": "secret", "server": "vscode"})
+        [isolated] = await ask(router, {"type": "call_tool", "id": 2, "name": "secret", "server": "snapgent"})
         self.assertIn("not available for the selected server", isolated["error"])
         self.assertEqual(calls, [])
 
@@ -144,7 +144,7 @@ class ServerManagementTests(unittest.IsolatedAsyncioTestCase):
             ({"type": "add_server", "id": 1, "server_id": "bad id", "command": "x"}, "Invalid MCP server id."),
             ({"type": "add_server", "id": 2, "server_id": "ok", "command": ""}, "MCP server command is required."),
             ({"type": "add_server", "id": 3, "server_id": "ok", "command": "x", "args": "no"}, "args must be an array"),
-            ({"type": "remove_server", "id": 4, "server_id": "vscode"}, "cannot be removed"),
+            ({"type": "remove_server", "id": 4, "server_id": "snapgent"}, "cannot be removed"),
         ):
             [reply] = await ask(router, request)
             self.assertFalse(reply["ok"])

@@ -4,11 +4,11 @@ import sys
 import unittest
 from unittest import mock
 
-from snapgent_vscode import limits
-from snapgent_vscode.context import Context
-from snapgent_vscode.tools import all_tools, call, get, registry, schemas
-from snapgent_vscode.tools import commands, editing, git as git_tools, project, reading
-from tests.vscode_support import WorkspaceCase, git
+from snapgent_mcp import limits
+from snapgent_mcp.context import Context
+from snapgent_mcp.tools import all_tools, call, get, registry, schemas
+from snapgent_mcp.tools import commands, editing, git as git_tools, project, reading
+from tests.mcp_support import WorkspaceCase, git
 
 
 class CatalogueTests(WorkspaceCase):

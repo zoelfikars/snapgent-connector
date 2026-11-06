@@ -1,5 +1,5 @@
-"""What the single `snapgent` program does before it serves: write the config that points the bridge at the VS Code
-MCP server (which is this same program run with --vscode-mcp), and free the port from an older Snapgent bridge."""
+"""What the single `snapgent` program does before it serves: write the config that points the bridge at the Snapgent
+MCP server (which is this same program run with --mcp), and free the port from an older Snapgent bridge."""
 
 import json
 import os
@@ -11,7 +11,10 @@ import time
 from pathlib import Path
 from typing import Dict, List
 
-VSCODE_FLAG = "--vscode-mcp"
+MCP_FLAG = "--mcp"
+LEGACY_MCP_FLAGS = ("--vscode-mcp",)  # what the config.json of an older version holds: still understood
+DEFAULT_SERVER_ID = "snapgent"
+LEGACY_SERVER_ID = "vscode"  # what older versions called the default server
 BUNDLED_NAMES = {"", "vscode_mcp.exe", "vscode_mcp.py", "vscode_mcp", "snapgent", "snapgent.exe"}
 
 
@@ -44,20 +47,25 @@ def runs_bundled_server(entry: Dict[str, object]) -> bool:
     args = entry.get("args")
     first = Path(str(args[0])).name if isinstance(args, list) and args else ""
     # `vscode_mcp.py` is what older versions wrote; `snapgent.py --vscode-mcp` is what a clone writes now.
-    return first in {"vscode_mcp.py", "snapgent.py", VSCODE_FLAG} or (command.name in {"python", "python3"} and not command.exists())
+    return first in {"vscode_mcp.py", "snapgent.py", MCP_FLAG, *LEGACY_MCP_FLAGS} or (command.name in {"python", "python3"} and not command.exists())
 
 
-def configure_vscode(config_path: Path, command: str, args: List[str]) -> bool:
-    """Point the `vscode` server at `command args`, keeping the user's own env and any entry they customised.
-    Returns True when the entry was written."""
+def configure_default_server(config_path: Path, command: str, args: List[str]) -> bool:
+    """Point the default (`snapgent`) server at `command args`, keeping the user's own env and any entry they customised.
+    An entry an older version wrote as `vscode` becomes `snapgent`, with its env. Returns True when the entry was written."""
     configuration = load_config(config_path)
     servers = configuration["mcpServers"]
     assert isinstance(servers, dict)
-    existing = servers.get("vscode")
+    legacy = servers.pop(LEGACY_SERVER_ID, None)
+    existing = servers.get(DEFAULT_SERVER_ID)
+    if not isinstance(existing, dict) and isinstance(legacy, dict):
+        existing = legacy  # the old entry moves to the new id, customised or not
     written = not isinstance(existing, dict) or runs_bundled_server(existing)
     if written:
         env = existing.get("env") if isinstance(existing, dict) and isinstance(existing.get("env"), dict) else {}
-        servers["vscode"] = {"command": command, "args": args, "env": env}
+        servers[DEFAULT_SERVER_ID] = {"command": command, "args": args, "env": env}
+    else:
+        servers[DEFAULT_SERVER_ID] = existing
     config_path.write_text(json.dumps(configuration, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return written
 
@@ -119,7 +127,7 @@ def _is_snapgent(pid: int) -> bool:
 
 
 def _stop(pid: int) -> None:
-    """End a program and what it started (the VS Code server is a child of the bridge)."""
+    """End a program and what it started (the MCP server is a child of the bridge)."""
     if os.name == "nt":
         _run(["taskkill", "/F", "/T", "/PID", str(pid)])
     else:

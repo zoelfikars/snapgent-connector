@@ -8,7 +8,7 @@ const WORKSPACE = { title: "Workspace required", text: "Open a project folder in
 
 function setup(over = {}) {
   const log = [];
-  const state = { superseded: false, stopped: false, tools: [tool("tree"), tool("read_files")], empty: true, started: false, composerReady: true, probe: { ok: true }, responses: [], connected: true, serverAlive: true, targetId: "vscode", ...over.state };
+  const state = { superseded: false, stopped: false, tools: [tool("tree"), tool("read_files")], empty: true, started: false, composerReady: true, probe: { ok: true }, responses: [], connected: true, serverAlive: true, targetId: "snapgent", ...over.state };
   const queue = [...state.responses];
   const deps = {
     session: {
@@ -28,7 +28,7 @@ function setup(over = {}) {
       submit: async (text) => { log.push(`submit:${text.slice(0, 12)}`); return `base${log.length}`; },
       next: async () => { log.push("next"); const r = queue.shift(); if (!r) throw new Error("no scripted reply"); return typeof r === "function" ? r(state) : r; },
     },
-    runner: { run: async (call) => { log.push(`run:${call.tool}`); return state.handshakeFeedback ?? "» list_commands\nvscode commands (2):"; } },
+    runner: { run: async (call) => { log.push(`run:${call.tool}`); return state.handshakeFeedback ?? "» list_commands\nsnapgent commands (2):"; } },
     view: {
       toast: (t) => log.push(`toast:${t}`),
       banner: (l, title, text) => log.push(["banner", title, text]),
@@ -49,17 +49,17 @@ describe("SessionStarter", () => {
     await t.starter.start();
     assert.deepEqual(t.log.filter((e) => typeof e === "string" && !e.startsWith("diag")), [
       "begin", "ensure:true", `probe:tree:{"path":"."}:5000`, "skills.load", "workspace", "run:list_commands",
-      "submit:START|vscode", "next", "markStarted", "toast:Agent on.", "end:true",
+      "submit:START|snapge", "next", "markStarted", "toast:Agent on.", "end:true",
     ]);
   });
 
   test("the model is never asked to fetch anything: the command list is run here and goes into the message", async () => {
-    const t = setup({ state: { responses: [ready], handshakeFeedback: "» list_commands\nvscode commands (2):\n\nread_files" } });
+    const t = setup({ state: { responses: [ready], handshakeFeedback: "» list_commands\nsnapgent commands (2):\n\nread_files" } });
     const submitted = [];
     t.starter._d.chat.submit = async (text) => { submitted.push(text); return "base"; };
     await t.starter.start();
     assert.equal(submitted.length, 1);
-    assert.ok(submitted[0].startsWith("START|vscode commands (2):"), "the result's header line is not part of the message");
+    assert.ok(submitted[0].startsWith("START|snapgent commands (2):"), "the result's header line is not part of the message");
     assert.ok(!submitted[0].includes("»"));
   });
 
@@ -267,15 +267,15 @@ describe("project instruction files in the start message", () => {
 });
 
 describe("start preconditions", () => {
-  const base = { target: "vscode", targetName: "VS Code", bridgeConnected: true, serverAlive: true, toolNames: ["tree"] };
+  const base = { target: "snapgent", targetName: "VS Code", bridgeConnected: true, serverAlive: true, toolNames: ["tree"] };
   test("ready when the probe tool exists", () => assert.equal(checkStartPreconditions(base), null));
-  test("connected vscode server without list_dir means no workspace", () => assert.deepEqual(checkStartPreconditions({ ...base, toolNames: ["read_files"] }), WORKSPACE));
+  test("connected snapgent server without list_dir means no workspace", () => assert.deepEqual(checkStartPreconditions({ ...base, toolNames: ["read_files"] }), WORKSPACE));
   test("no tools at all", () => assert.equal(checkStartPreconditions({ ...base, serverAlive: false, toolNames: [] }).title, "VS Code tools unavailable"));
-  test("prefixed names still count", () => assert.equal(checkStartPreconditions({ ...base, toolNames: ["vscode/tree"] }), null));
-  test("a non-vscode target needs no probe tool", () => assert.equal(checkStartPreconditions({ ...base, target: "x", toolNames: ["foo"] }), null));
+  test("prefixed names still count", () => assert.equal(checkStartPreconditions({ ...base, toolNames: ["snapgent/tree"] }), null));
+  test("a non-snapgent target needs no probe tool", () => assert.equal(checkStartPreconditions({ ...base, target: "x", toolNames: ["foo"] }), null));
   test("probe success", () => { assert.equal(probeSucceeded({ ok: true }), true); assert.equal(probeSucceeded(null), false); });
   test("unavailable notes", () => {
     assert.equal(handshakeUnavailable("No commands available - offline"), true);
-    assert.equal(handshakeUnavailable("vscode commands (2):"), false);
+    assert.equal(handshakeUnavailable("snapgent commands (2):"), false);
   });
 });

@@ -8,9 +8,9 @@ const NASTY = { id: 'a"><img src=x onerror=1>', name: "<b>Bold</b> & 'quotes'" }
 
 describe("target menus", () => {
   test("the menu lists every option and badges only the active one", () => {
-    const doc = parse(targetMenuHtml([{ id: "vscode", name: "VS Code" }, NASTY], "vscode"));
+    const doc = parse(targetMenuHtml([{ id: "snapgent", name: "VS Code" }, NASTY], "snapgent"));
     const rows = [...doc.querySelectorAll(".zs-target-opt")];
-    assert.deepEqual(rows.map((r) => r.dataset.id), ["vscode", NASTY.id]);
+    assert.deepEqual(rows.map((r) => r.dataset.id), ["snapgent", NASTY.id]);
     assert.deepEqual(rows.map((r) => r.classList.contains("zs-target-cur")), [true, false]);
     assert.equal(doc.querySelectorAll(".zs-site-badge").length, 1);
     assert.equal(doc.querySelector("img, b"), null, "nothing a server name says becomes markup");

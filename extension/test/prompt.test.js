@@ -16,7 +16,7 @@ const custom = ZS.buildSystemPrompt({ customPrompt: "Reply in Indonesian", provi
 test("custom prompt appended last", () => assert.ok(custom.endsWith("Reply in Indonesian")));
 test("provider notes included", () => assert.ok(custom.includes("site note")));
 
-const start = ZS.buildStartMessage({ prompt: "P", commands: "vscode commands (2):\n\nread_files(...)", tree: "root\n└── a.js" });
+const start = ZS.buildStartMessage({ prompt: "P", commands: "snapgent commands (2):\n\nread_files(...)", tree: "root\n└── a.js" });
 test("the start message holds the prompt, the commands and the tree, and asks for a short answer", () => {
   assert.ok(start.startsWith("P\n\n") && start.includes("read_files(...)") && start.includes("└── a.js"));
   assert.ok(start.endsWith("I will tell you what I want to do."));

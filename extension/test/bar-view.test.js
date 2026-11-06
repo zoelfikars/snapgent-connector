@@ -5,8 +5,8 @@ import { escapeHtml } from "../src/ui/html.js";
 
 const base = {
   staleExtension: false, starting: false, started: false, running: false, parked: false, blankChat: true,
-  bridge: { connected: true, servers: [{ id: "vscode", alive: true, tools: 28 }] }, bridgeOk: true,
-  target: { id: "vscode", name: "VS Code" }, activeToolCount: 28, workspaceReady: true, workspaceProbePending: false, modeWarning: null,
+  bridge: { connected: true, servers: [{ id: "snapgent", alive: true, tools: 28 }] }, bridgeOk: true,
+  target: { id: "snapgent", name: "VS Code" }, activeToolCount: 28, workspaceReady: true, workspaceProbePending: false, modeWarning: null,
 };
 const bar = (over = {}) => computeBarView({ ...base, ...over });
 
@@ -35,7 +35,7 @@ describe("bar view: before a session", () => {
   });
 
   test("the server is alive but advertises no tools yet: still the folder message", () => {
-    const v = bar({ bridgeOk: false, workspaceReady: false, bridge: { connected: true, servers: [{ id: "vscode", alive: true, tools: 0 }] } });
+    const v = bar({ bridgeOk: false, workspaceReady: false, bridge: { connected: true, servers: [{ id: "snapgent", alive: true, tools: 0 }] } });
     assert.equal(v.message, "Open a <b>folder in your editor</b>");
   });
 
@@ -110,7 +110,7 @@ describe("escapeHtml", () => {
 });
 
 describe("computeBarView: a site that needs calibrating", () => {
-  const base = { staleExtension: false, starting: false, started: false, running: false, parked: false, blankChat: true, bridge: { connected: true, servers: [] }, bridgeOk: true, target: { id: "vscode", name: "VS Code" }, activeToolCount: 0, workspaceReady: true, workspaceProbePending: false, modeWarning: "Cannot find the send button on this page. Re-calibrate it." };
+  const base = { staleExtension: false, starting: false, started: false, running: false, parked: false, blankChat: true, bridge: { connected: true, servers: [] }, bridgeOk: true, target: { id: "snapgent", name: "VS Code" }, activeToolCount: 0, workspaceReady: true, workspaceProbePending: false, modeWarning: "Cannot find the send button on this page. Re-calibrate it." };
 
   test("the only action is Calibrate, with the reason, whatever else is going on", () => {
     for (const blankChat of [true, false]) {

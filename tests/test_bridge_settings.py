@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from snapgent_bridge import settings
-from snapgent_vscode.tools import commands
+from snapgent_mcp.tools import commands
 
 
 class AppRootTests(unittest.TestCase):

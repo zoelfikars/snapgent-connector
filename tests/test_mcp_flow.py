@@ -4,11 +4,11 @@ import json
 import sys
 from itertools import count
 
-from snapgent_vscode.security import MODE_ARGUMENT, READONLY, RESERVED_ARGUMENT, STANDARD, TRUSTED, ConfirmationStore, Policy
-from snapgent_vscode.server import McpServer
-from snapgent_vscode.tools import commands
-from snapgent_vscode.workspace import Workspace
-from tests.vscode_support import WorkspaceCase
+from snapgent_mcp.security import MODE_ARGUMENT, READONLY, RESERVED_ARGUMENT, STANDARD, TRUSTED, ConfirmationStore, Policy
+from snapgent_mcp.server import McpServer
+from snapgent_mcp.tools import commands
+from snapgent_mcp.workspace import Workspace
+from tests.mcp_support import WorkspaceCase
 
 
 class FlowCase(WorkspaceCase):

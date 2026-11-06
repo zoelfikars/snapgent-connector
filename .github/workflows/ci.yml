@@ -92,13 +92,13 @@ jobs:
           path: server/dist/snapgent.exe
           retention-days: 7
           if-no-files-found: error
-      - name: snapgent.exe answers as the VS Code MCP server
+      - name: snapgent.exe answers as the Snapgent MCP server
         shell: python
         run: |
           import json, subprocess
           request = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}) + "\n"
-          out = subprocess.run(["dist/snapgent.exe", "--vscode-mcp"], input=request, capture_output=True, text=True, timeout=60).stdout
-          assert json.loads(out.splitlines()[0])["result"]["serverInfo"]["name"] == "vscode-mcp", out
+          out = subprocess.run(["dist/snapgent.exe", "--mcp"], input=request, capture_output=True, text=True, timeout=60).stdout
+          assert json.loads(out.splitlines()[0])["result"]["serverInfo"]["name"] == "snapgent-mcp", out
       - name: snapgent.exe starts the bridge, writes its configuration and listens; a second start replaces it
         shell: python
         run: |
@@ -115,7 +115,7 @@ jobs:
               return subprocess.Popen(["dist/snapgent.exe"], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
           first = start()
           assert listening(), "snapgent.exe never listened"
-          assert json.load(open("dist/config.json"))["mcpServers"]["vscode"]["args"] == ["--vscode-mcp"]
+          assert json.load(open("dist/config.json"))["mcpServers"]["snapgent"]["args"] == ["--mcp"]
           second = start()
           for _ in range(50):
               if first.poll() is not None:
@@ -141,10 +141,10 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv venv --python 3.12 "$RUNNER_TEMP/venv" && uv pip install --python "$RUNNER_TEMP/venv/bin/python" pyinstaller websockets
       - run: $RUNNER_TEMP/venv/bin/pyinstaller --noconfirm snapgent.spec
-      - name: It answers as the VS Code MCP server
+      - name: It answers as the Snapgent MCP server
         run: |
           echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
-            | timeout 30 ./dist/snapgent --vscode-mcp | grep -q '"serverInfo"'
+            | timeout 30 ./dist/snapgent --mcp | grep -q '"serverInfo"'
       - name: It starts the bridge, writes its configuration and listens; a second start replaces it
         run: |
           export ZS_BRIDGE_PORT=17999
@@ -152,7 +152,7 @@ jobs:
           ./dist/snapgent </dev/null >first.log 2>&1 &
           first=$!
           listening
-          grep -q '"--vscode-mcp"' dist/config.json
+          grep -q '"--mcp"' dist/config.json
           ./dist/snapgent </dev/null >second.log 2>&1 &
           second=$!
           for _ in $(seq 1 50); do kill -0 "$first" 2>/dev/null || break; sleep 0.2; done

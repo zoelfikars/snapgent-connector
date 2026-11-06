@@ -72,7 +72,7 @@ The default target. Automatically connects to the workspace currently open in VS
 1. **You** describe a task in a supported AI chat.
 2. The **AI** replies with a snapgentV3 command.
 3. The **extension** detects the command and forwards it to the local bridge.
-4. The **bridge** routes it to the VS Code MCP server.
+4. The **bridge** routes it to the Snapgent MCP server.
 5. The **result** is sent back into chat, and the AI continues working.
 
 VS Code's MCP server is configured by `snapgent` itself; it detects the open VS Code workspace automatically.
@@ -240,9 +240,9 @@ snapgent-full/
 │   ├── build/                 # Manifest generation + bundling -> dist/{chrome,firefox}
 │   └── test/                  # node:test suites (npm test)
 ├── server/                    # Everything you run: same layout as the release zip
-│   ├── snapgent.py            # The one program: the bridge, or the VS Code MCP server with --vscode-mcp
+│   ├── snapgent.py            # The one program: the bridge, or the Snapgent MCP server with --mcp
 │   ├── snapgent_bridge/       # Bridge implementation (protocol, registry, router, trust, server, launcher)
-│   ├── snapgent_vscode/       # VS Code MCP server implementation (tools, security policy)
+│   ├── snapgent_mcp/       # Snapgent MCP server implementation (tools, security policy)
 │   └── snapgent.spec          # PyInstaller recipe (snapgent.exe and snapgent are built by CI)
 ├── tests/                     # Python tests (python -m unittest discover -s tests -t .)
 ├── scripts/                   # package_release.py assembles the release files

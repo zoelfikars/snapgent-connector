@@ -13,7 +13,7 @@ export function targetMenuHtml(options, currentId) {
   return `<section class="zs-menu-sec"><div class="zs-sec-label"><span>MCP target</span></div>${rows}</section>`;
 }
 
-/** What the bar offers for approvals; `id` is what the VS Code server understands (see server/snapgent_vscode/security/modes.py). */
+/** What the bar offers for approvals; `id` is what the VS Code server understands (see server/snapgent_mcp/security/modes.py). */
 export const APPROVAL_MODES = [
   { id: "plan", name: "Plan", note: "Read only; it may save its plan to .snapgent/plans/" },
   { id: "manual", name: "Manual", note: "Asks before deleting, committing or running commands" },

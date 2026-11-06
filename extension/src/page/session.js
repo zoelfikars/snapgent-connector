@@ -5,6 +5,7 @@
 import { SessionStarter, SessionTracker, textShowsSession } from "../application/index.js";
 import { SESSION_PHRASE } from "../domain/constants.js";
 import { buildStartMessage } from "../domain/prompt/start-message.js";
+import { DEFAULT_SERVER_ID } from "../domain/tools/default-server.js";
 import { waitFor } from "./visibility.js";
 
 /**
@@ -60,7 +61,7 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
       id: settings.target,
       name: () => serverDirectory.name(settings.target()),
       bridgeConnected: () => !!state.bridge.connected,
-      serverAlive: () => !!(state.bridge.servers || []).find((server) => server.id === "vscode" && server.alive),
+      serverAlive: () => !!(state.bridge.servers || []).find((server) => server.id === DEFAULT_SERVER_ID && server.alive),
     },
     catalogue: tools.catalogue,
     callTool: (name, args, timeout) => tools.bridge.callTool({ name, arguments: tools.workspace.withRoot(args), timeout }),

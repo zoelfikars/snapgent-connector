@@ -44,11 +44,11 @@ describe("ToolCatalogue", () => {
 
   test("only the selected, enabled server's tools are active", async () => {
     const { catalogue, session } = setup({
-      tools: [tool("a", {}, "vscode"), tool("b", {}, "other"), tool("legacy")],
-      enabled: new Set(["vscode", "other"]),
+      tools: [tool("a", {}, "snapgent"), tool("b", {}, "other"), tool("legacy")],
+      enabled: new Set(["snapgent", "other"]),
     });
     await catalogue.ensure();
-    assert.deepEqual([...catalogue.names()].sort(), ["a", "legacy"]); // untagged tool belongs to vscode
+    assert.deepEqual([...catalogue.names()].sort(), ["a", "legacy"]); // untagged tool belongs to snapgent
     session.state.target = "other";
     assert.deepEqual([...catalogue.names()], ["b"]);
     session.state.enabled.delete("other");
@@ -56,10 +56,10 @@ describe("ToolCatalogue", () => {
   });
 
   test("knows() ignores a server prefix in either direction", async () => {
-    const { catalogue } = setup({ tools: [tool("vscode/read_file")] });
+    const { catalogue } = setup({ tools: [tool("snapgent/read_file")] });
     await catalogue.ensure();
     assert.equal(catalogue.knows("read_file"), true);
-    assert.equal(catalogue.knows("vscode/read_file"), true);
+    assert.equal(catalogue.knows("snapgent/read_file"), true);
     assert.equal(catalogue.knows("write_file"), false);
   });
 });

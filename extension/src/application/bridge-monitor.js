@@ -3,6 +3,8 @@
 // connection just drop or come back, and (for VS Code) is a workspace actually open. The workspace is probed
 // by listing its root, at most once per probe interval, never two at a time.
 
+import { DEFAULT_SERVER_ID } from "../domain/tools/default-server.js";
+
 export const PROBE_INTERVAL_MS = 5000;
 const PROBE_TIMEOUT_MS = 5000;
 
@@ -36,9 +38,9 @@ export class BridgeMonitor {
     const lost = this._wasConnected && !status.connected;
     this._wasConnected = !!status.connected;
 
-    if (targetId === "vscode" && serverConnected && !this.workspaceProbePending && this._now() - this._probeAt >= PROBE_INTERVAL_MS) {
+    if (targetId === DEFAULT_SERVER_ID && serverConnected && !this.workspaceProbePending && this._now() - this._probeAt >= PROBE_INTERVAL_MS) {
       this._probe(usable);
-    } else if (targetId === "vscode" && !serverConnected) {
+    } else if (targetId === DEFAULT_SERVER_ID && !serverConnected) {
       this.workspaceReady = false;
     }
     return { lost, connected: !!status.connected };
@@ -54,7 +56,7 @@ export class BridgeMonitor {
       return this._listRoot(listTool.name, PROBE_TIMEOUT_MS).then((result) => { this.workspaceReady = !!(result && result.ok); });
     }).catch((error) => {
       this.workspaceReady = false;
-      this._log("Could not verify VS Code workspace:", error);
+      this._log("Could not verify the workspace:", error);
     }).finally(() => {
       this.workspaceProbePending = false;
       this._onChange();

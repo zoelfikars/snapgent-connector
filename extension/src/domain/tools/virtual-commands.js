@@ -3,12 +3,13 @@
 
 import { resultHeader } from "./result-marker.js";
 import { formatCatalogue } from "./catalogue.js";
+import { DEFAULT_SERVER_ID } from "./default-server.js";
 
 export const LIST_SERVERS = "list_mcp_servers";
 export const isListCommands = (name) => name === "list_commands" || name === "list_tools";
 
 /** A tool without a "server" tag comes from an older bridge: treat it as the default server. */
-export const serverOf = (tool) => tool.server || "vscode";
+export const serverOf = (tool) => tool.server || DEFAULT_SERVER_ID;
 
 /**
  * @param {{ servers: Array<{id:string, alive?:boolean, tools?:number}>, target: string }} input
@@ -17,10 +18,10 @@ export const serverOf = (tool) => tool.server || "vscode";
 export function renderServerList({ servers, target }) {
   const lines = servers.length
     ? servers.map((sv) => {
-        const label = sv.id === "vscode" ? "Snapgent MCP (default target)" : `${sv.id} (addon)`;
+        const label = sv.id === DEFAULT_SERVER_ID ? "Snapgent MCP (default target)" : `${sv.id} (addon)`;
         return `- ${sv.id}: ${label} - ${sv.alive ? `${sv.tools || 0} commands available` : "offline (no tools)"}`;
       })
-    : ["- vscode: Snapgent MCP (default target) - unknown (bridge did not report server health)"];
+    : [`- ${DEFAULT_SERVER_ID}: Snapgent MCP (default target) - unknown (bridge did not report server health)`];
   return (
     `${resultHeader(LIST_SERVERS)}\n` +
     `Connected MCP servers (${lines.length}):\n${lines.join("\n")}\n` +

@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from snapgent_vscode.context import Context
+from snapgent_mcp.context import Context
 
 
 class WorkspaceCase(unittest.TestCase):

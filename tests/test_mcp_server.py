@@ -5,10 +5,10 @@ import sys
 import unittest
 from pathlib import Path
 
-from snapgent_vscode import SERVER_NAME, protocol
-from snapgent_vscode.server import McpServer
-from snapgent_vscode.workspace import Workspace
-from tests.vscode_support import WorkspaceCase
+from snapgent_mcp import SERVER_NAME, protocol
+from snapgent_mcp.server import McpServer
+from snapgent_mcp.workspace import Workspace
+from tests.mcp_support import WorkspaceCase
 
 ROOT = Path(__file__).resolve().parent.parent / "server"
 
@@ -127,7 +127,7 @@ class ServerTests(WorkspaceCase):
         self.assertEqual(response["result"]["content"][0]["text"], "quiet")
 
     def test_a_user_stop_is_marked_cancelled_not_errored(self):
-        from snapgent_vscode.jobs import CANCELLED_MESSAGE
+        from snapgent_mcp.jobs import CANCELLED_MESSAGE
 
         def cancelled(*_args):
             raise RuntimeError(CANCELLED_MESSAGE)
@@ -142,13 +142,13 @@ class ServerTests(WorkspaceCase):
 
 
 class EntryPointTests(unittest.TestCase):
-    def test_snapgent_py_vscode_mcp_speaks_mcp_over_stdio(self):
+    def test_snapgent_py_mcp_speaks_mcp_over_stdio(self):
         requests = [
             {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
             {"jsonrpc": "2.0", "method": "notifications/initialized"},
             {"jsonrpc": "2.0", "id": 2, "method": "bogus"},
         ]
-        result = subprocess.run([sys.executable, "snapgent.py", "--vscode-mcp"], cwd=ROOT, input="\n".join(map(json.dumps, requests)) + "\n",
+        result = subprocess.run([sys.executable, "snapgent.py", "--mcp"], cwd=ROOT, input="\n".join(map(json.dumps, requests)) + "\n",
                                 capture_output=True, text=True, timeout=20)
         replies = [json.loads(line) for line in result.stdout.splitlines()]
         self.assertEqual([r["id"] for r in replies], [1, 2])

@@ -17,6 +17,7 @@ import { toFeedback } from "../domain/tools/result-feedback.js";
 import { runningDetail } from "../domain/tools/result-summary.js";
 import { LIST_SERVERS, isListCommands, renderCommandList, renderServerList } from "../domain/tools/virtual-commands.js";
 import { bareToolName } from "../domain/tools/names.js";
+import { DEFAULT_SERVER_ID } from "../domain/tools/default-server.js";
 import { callWithGuards } from "./call-guard.js";
 
 const DEFAULT_TIMEOUT_MS = 120000;
@@ -74,7 +75,7 @@ export class ToolRunner {
     const refusal = isolationError({ name, target, targetEnabled: this._session.isEnabled(target) });
     if (refusal) return refusal;
     if (!this._catalogue.names().size) await this._catalogue.ensure();
-    const workspaceTarget = target === "vscode" || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
+    const workspaceTarget = target === DEFAULT_SERVER_ID || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
     if (workspaceTarget && !this._catalogue.names().size) return FEEDBACK.workspaceClosed(this._workspaceRoot());
     if (!this._catalogue.knows(name)) return FEEDBACK.unknownTool(name, [...this._catalogue.names()]);
 
@@ -120,7 +121,7 @@ export class ToolRunner {
 
   _callBridge(name, args, target, jobKey) {
     // The VS Code server applies the bar's choice (plan / manual / auto) and keeps the call under its job key; other servers know nothing of either.
-    const workspaceTarget = target === "vscode" || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
+    const workspaceTarget = target === DEFAULT_SERVER_ID || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
     const root = workspaceTarget ? this._workspaceRoot() : null;
     const sent = workspaceTarget ? { ...args, [MODE_ARGUMENT]: this._approvalMode(), ...(jobKey ? { [JOB_ARGUMENT]: jobKey } : {}), ...(root ? { [ROOT_ARGUMENT]: root } : {}) } : args;
     return callWithGuards(
@@ -139,7 +140,7 @@ export class ToolRunner {
 
   /** Stop only abandons the wait: the command itself keeps running on the machine unless the server is told to end it. */
   _cancelJob(name, target, jobKey) {
-    if (!jobKey || target !== "vscode") return;
+    if (!jobKey || target !== DEFAULT_SERVER_ID) return;
     const cancel = { [JOB_ARGUMENT]: jobKey, [JOB_OP_ARGUMENT]: "cancel", [MODE_ARGUMENT]: this._approvalMode() };
     Promise.resolve(this._bridge.callTool({ name, arguments: cancel, timeout: 5000, server: target })).catch(() => {});
   }
@@ -150,7 +151,7 @@ export class ToolRunner {
   }
 
   _terminalBegin(jobKey, name, args, target) {
-    const workspaceTarget = target === "vscode" || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
+    const workspaceTarget = target === DEFAULT_SERVER_ID || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
     if (!jobKey || !workspaceTarget) return; // only folder-aware servers stream; others have no terminal
     try {
       this._sink.terminal && this._sink.terminal.begin({ key: jobKey, name, label: runningDetail({ arguments: args }) });

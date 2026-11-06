@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from snapgent_vscode import workspace as ws
+from snapgent_mcp import workspace as ws
 
 
 class StoragePathTests(unittest.TestCase):

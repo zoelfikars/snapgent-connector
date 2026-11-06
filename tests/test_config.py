@@ -60,9 +60,10 @@ class StoreTests(unittest.TestCase):
         self.store.remove_server("extra")
         self.assertEqual(self.store.load_servers(), {})
 
-    def test_vscode_cannot_be_removed_and_ids_are_checked(self):
-        with self.assertRaisesRegex(ConfigError, "cannot be removed"):
-            self.store.remove_server("vscode")
+    def test_the_default_server_cannot_be_removed_under_its_new_or_its_old_name_and_ids_are_checked(self):
+        for server_id in ("snapgent", "vscode"):
+            with self.assertRaisesRegex(ConfigError, "cannot be removed"):
+                self.store.remove_server(server_id)
         with self.assertRaisesRegex(ConfigError, "Invalid MCP server id"):
             self.store.add_server("bad id", "node", [], {})
         with self.assertRaisesRegex(ConfigError, "Invalid MCP server id"):

@@ -1,13 +1,13 @@
 import unittest
 
-from snapgent_vscode import risk
-from snapgent_vscode.security import (
+from snapgent_mcp import risk
+from snapgent_mcp.security import (
     ALLOW, CONFIRM, DENY, MODES, READONLY, RESERVED_ARGUMENT, STANDARD, TRUSTED,
     ConfirmationStore, Policy, SessionState, decide, policy_from_env,
 )
-from snapgent_vscode.security import commands as cmd
-from snapgent_vscode.security import files as sf
-from snapgent_vscode.security.confirmation import fingerprint
+from snapgent_mcp.security import commands as cmd
+from snapgent_mcp.security import files as sf
+from snapgent_mcp.security.confirmation import fingerprint
 
 
 class ModeTests(unittest.TestCase):

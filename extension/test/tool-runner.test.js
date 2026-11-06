@@ -45,7 +45,7 @@ describe("ToolRunner.run — real tools", () => {
     const { runner, bridge } = setup({ results: { read_file: { ok: true, text: "file body" } } });
     const text = await runner.run({ tool: "read_file", arguments: { path: "a.js" } });
     assert.equal(text, "» read_file\nfile body");
-    assert.deepEqual(bridge.calls, [{ name: "read_file", arguments: { path: "a.js", __snapgent_mode: "manual" }, timeout: 120000, server: "vscode" }]);
+    assert.deepEqual(bridge.calls, [{ name: "read_file", arguments: { path: "a.js", __snapgent_mode: "manual" }, timeout: 120000, server: "snapgent" }]);
   });
 
   test("loads the catalogue lazily on the first call", async () => {
@@ -74,7 +74,7 @@ describe("ToolRunner.run — real tools", () => {
 
   test("a prefix naming another server is refused", async () => {
     const { runner, bridge } = setup();
-    assert.match(await runner.run({ tool: "other/read_file" }), /Only the selected target "vscode"/);
+    assert.match(await runner.run({ tool: "other/read_file" }), /Only the selected target "snapgent"/);
     assert.equal(bridge.calls.length, 0);
   });
 
@@ -111,7 +111,7 @@ describe("ToolRunner.run — virtual commands", () => {
   test("list_commands renders the selected server's catalogue without calling a tool", async () => {
     const { runner, bridge } = setup();
     const text = await runner.run({ tool: "list_commands" });
-    assert.match(text, /^» list_commands\nvscode commands \(2\):/);
+    assert.match(text, /^» list_commands\nsnapgent commands \(2\):/);
     assert.match(text, /read_file: read_file tool/);
     assert.equal(bridge.calls.length, 0);
   });
@@ -122,9 +122,9 @@ describe("ToolRunner.run — virtual commands", () => {
   });
 
   test("list_mcp_servers reports only the selected, enabled server", async () => {
-    const { runner } = setup({ session: { servers: [{ id: "vscode", alive: true, tools: 2 }, { id: "other", alive: true, tools: 9 }] } });
+    const { runner } = setup({ session: { servers: [{ id: "snapgent", alive: true, tools: 2 }, { id: "other", alive: true, tools: 9 }] } });
     const text = await runner.run({ tool: "list_mcp_servers" });
-    assert.match(text, /- vscode: Snapgent MCP \(default target\) - 2 commands available/);
+    assert.match(text, /- snapgent: Snapgent MCP \(default target\) - 2 commands available/);
     assert.doesNotMatch(text, /other/);
   });
 });

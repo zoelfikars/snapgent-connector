@@ -3,8 +3,10 @@
 // instructions the user wants appended to the system prompt. The bridge is the source of truth for
 // which servers exist; what is kept here is only display names, the on/off toggles and the prompt.
 
+import { DEFAULT_SERVER_ID, migratedToggles } from "../domain/tools/default-server.js";
+
 const KEYS = { toggles: "zsMcpEnabled", custom: "zsCustomMcpServers", prompt: "zsCustomPrompt" };
-const BUILT_IN = { id: "vscode", name: "Snapgent MCP" };
+const BUILT_IN = { id: DEFAULT_SERVER_ID, name: "Snapgent MCP" };
 
 const isPlainObject = (value) => value && typeof value === "object" && !Array.isArray(value);
 
@@ -21,7 +23,7 @@ export class ServerDirectory {
     this._prompt = "";
     /** Resolves once the persisted values are loaded. Reads before that see the defaults. */
     this.ready = Promise.all([
-      this._hydrate(KEYS.toggles, isPlainObject, (v) => { this._toggles = v; this._onChange(); }),
+      this._hydrate(KEYS.toggles, isPlainObject, (v) => { this._toggles = migratedToggles(v); if (this._toggles !== v) this._store.set(KEYS.toggles, this._toggles); this._onChange(); }),
       this._hydrate(KEYS.custom, Array.isArray, (v) => { this._custom = v; }),
       this._hydrate(KEYS.prompt, (v) => typeof v === "string", (v) => { this._prompt = v; }),
     ]);

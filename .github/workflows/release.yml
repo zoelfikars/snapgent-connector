@@ -88,12 +88,12 @@ jobs:
       - run: python -m unittest discover -s tests -t .
       - run: pyinstaller --noconfirm snapgent.spec
         working-directory: server
-      - name: The program starts and answers as the VS Code MCP server
+      - name: The program starts and answers as the Snapgent MCP server
         working-directory: server
         run: |
           ./dist/snapgent --version
           echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
-            | timeout 20 ./dist/snapgent --vscode-mcp | grep -q '"serverInfo"'
+            | timeout 20 ./dist/snapgent --mcp | grep -q '"serverInfo"'
       - uses: actions/upload-artifact@v4
         with:
           name: linux-binary

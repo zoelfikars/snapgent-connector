@@ -13,8 +13,8 @@ Browser extension (`extension/`, Manifest V3, vanilla JS ESM) + local Python bri
 - `extension/src/page/`, `src/ui/`, `src/entry/` — browser wiring, the bar, dialogs, content-script composition.
 - `extension/src/infrastructure/` — the calibrated engine that reads a chat page from its profile ([docs/CALIBRATION.md](docs/CALIBRATION.md)).
 - `extension/src/sites/registry.js` — the one list of supported AI sites; manifest, background and popup are generated from it.
-- `server/snapgent.py` — one program: the bridge, or the VS Code MCP server with `--vscode-mcp`.
-- `server/snapgent_bridge/`, `server/snapgent_vscode/` — bridge and VS Code server implementations.
+- `server/snapgent.py` — one program: the bridge, or the Snapgent MCP server with `--mcp`.
+- `server/snapgent_bridge/`, `server/snapgent_mcp/` — bridge and VS Code server implementations.
 - `extension/test/`, `tests/` — JS (node:test) and Python (unittest) suites.
 
 ## Commands

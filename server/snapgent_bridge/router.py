@@ -5,7 +5,7 @@ import time
 from typing import Any, Awaitable, Callable, Dict
 
 from . import folder_picker, protocol
-from .config import ConfigStore
+from .config import PROTECTED_SERVER_ID, ConfigStore
 from .registry import ServerRegistry
 from .settings import MAX_LOG_CHARS
 
@@ -101,15 +101,15 @@ class RequestRouter:
         await reply(protocol.workspace_message(request.get("id"), True, {"picked": chosen}))
 
     async def _ask_vscode(self, method, params, request, reply):
-        """The bar's questions about the VS Code server's workspace (which folders, which one is pinned)."""
-        server = self._registry.servers.get("vscode")
+        """The bar's questions about the default server's workspace (which folders, which one is pinned)."""
+        server = self._registry.servers.get(PROTECTED_SERVER_ID)
         if server is None:
-            await reply(protocol.workspace_message(request.get("id"), False, error="The VS Code server is not configured."))
+            await reply(protocol.workspace_message(request.get("id"), False, error="The Snapgent MCP server is not configured."))
             return
         try:
             data = await server.request(method, params)
         except (asyncio.TimeoutError, RuntimeError, OSError) as error:
-            await reply(protocol.workspace_message(request.get("id"), False, error=str(error) or "The VS Code server did not answer."))
+            await reply(protocol.workspace_message(request.get("id"), False, error=str(error) or "The Snapgent MCP server did not answer."))
             return
         await reply(protocol.workspace_message(request.get("id"), True, data if isinstance(data, dict) else {}))
 

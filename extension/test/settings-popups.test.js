@@ -13,11 +13,11 @@ const change = (el, checked) => { el.checked = checked; el.dispatchEvent(new (el
 describe("MCP settings popup", () => {
   function open(over = {}) {
     const w = newPage();
-    const enabled = new Set(["vscode"]);
+    const enabled = new Set(["snapgent"]);
     const events = [];
     const handle = openMcpSettings({
       document: w.document,
-      options: [{ id: "vscode", name: "VS Code", tools: 28 }, { id: "x", name: "<b>Evil</b>", tools: 0 }],
+      options: [{ id: "snapgent", name: "VS Code", tools: 28 }, { id: "x", name: "<b>Evil</b>", tools: 0 }],
       isEnabled: (id) => enabled.has(id),
       setEnabled: (id, on) => { on ? enabled.add(id) : enabled.delete(id); events.push(["set", id, on]); },
       onToggle: () => events.push(["toggle"]),

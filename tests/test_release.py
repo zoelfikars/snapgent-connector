@@ -93,7 +93,7 @@ class RepositoryLayoutTests(unittest.TestCase):
         except (OSError, subprocess.CalledProcessError):
             self.skipTest("not a git checkout")
         at_top = {path.split("/")[1] for path in tracked}
-        self.assertEqual(sorted(at_top), ["snapgent.py", "snapgent.spec", "snapgent_bridge", "snapgent_vscode"])
+        self.assertEqual(sorted(at_top), ["snapgent.py", "snapgent.spec", "snapgent_bridge", "snapgent_mcp"])
 
     def test_no_compiled_binaries_are_tracked(self):
         try:

@@ -1,4 +1,4 @@
-"""How strict the server is. Chosen by the user in config.json (mcpServers.vscode.env), never by the model."""
+"""How strict the server is. Chosen by the user in config.json (mcpServers.snapgent.env), never by the model."""
 
 from dataclasses import dataclass, field
 from typing import FrozenSet, Mapping

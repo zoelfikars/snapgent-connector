@@ -5,8 +5,8 @@ from snapgent_bridge import protocol
 
 class ParseToolCallTests(unittest.TestCase):
     def test_well_formed(self):
-        call = protocol.parse_tool_call({"id": 7, "name": "read_file", "arguments": {"path": "a"}, "timeout": 5000, "server": "vscode"})
-        self.assertEqual((call.request_id, call.name, call.arguments, call.timeout_seconds, call.selected_server), (7, "read_file", {"path": "a"}, 5.0, "vscode"))
+        call = protocol.parse_tool_call({"id": 7, "name": "read_file", "arguments": {"path": "a"}, "timeout": 5000, "server": "snapgent"})
+        self.assertEqual((call.request_id, call.name, call.arguments, call.timeout_seconds, call.selected_server), (7, "read_file", {"path": "a"}, 5.0, "snapgent"))
 
     def test_missing_arguments_default_to_empty(self):
         self.assertEqual(protocol.parse_tool_call({"id": 1, "name": "x"}).arguments, {})

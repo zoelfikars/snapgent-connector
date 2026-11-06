@@ -2,6 +2,7 @@
 // What the status bar says. Pure: the page's state goes in, a description of the bar comes out;
 // drawing it is somebody else's job. The order of the checks below IS the priority of the messages.
 
+import { DEFAULT_SERVER_ID } from "../domain/tools/default-server.js";
 import { escapeHtml } from "./html.js";
 
 /**
@@ -41,7 +42,7 @@ function whileStarted(state) {
   const tools = state.activeToolCount || (server && server.tools) || 0;
   const name = escapeHtml(state.target.name);
   // A chat that works in a folder while VS Code is closed: the server then offers no commands, and the way out is to open that folder.
-  const closed = state.target.id === "vscode" && state.bridge.connected && !!server && !!server.alive && !tools;
+  const closed = state.target.id === DEFAULT_SERVER_ID && state.bridge.connected && !!server && !!server.alive && !tools;
   if (closed && state.workspaceFolder) return view("warn", `<b>Active</b> · open <b>${escapeHtml(String(state.workspaceFolder).replace(/[\\/]+$/, "").split(/[\\/]/).pop())}</b> in your editor`, { warn: true });
   if (!state.bridge.connected) return view("warn", `<b>Active</b> · ${state.bridge.needsApproval ? "approve in the bridge terminal" : "start the bridge"}`, { warn: true });
   if (!state.bridgeOk) return view("warn", `<b>Active</b> · ${name} offline`, { warn: true });
@@ -49,13 +50,13 @@ function whileStarted(state) {
 }
 
 function beforeStart(state) {
-  const isVscode = state.target.id === "vscode";
-  if (state.bridgeOk && (!isVscode || state.workspaceReady)) return view("standby", "Ready.", { label: START, kind: "start" });
+  const isDefaultServer = state.target.id === DEFAULT_SERVER_ID;
+  if (state.bridgeOk && (!isDefaultServer || state.workspaceReady)) return view("standby", "Ready.", { label: START, kind: "start" });
   const server = (state.bridge.servers || []).find((item) => item.id === state.target.id);
-  const folderMissing = isVscode && state.bridge.connected && !!server && !!server.alive && !(server.tools > 0);
+  const folderMissing = isDefaultServer && state.bridge.connected && !!server && !!server.alive && !(server.tools > 0);
   let message;
   if (!state.bridge.connected) message = state.bridge.needsApproval ? "Approve this extension in the <b>bridge terminal</b>" : "Start the <b>bridge</b>";
-  else if (isVscode && (state.bridgeOk || folderMissing)) {
+  else if (isDefaultServer && (state.bridgeOk || folderMissing)) {
     message = state.workspaceProbePending ? "Checking the <b>workspace</b>…" : "Open a <b>folder in your editor</b>";
   } else message = `<b>${escapeHtml(state.target.name)} unavailable</b>`;
   return view("warn", message, { label: START, kind: "start", disabled: true, warn: true });

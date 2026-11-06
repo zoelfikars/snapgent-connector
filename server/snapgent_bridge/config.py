@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 SERVER_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
-PROTECTED_SERVER_ID = "vscode"  # the default target cannot be removed
+PROTECTED_SERVER_ID = "snapgent"  # the default target cannot be removed
+LEGACY_SERVER_ID = "vscode"  # its name in older versions: protected too, until the launcher renames it
 
 
 class ConfigError(RuntimeError):
@@ -71,7 +72,7 @@ class ConfigStore:
     def remove_server(self, server_id: Any) -> None:
         if not valid_server_id(server_id):
             raise ConfigError("Invalid MCP server id.")
-        if server_id == PROTECTED_SERVER_ID:
+        if server_id in (PROTECTED_SERVER_ID, LEGACY_SERVER_ID):
             raise ConfigError("The Snapgent MCP server cannot be removed.")
         self._mutate(lambda servers: servers.pop(server_id, None))
 

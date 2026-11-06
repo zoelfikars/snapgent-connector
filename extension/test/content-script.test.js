@@ -40,7 +40,7 @@ async function startOn(html, url = "https://chatgpt.com/c/test", { storage = {} 
     // A bridge that is connected with a live VS Code server but advertises no tools yet.
     runtime: {
       sendMessage: (message, callback) => callback && callback(
-        message.type === "status" ? { connected: true, mcpAlive: true, tools: 0, servers: [{ id: "vscode", alive: true, tools: 3 }] }
+        message.type === "status" ? { connected: true, mcpAlive: true, tools: 0, servers: [{ id: "snapgent", alive: true, tools: 3 }] }
         : message.type === "list_tools" ? { ok: true, tools: [] }
         : { ok: true },
       ),

@@ -7,13 +7,13 @@ import { renderCommandList, renderServerList } from "../src/domain/tools/virtual
 
 describe("names", () => {
   test("bareToolName strips a server prefix", () => {
-    assert.equal(bareToolName("vscode/read_file"), "read_file");
+    assert.equal(bareToolName("snapgent/read_file"), "read_file");
     assert.equal(bareToolName("read_file"), "read_file");
     assert.equal(bareToolName(undefined), "");
   });
 
   test("isKnownName matches across prefixes and rejects empty input", () => {
-    const names = new Set(["vscode/read_file", "git_status"]);
+    const names = new Set(["snapgent/read_file", "git_status"]);
     assert.equal(isKnownName(names, "read_file"), true);
     assert.equal(isKnownName(names, "other/git_status"), true);
     assert.equal(isKnownName(names, "nope"), false);
@@ -24,29 +24,29 @@ describe("names", () => {
 
 describe("isolationError", () => {
   test("allows an enabled target with a bare or matching-prefix name", () => {
-    assert.equal(isolationError({ name: "read_file", target: "vscode", targetEnabled: true }), null);
-    assert.equal(isolationError({ name: "vscode/read_file", target: "vscode", targetEnabled: true }), null);
+    assert.equal(isolationError({ name: "read_file", target: "snapgent", targetEnabled: true }), null);
+    assert.equal(isolationError({ name: "snapgent/read_file", target: "snapgent", targetEnabled: true }), null);
   });
   test("refuses a disabled target and a foreign prefix", () => {
-    assert.match(isolationError({ name: "x", target: "vscode", targetEnabled: false }), /disabled/);
-    assert.match(isolationError({ name: "evil/x", target: "vscode", targetEnabled: true }), /Only the selected target/);
+    assert.match(isolationError({ name: "x", target: "snapgent", targetEnabled: false }), /disabled/);
+    assert.match(isolationError({ name: "evil/x", target: "snapgent", targetEnabled: true }), /Only the selected target/);
   });
 });
 
 describe("virtual commands", () => {
   test("renderCommandList: ordered refusals, then the scoped catalogue", () => {
     const tools = [{ name: "a", description: "A", inputSchema: {} }];
-    const base = { name: "list_commands", target: "vscode", enabled: true, tools };
+    const base = { name: "list_commands", target: "snapgent", enabled: true, tools };
     assert.match(renderCommandList({ ...base, asked: "other" }), /not available/);
     assert.match(renderCommandList({ ...base, enabled: false }), /disabled/);
     assert.match(renderCommandList({ ...base, tools: [] }), /No commands available/);
     assert.match(renderCommandList({ ...base, tools: [{ ...tools[0], server: "other" }] }), /has no commands available/);
-    assert.match(renderCommandList(base), /vscode commands \(1\):\n\na: A/);
+    assert.match(renderCommandList(base), /snapgent commands \(1\):\n\na: A/);
   });
 
   test("renderServerList falls back to 'unknown' when the bridge reported nothing", () => {
-    assert.match(renderServerList({ servers: [], target: "vscode" }), /unknown \(bridge did not report server health\)/);
-    assert.match(renderServerList({ servers: [{ id: "vscode", alive: false }], target: "vscode" }), /offline \(no tools\)/);
+    assert.match(renderServerList({ servers: [], target: "snapgent" }), /unknown \(bridge did not report server health\)/);
+    assert.match(renderServerList({ servers: [{ id: "snapgent", alive: false }], target: "snapgent" }), /offline \(no tools\)/);
   });
 });
 

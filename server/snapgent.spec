@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 # Build: pyinstaller --noconfirm snapgent.spec   ->   dist/snapgent (snapgent.exe on Windows)
-# One program: the bridge, and (with --vscode-mcp) the VS Code MCP server it starts.
+# One program: the bridge, and (with --mcp) the Snapgent MCP server it starts.
 from PyInstaller.utils.hooks import collect_submodules
 
 a = Analysis(
@@ -9,7 +9,7 @@ a = Analysis(
     binaries=[],
     datas=[],
     # `websockets` loads parts of itself lazily; collect everything so the frozen bridge can serve.
-    hiddenimports=collect_submodules("snapgent_bridge") + collect_submodules("snapgent_vscode") + collect_submodules("websockets"),
+    hiddenimports=collect_submodules("snapgent_bridge") + collect_submodules("snapgent_mcp") + collect_submodules("websockets"),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

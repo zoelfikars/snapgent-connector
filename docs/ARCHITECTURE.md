@@ -113,7 +113,7 @@ recognised as a user turn). Read them from the page console, or copy the whole l
 Everything the user runs lives in `server/`: one program, `snapgent.py`, the same from a clone and (built by PyInstaller) from a release. Tests live in `tests/` and put
 `server/` on `sys.path`.
 
-`snapgent.py` is the entry point (`snapgent --vscode-mcp` runs the VS Code server instead); the
+`snapgent.py` is the entry point (`snapgent --mcp` runs the VS Code server instead); the
 implementation is a package where each module has one reason to change.
 
 ```
@@ -151,12 +151,12 @@ bridge terminal is asked once (`trust.py`, like SSH `known_hosts`); a yes is sto
 no. `ZS_ALLOWED_ORIGINS` pins the exact origin and skips the question. Without this, a hostile extension
 could call tools, add servers (spawn commands) and approve its own confirmation tokens.
 
-## VS Code MCP server (`server/snapgent_vscode/`)
+## Snapgent MCP server (`server/snapgent_mcp/`)
 
-The bridge starts it as `snapgent --vscode-mcp` (the same program again).
+The bridge starts it as `snapgent --mcp` (the same program again).
 
 ```
-snapgent_vscode/
+snapgent_mcp/
   limits.py  risk.py  context.py     constants, tool risk levels, Context(root, policy, session)
   workspace.py                       which folder VS Code has open (storage.json parsing is pure)
   paths.py                           every path must resolve inside the workspace root

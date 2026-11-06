@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { DEFAULT_SERVER_ID } from "../tools/default-server.js";
+
 export function compactTools(tools) {
   return (tools || [])
     .map((t) => {
@@ -16,7 +18,7 @@ export function compactTools(tools) {
 // a tool result every so often so the model does not drift from the exact
 // command names over a long session. It is explicitly framed as an automatic
 // snapgentV3 reminder (NOT a user message and NOT a new command to run).
-export function toolsReminder(tools, targetName = "Snapgent MCP", serverId = "vscode") {
+export function toolsReminder(tools, targetName = "Snapgent MCP", serverId = DEFAULT_SERVER_ID) {
   const toolsString =
     `  list_commands(server: "${serverId}") - list available ${targetName} commands with full parameter details\n` +
     compactTools(tools);

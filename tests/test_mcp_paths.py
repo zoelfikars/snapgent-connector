@@ -3,8 +3,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from snapgent_vscode.paths import iter_files, relative, resolve_inside
-from tests.vscode_support import WorkspaceCase
+from snapgent_mcp.paths import iter_files, relative, resolve_inside
+from tests.mcp_support import WorkspaceCase
 
 
 class ResolveInsideTests(WorkspaceCase):
@@ -59,7 +59,7 @@ class IterFilesTests(WorkspaceCase):
             for current, dirs, names in original(base, *args, **kwargs):
                 entered.append(Path(current).name)
                 yield current, dirs, names
-        with mock.patch("snapgent_vscode.paths.os.walk", spy):
+        with mock.patch("snapgent_mcp.paths.os.walk", spy):
             found = [relative(p, self.root) for p in iter_files(self.root, {"target"})]
         self.assertEqual(found, ["src/a.rs"])
         self.assertNotIn("debug", entered)

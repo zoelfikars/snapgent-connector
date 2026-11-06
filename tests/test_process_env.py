@@ -3,7 +3,7 @@ import sys
 import unittest
 from unittest import mock
 
-from snapgent_vscode.process import child_environment
+from snapgent_mcp.process import child_environment
 
 
 class ChildEnvironmentTests(unittest.TestCase):
