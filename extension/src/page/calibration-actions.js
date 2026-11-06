@@ -110,6 +110,16 @@ export function createCalibrationActions({ document, location, provider, state, 
     } catch { toast("Could not copy to the clipboard."); }
   }
 
+  /** Filler text written into the text box the way the extension writes its own messages (a paste event first), and not sent. */
+  async function fillTestText(chars) {
+    if (provider.needsCalibration) { toast("Calibrate this site first."); return; }
+    const text = loremIpsum(chars);
+    try {
+      const via = await provider.writeText(text);
+      toast(`Wrote ${text.length.toLocaleString("en-US")} characters into the text box (via ${via}).`);
+    } catch (error) { toast(String((error && error.message) || error)); }
+  }
+
   async function remove() {
     await store.remove(location.hostname);
     toast("Calibration removed.");
@@ -137,5 +147,5 @@ export function createCalibrationActions({ document, location, provider, state, 
   // undefined: not calibrated, so nothing to keep them in; null: calibrated, no values of its own.
   const limits = () => (provider.needsCalibration ? undefined : provider.limits || null);
 
-  return { limits, setLimits, copyTestText, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
+  return { limits, setLimits, copyTestText, fillTestText, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
 }

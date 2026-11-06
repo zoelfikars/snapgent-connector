@@ -25,6 +25,7 @@ export function createBarSettings({ document, root, settings, serverDirectory, t
     onExportAll: calibration.exportAll,
     onImportAll: calibration.importAll,
     onCopyTest: calibration.copyTestText,
+    onFillTest: calibration.fillTestText,
   });
 
   async function openPreferencesDialog() {

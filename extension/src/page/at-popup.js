@@ -68,6 +68,7 @@ export function createAtPopup({ document, window, root, state, settings, provide
         onExportAll: calibration && calibration.exportAll,
         onImportAll: calibration && calibration.importAll,
         onCopyTest: calibration && calibration.copyTestText,
+        onFillTest: calibration && calibration.fillTestText,
       },
     });
   }
