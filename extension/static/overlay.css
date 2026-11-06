@@ -676,8 +676,8 @@ html #zs-bar .zs-pill { order: 2; flex: none; }
 
 /* Stop is icon-only: a compact square in the tool row. */
 html #zs-bar #zs-tools #zs-stop {
-  flex: none; width: 30px; height: 30px; min-height: 0; padding: 0;
-  font-size: 14px; border-radius: 9px; box-sizing: border-box;
+  flex: none; width: 28px; height: 28px; min-height: 0; padding: 0;
+  font-size: 13px; border-radius: 9px; box-sizing: border-box;
 }
 
 /* Auto removes the safety net, so its pill looks different. */
@@ -779,16 +779,16 @@ html.zs-light .zs-file-active { background: rgba(234, 179, 8, 0.28); }
 
 /* ── terminal pill + panel ─────────────────────────────────────────────── */
 html #zs-bar #zs-tools {
-  order: 1; flex: none; display: flex; flex-direction: row; align-items: center; gap: 6px;
+  order: 1; flex: none; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px;
 }
-#zs-term-btn, #zs-files-btn, #zs-prefs-btn {
+#zs-term-btn, #zs-files-btn, #zs-skills-btn, #zs-mcp-btn, #zs-prefs-btn {
   flex: none; position: relative; display: inline-flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px; box-sizing: border-box; padding: 0;
+  width: 28px; height: 28px; box-sizing: border-box; padding: 0;
   border-radius: 9px; border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.07); color: #c7d2fe; cursor: pointer;
   transition: background 0.15s ease;
 }
-#zs-term-btn:hover, #zs-files-btn:hover, #zs-prefs-btn:hover { background: rgba(255, 255, 255, 0.13); }
+#zs-term-btn:hover, #zs-files-btn:hover, #zs-skills-btn:hover, #zs-mcp-btn:hover, #zs-prefs-btn:hover { background: rgba(255, 255, 255, 0.13); }
 #zs-files-btn[hidden] { display: none; }
 #zs-term-badge, #zs-files-badge {
   position: absolute; top: -4px; right: -4px;
@@ -799,7 +799,7 @@ html #zs-bar #zs-tools {
 }
 #zs-files-badge { background: #818cf8; color: #0b0c14; box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.3); }
 #zs-term-badge[hidden], #zs-files-badge[hidden] { display: none; }
-html.zs-light #zs-prefs-btn, html.zs-light #zs-files-btn { background: rgba(0, 0, 0, 0.05); color: #3730a3; }
+html.zs-light #zs-prefs-btn, html.zs-light #zs-files-btn, html.zs-light #zs-skills-btn, html.zs-light #zs-mcp-btn { background: rgba(0, 0, 0, 0.05); color: #3730a3; }
 
 #zs-term {
   position: fixed; z-index: 2147483646; right: 14px; top: 14px;

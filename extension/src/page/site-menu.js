@@ -2,9 +2,8 @@
 // The menu behind the "switch AI" pill: shortcuts to the other chat sites, the MCP and skills settings, where the bar sits, and the
 // calibration of this site.
 
-import { SKILL_MAX_BYTES } from "../domain/skills/skill-text.js";
 import { SITE_LINKS } from "../sites/registry.js";
-import { openMcpSettings, openPreferences, openSkillsSettings, switchMenuHtml } from "../ui/index.js";
+import { switchMenuHtml } from "../ui/index.js";
 
 /**
  * @param {{ document: Document, window: Window, menu: HTMLElement, button: HTMLElement, group: object,
@@ -12,28 +11,9 @@ import { openMcpSettings, openPreferences, openSkillsSettings, switchMenuHtml } 
  *           barPrefs: { get: () => object, set: (change: object) => void }, preferences: object, refreshTarget: () => void }} deps
  * @returns {{ toggle: (toSupport: boolean) => void, close: () => void, isOpen: () => boolean }}
  */
-export function createSiteMenu({ document, window, menu, button, group, provider, settings, serverDirectory, skills, calibration, barPrefs, preferences, refreshTarget, isWorkspaceTarget }) {
+export function createSiteMenu({ document, window, menu, button, group, provider, calibration, barPrefs }) {
   const close = () => { menu.hidden = true; };
   group.add({ close });
-
-  function openMcp() {
-    const servers = serverDirectory.servers();
-    openMcpSettings({
-      document,
-      options: serverDirectory.allOptions().map((option) => ({ id: option.id, name: option.name, tools: (servers.find((server) => server.id === option.id) || {}).tools })),
-      isEnabled: (id) => serverDirectory.isEnabled(id),
-      setEnabled: (id, on) => serverDirectory.setEnabled(id, on),
-      onToggle: refreshTarget, // a re-enabled server is selectable without waiting for the popup to close
-      onClose: () => {
-        // The target was just disabled: move to the first enabled one (which restarts the page against it).
-        if (!serverDirectory.isEnabled(settings.target())) {
-          const next = serverDirectory.firstEnabled();
-          if (next) { settings.selectTarget(next.id); return; }
-        }
-        refreshTarget();
-      },
-    });
-  }
 
   function fill() {
     menu.innerHTML = switchMenuHtml(SITE_LINKS, provider.displayName);
@@ -45,24 +25,6 @@ export function createSiteMenu({ document, window, menu, button, group, provider
       const el = menu.querySelector(selector);
       if (el) el.addEventListener("click", (event) => { event.stopPropagation(); close(); action(); });
     };
-    on("#zs-mcp-settings", openMcp);
-    on("#zs-prefs", async () => openPreferences({
-      document, values: await preferences.read(), defaults: { folders: preferences.defaultFolders() },
-      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders },
-      corner: barPrefs.get().corner,
-      actions: {
-        onToggleCorner: () => barPrefs.set({ corner: barPrefs.get().corner === "top" ? "bottom" : "top" }),
-        onHideBar: () => barPrefs.set({ hidden: true }),
-        onCalibrate: () => calibration.open(null),
-        onExportCal: calibration.exportProfile,
-        onImportCal: calibration.importProfile,
-        onCopyDiag: calibration.copyDiagnostics,
-        onRemoveCal: calibration.remove,
-        onExportAll: calibration.exportAll,
-        onImportAll: calibration.importAll,
-      },
-    }));
-    on("#zs-skills-settings", () => openSkillsSettings({ document, skills, maxFileBytes: SKILL_MAX_BYTES, loadOnOpen: isWorkspaceTarget && isWorkspaceTarget() }));
   }
 
   /** `toSupport` scrolls the panel to its last section (the support links); otherwise it opens at the top. */

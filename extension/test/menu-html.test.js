@@ -29,9 +29,8 @@ describe("switch AI menu", () => {
     assert.equal(link.querySelector(".zs-site-host").textContent, "claude.ai", "www. is dropped from the shown host");
   });
 
-  test("keeps the two settings buttons the page wires up, and survives an unknown current site and a bad url", () => {
+  test("survives an unknown current site and a bad url", () => {
     const doc = parse(switchMenuHtml([{ name: "Odd", url: "not a url" }], undefined));
-    assert.ok(doc.querySelector("#zs-mcp-settings") && doc.querySelector("#zs-skills-settings"));
     assert.equal(doc.querySelector(".zs-site-host").textContent, "");
     assert.equal(doc.querySelectorAll(".zs-site-here").length, 0);
   });
@@ -42,7 +41,7 @@ describe("what the switch AI menu leaves out", () => {
     const sites = [{ name: "ChatGPT", url: "https://chatgpt.com/" }];
     const doc = parse(switchMenuHtml(sites, "chatgpt"));
     assert.ok(doc.querySelector(".zs-site-grid"));
-    for (const id of ["zs-bar-corner", "zs-bar-hide", "zs-cal-start", "zs-cal-export-all"]) {
+    for (const id of ["zs-bar-corner", "zs-bar-hide", "zs-cal-start", "zs-cal-export-all", "zs-prefs", "zs-skills-settings", "zs-mcp-settings"]) {
       assert.equal(doc.querySelector(`#${id}`), null, id);
     }
   });

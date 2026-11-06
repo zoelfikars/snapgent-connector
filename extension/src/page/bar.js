@@ -5,11 +5,12 @@
 // the composer while the agent types.
 
 import {
-  computeBarView, createBarPlacer, createInputCover, createNotifications, createSetupCard, openPreferences, pillHtml, shouldShowSetup, applyTheme,
+  computeBarView, createBarPlacer, createInputCover, createNotifications, createSetupCard, pillHtml, shouldShowSetup, applyTheme,
   computeMenuPlacement, applyMenuPlacement, viewportOf,
 } from "../ui/index.js";
 import { isWorkspaceServer } from "../domain/agent/session-start.js";
 import { createBarMenus } from "./bar-menus.js";
+import { createBarSettings } from "./bar-settings.js";
 import { createFilesMenu } from "./files-menu.js";
 import { createMenuGroup } from "./pill-menu.js";
 import { createSiteMenu } from "./site-menu.js";
@@ -19,6 +20,8 @@ const BOLT = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke
 const TERM = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`;
 const GEAR = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
 const FILES = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`;
+const STAR = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+const MCP = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>`;
 const pill = (id, nameId, label, title = "", popup) => pillHtml({ id, nameId, label, title, popup });
 const TEMPLATE = `
   <div id="zs-bar">
@@ -27,6 +30,8 @@ const TEMPLATE = `
     <div id="zs-tools">
       <button id="zs-term-btn" type="button" aria-label="Terminal: commands running in this chat" title="Terminal: see what the running command prints, and stop it">${TERM}<span id="zs-term-badge" hidden></span></button>
       <button id="zs-files-btn" type="button" aria-haspopup="menu" aria-label="Files: tag files in your message" title="Pick files: their contents go with your next message">${FILES}<span id="zs-files-badge" hidden></span></button>
+      <button id="zs-skills-btn" type="button" aria-label="Skills" title="Skills">${STAR}</button>
+      <button id="zs-mcp-btn" type="button" aria-label="MCP settings" title="MCP settings">${MCP}</button>
       <button id="zs-prefs-btn" type="button" aria-label="Preferences" title="Preferences">${GEAR}</button>
       <button id="zs-stop" type="button" hidden aria-label="Stop" title="Stop">■</button>
     </div>
@@ -61,32 +66,18 @@ export function createBar({ document, window, provider, state, settings, serverD
 
   const group = createMenuGroup();
   const menus = createBarMenus({ document, root, group, settings, serverDirectory, send, confirm: tools.confirm, catalogue: tools.catalogue, workspace: tools.workspace, monitor, toast: notifications.toast });
-  // Preferences is opened from the gear and from the Files window: the bar's own options and this site's calibration live there.
-  const prefsActions = () => ({
-    onToggleCorner: () => barPrefs.set({ corner: prefs.corner === "top" ? "bottom" : "top" }),
-    onHideBar: () => barPrefs.set({ hidden: true }),
-    onCalibrate: () => calibration.open(null),
-    onExportCal: calibration.exportProfile,
-    onImportCal: calibration.importProfile,
-    onCopyDiag: calibration.copyDiagnostics,
-    onRemoveCal: calibration.remove,
-    onExportAll: calibration.exportAll,
-    onImportAll: calibration.importAll,
+  // Skills, MCP servers and Preferences live in their own buttons; the Files window opens the same Preferences dialog.
+  const isWorkspaceTarget = () => isWorkspaceServer(settings.target(), tools.catalogue ? tools.catalogue.active().map((t) => t.name) : []);
+  const barSettings = createBarSettings({
+    document, root, settings, serverDirectory, tools, preferences, calibration, barPrefs, isWorkspaceTarget,
+    syncMenus: () => menus.sync(),
   });
-  const prefsValues = () => preferences.read();
   const filesMenu = createFilesMenu({
     document, root, group, state, settings, files, preferences, toast: notifications.toast,
-    openPreferences: async () => openPreferences({
-      document, values: await prefsValues(), defaults: { folders: preferences.defaultFolders() },
-      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders },
-      corner: prefs.corner,
-      actions: prefsActions(),
-    }),
+    openPreferences: barSettings.openPreferences,
   });
-  const isWorkspaceTarget = () => isWorkspaceServer(settings.target(), tools.catalogue ? tools.catalogue.active().map((t) => t.name) : []);
   const siteMenu = createSiteMenu({
-    document, window, menu: el.menu, button: $("#zs-switch"), group, provider, settings, serverDirectory, skills: tools.skills, calibration, barPrefs, preferences,
-    refreshTarget: () => menus.sync(), isWorkspaceTarget,
+    document, window, menu: el.menu, button: $("#zs-switch"), group, provider, calibration, barPrefs,
   });
   $("#zs-switch-name").textContent = provider.displayName || provider.id;
 
@@ -154,15 +145,6 @@ export function createBar({ document, window, provider, state, settings, serverD
   el.term.addEventListener("click", (event) => { event.stopPropagation(); if (terminal) terminal.toggle(); });
   el.stop.addEventListener("click", onStop);
   el.stopFloat.addEventListener("click", (event) => { event.stopPropagation(); el.stop.click(); }); // the same Stop, reachable while the bar is hidden
-
-  $("#zs-prefs-btn").addEventListener("click", async (event) => {
-    event.stopPropagation();
-    openPreferences({
-      document, values: await prefsValues(), defaults: { folders: preferences.defaultFolders() },
-      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders },
-      corner: prefs.corner, actions: prefsActions(),
-    });
-  });
 
   applyTheme(document);
   setInterval(() => applyTheme(document), 4000); // follow the host page toggling its theme

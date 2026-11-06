@@ -131,7 +131,7 @@ export function switchMenuHtml(sites, currentName) {
   }).join("");
   return `<div class="zs-menu-head"><span class="zs-menu-logo">snapgentV3</span></div>
          <section class="zs-menu-sec">
-           <div class="zs-sec-label zs-sec-label-row"><span>Switch AI</span><span><button id="zs-prefs" class="zs-gear" title="Preferences" aria-label="Preferences">&#9776;</button><button id="zs-skills-settings" class="zs-gear" title="Skills" aria-label="Skills">&#9733;</button><button id="zs-mcp-settings" class="zs-gear" title="MCP settings" aria-label="MCP settings">&#9881;</button></span></div>
+           <div class="zs-sec-label"><span>Switch AI</span></div>
            <div class="zs-site-grid">${grid}</div>
          </section>`;
 }
