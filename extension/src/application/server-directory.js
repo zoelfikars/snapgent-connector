@@ -3,12 +3,15 @@
 // instructions the user wants appended to the system prompt. The bridge is the source of truth for
 // which servers exist; what is kept here is only display names, the on/off toggles and the prompt.
 
-import { DEFAULT_SERVER_ID, migratedToggles } from "../domain/tools/default-server.js";
+import { DEFAULT_SERVER_ID, LEGACY_SERVER_ID, migratedToggles } from "../domain/tools/default-server.js";
 
 const KEYS = { toggles: "zsMcpEnabled", custom: "zsCustomMcpServers", prompt: "zsCustomPrompt" };
 const BUILT_IN = { id: DEFAULT_SERVER_ID, name: "Snapgent MCP" };
 
 const isPlainObject = (value) => value && typeof value === "object" && !Array.isArray(value);
+
+// The default server is built in: it is never one of the "servers" listed beside it, under its current or its old id.
+const isBuiltInId = (id) => id === DEFAULT_SERVER_ID || id === LEGACY_SERVER_ID;
 
 export class ServerDirectory {
   /**
@@ -49,7 +52,14 @@ export class ServerDirectory {
 
   /** Every non-built-in server, with the bridge's live health. Servers only the cache knows (mid-restart) are kept. */
   servers() {
-    const live = this._live().filter((server) => server.id !== BUILT_IN.id);
+    const live = this._live().filter((server) => !isBuiltInId(server.id));
+    // A cached entry under the default server's id is left over from a build that did not know that id yet (it listed the
+    // server it was talking to as one the user had added). Dropped here, not only hidden, so it never comes back.
+    const stale = this._custom.filter((server) => isBuiltInId(server.id));
+    if (stale.length) {
+      this._custom = this._custom.filter((server) => !isBuiltInId(server.id));
+      this._store.set(KEYS.custom, this._custom);
+    }
     const cached = new Map(this._custom.map((server) => [server.id, server]));
     const merged = live.map((server) => {
       const known = cached.get(server.id);

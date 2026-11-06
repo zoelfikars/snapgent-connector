@@ -63,6 +63,17 @@ describe("ServerDirectory", () => {
     assert.deepEqual(dir.servers(), [{ id: "gone", name: "Gone", alive: undefined, tools: undefined }]);
   });
 
+  test("a cached entry for the default server (under its current or its old id) is dropped, not listed beside it", async () => {
+    // What a build that did not know the `snapgent` id stored: the server the bridge reported, as if the user had added it.
+    const { dir, store } = await directory({
+      stored: { zsCustomMcpServers: [{ id: "snapgent", name: "snapgent" }, { id: "vscode", name: "vscode" }, { id: "git", name: "Git" }] },
+      live: [{ id: "snapgent", alive: true, tools: [1] }],
+    });
+    assert.deepEqual(dir.servers().map((server) => server.id), ["git"]);
+    assert.deepEqual(dir.allOptions().map((option) => option.id), ["snapgent", "git"], "the target dropdown lists it once");
+    assert.deepEqual(store.data.zsCustomMcpServers, [{ id: "git", name: "Git" }], "the stale entries are gone from what is stored");
+  });
+
   test("names: the built-in one, a known one, and an unknown id as itself", async () => {
     const { dir } = await directory({ stored: { zsCustomMcpServers: [{ id: "a", name: "Alpha" }] }, live: [{ id: "a" }] });
     assert.deepEqual(["snapgent", "a", "zzz"].map((id) => dir.name(id)), ["Snapgent MCP", "Alpha", "zzz"]);
