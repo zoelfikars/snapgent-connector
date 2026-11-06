@@ -26,7 +26,8 @@ export function createAtPopup({ document, window, root, state, settings, provide
   let text = "";
   let dismissed = null; // the tag the user closed the list for: it stays closed until that tag is gone
 
-  const enabled = () => state.started && settings.target() === "vscode" && settings.atPopup() && attachments.canList();
+  // `canList` is true only when the target advertises `find_files`, which only a folder-aware server does.
+  const enabled = () => state.started && settings.atPopup() && attachments.canList();
   const inEditor = (node) => { const editor = provider.getEditor(); return !!editor && (node === editor || editor.contains(node)); };
 
   function place() {

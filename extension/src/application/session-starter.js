@@ -3,7 +3,7 @@
 // would otherwise ask for one command at a time (the workspace, the command list, the project tree) and wait for its short answer.
 // Orchestration only; the rules live in domain/agent/session-start.
 
-import { WORKSPACE_PROBE_TOOL, checkStartPreconditions, handshakeUnavailable, probeSucceeded, workspaceRequiredBanner } from "../domain/agent/session-start.js";
+import { WORKSPACE_PROBE_TOOL, checkStartPreconditions, handshakeUnavailable, isWorkspaceServer, probeSucceeded, workspaceRequiredBanner } from "../domain/agent/session-start.js";
 import { withoutResultHeader } from "../domain/tools/result-marker.js";
 import { unreadableBanner } from "../domain/agent/turn-policy.js";
 import { bareToolName } from "../domain/tools/names.js";
@@ -70,7 +70,8 @@ export class SessionStarter {
     });
     if (problem) { view.banner("warn", problem.title, problem.text); return false; }
 
-    if (target.id() === "vscode" && this._d.workspace.choose) {
+    const workspaceTarget = isWorkspaceServer(target.id(), catalogue.active().map((tool) => tool.name));
+    if (workspaceTarget && this._d.workspace.choose) {
       const choice = await this._d.workspace.choose();
       if (!alive()) return false;
       if (choice.cancelled) { view.toast("Start cancelled."); return false; }
@@ -79,7 +80,7 @@ export class SessionStarter {
       this._diag("start.workspace", { path: choice.path });
     }
 
-    if (target.id() === "vscode") {
+    if (workspaceTarget) {
       const probeTool = catalogue.active().find((tool) => bareToolName(tool.name) === WORKSPACE_PROBE_TOOL);
       const probe = await callTool(probeTool.name, { path: "." }, 5000);
       if (!alive()) return false;
@@ -95,7 +96,7 @@ export class SessionStarter {
     if (!alive()) return false;
     if (!mode.ready) { view.banner("warn", `${page.displayName()} mode not ready`, "Try a new chat or reload."); return false; }
 
-    if (target.id() === "vscode") await skills.load();
+    if (workspaceTarget) await skills.load();
     return alive();
   }
 

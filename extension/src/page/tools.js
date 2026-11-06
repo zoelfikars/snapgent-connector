@@ -60,7 +60,7 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
     bound: bindings.current,
     /** `args` for a VS Code call made outside the runner, with the chat's folder. */
     withRoot(args) {
-      const root = settings.target() === "vscode" ? bindings.current() : null;
+      const root = bindings.current();
       return root ? { ...args, [ROOT_ARGUMENT]: root } : args;
     },
     /** The user chose a folder for this chat (null: let it follow the server again). */

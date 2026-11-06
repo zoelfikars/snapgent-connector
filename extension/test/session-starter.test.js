@@ -157,8 +157,8 @@ describe("SessionStarter", () => {
     assert.equal(banners(t.log).length, 0);
   });
 
-  test("non-vscode targets skip the workspace probe and skills", async () => {
-    const t = setup({ state: { targetId: "other", responses: [ready] } });
+  test("non-workspace targets skip the workspace probe and skills", async () => {
+    const t = setup({ state: { targetId: "other", tools: [tool("read_file")], responses: [ready] } });
     await t.starter.start();
     assert.ok(!t.log.some((e) => String(e).startsWith("probe")));
     assert.ok(!t.log.includes("skills.load"));

@@ -9,6 +9,15 @@ export const workspaceRequiredBanner = () => ({ ...WORKSPACE_REQUIRED });
 /** The cheap tool we call to prove a workspace is really open. */
 export const WORKSPACE_PROBE_TOOL = "tree";
 
+/** Tools that only a folder-aware server (VS Code and its forks) advertises: their presence is the tell. */
+const WORKSPACE_TOOLS = ["tree", "list_dir", "list_commands"];
+
+/** Whether this target works in a folder: VS Code, or any server that advertises a folder tool (an editor's fork, a remote). */
+export function isWorkspaceServer(targetId, toolNames) {
+  if (targetId === "vscode") return true;
+  return (toolNames || []).some((name) => WORKSPACE_TOOLS.includes(bareToolName(name)));
+}
+
 /**
  * Checks that need no I/O, in the order they are reported.
  * @returns {{ title: string, text: string } | null} a banner explaining what to fix, or null when ready

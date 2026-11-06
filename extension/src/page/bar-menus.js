@@ -2,6 +2,7 @@
 // The three dropdown pills that choose where the agent works and how freely: the MCP target, the approval mode (Plan / Manual /
 // Auto) and the workspace folder (VS Code's active window, one of its open folders, or any folder).
 
+import { isWorkspaceServer } from "../domain/agent/session-start.js";
 import { APPROVAL_MODES, modeMenuHtml, targetMenuHtml, workspaceLabel, workspaceMenuHtml } from "../ui/index.js";
 import { createPillMenu } from "./pill-menu.js";
 
@@ -121,10 +122,10 @@ export function createBarMenus({ document, root, group, settings, serverDirector
       const mode = APPROVAL_MODES.find((item) => item.id === settings.approvalMode()) || APPROVAL_MODES[1];
       $("#zs-mode-name").textContent = mode.name;
       $("#zs-mode-btn").dataset.mode = mode.id;
-      // Mode and folder only mean something for the VS Code server.
-      const forVscode = settings.target() === "vscode";
-      $("#zs-mode-btn").hidden = !forVscode;
-      $("#zs-ws-btn").hidden = !forVscode;
+      // Mode and folder only mean something for a workspace-enabled server (VS Code or its forks).
+      const isWorkspace = isWorkspaceServer(settings.target(), (catalogue ? catalogue.active() : []).map((t) => t.name));
+      $("#zs-mode-btn").hidden = !isWorkspace;
+      $("#zs-ws-btn").hidden = !isWorkspace;
       if (targetMenu.isOpen) targetMenu.refresh();
     },
   };

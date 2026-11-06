@@ -74,7 +74,8 @@ export class ToolRunner {
     const refusal = isolationError({ name, target, targetEnabled: this._session.isEnabled(target) });
     if (refusal) return refusal;
     if (!this._catalogue.names().size) await this._catalogue.ensure();
-    if (target === "vscode" && !this._catalogue.names().size) return FEEDBACK.workspaceClosed(this._workspaceRoot());
+    const workspaceTarget = target === "vscode" || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
+    if (workspaceTarget && !this._catalogue.names().size) return FEEDBACK.workspaceClosed(this._workspaceRoot());
     if (!this._catalogue.knows(name)) return FEEDBACK.unknownTool(name, [...this._catalogue.names()]);
 
     return this._execute(name, this._withBudget(name, withoutReserved(args), budgetChars), target, jobKey);
@@ -119,8 +120,9 @@ export class ToolRunner {
 
   _callBridge(name, args, target, jobKey) {
     // The VS Code server applies the bar's choice (plan / manual / auto) and keeps the call under its job key; other servers know nothing of either.
-    const root = target === "vscode" ? this._workspaceRoot() : null;
-    const sent = target === "vscode" ? { ...args, [MODE_ARGUMENT]: this._approvalMode(), ...(jobKey ? { [JOB_ARGUMENT]: jobKey } : {}), ...(root ? { [ROOT_ARGUMENT]: root } : {}) } : args;
+    const workspaceTarget = target === "vscode" || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
+    const root = workspaceTarget ? this._workspaceRoot() : null;
+    const sent = workspaceTarget ? { ...args, [MODE_ARGUMENT]: this._approvalMode(), ...(jobKey ? { [JOB_ARGUMENT]: jobKey } : {}), ...(root ? { [ROOT_ARGUMENT]: root } : {}) } : args;
     return callWithGuards(
       () => this._bridge.callTool({ name, arguments: sent, timeout: this._timeoutMs, server: target }),
       { timeoutMs: this._timeoutMs, isStopped: () => this._session.isStopped(), timers: this._timers },
@@ -143,12 +145,13 @@ export class ToolRunner {
   }
 
   /** Stop from the terminal panel: the same cancellation as the loop's Stop, named after that one tab. */
-  cancelJob(jobKey, name, target = "vscode") {
-    this._cancelJob(name, target, jobKey);
+  cancelJob(jobKey, name, target) {
+    this._cancelJob(name, target || this._session.target(), jobKey);
   }
 
   _terminalBegin(jobKey, name, args, target) {
-    if (!jobKey || target !== "vscode") return; // only VS Code commands stream; other servers have no terminal
+    const workspaceTarget = target === "vscode" || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
+    if (!jobKey || !workspaceTarget) return; // only folder-aware servers stream; others have no terminal
     try {
       this._sink.terminal && this._sink.terminal.begin({ key: jobKey, name, label: runningDetail({ arguments: args }) });
     } catch { /* the panel must never break a command */ }

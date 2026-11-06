@@ -106,7 +106,7 @@ export function createFilesMenu({ document, root, group, state, settings, files,
   return {
     /** Shown only while a VS Code session is on: the files are read by the agent's own tool. */
     sync() {
-      button.hidden = !(state.started && settings.target() === "vscode" && files.canList());
+      button.hidden = !(state.started && files.canList());
       if (button.hidden && win.isOpen()) win.close();
     },
   };

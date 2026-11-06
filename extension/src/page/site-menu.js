@@ -12,7 +12,7 @@ import { openMcpSettings, openPreferences, openSkillsSettings, switchMenuHtml } 
  *           barPrefs: { get: () => object, set: (change: object) => void }, preferences: object, refreshTarget: () => void }} deps
  * @returns {{ toggle: (toSupport: boolean) => void, close: () => void, isOpen: () => boolean }}
  */
-export function createSiteMenu({ document, window, menu, button, group, provider, settings, serverDirectory, skills, calibration, barPrefs, preferences, refreshTarget }) {
+export function createSiteMenu({ document, window, menu, button, group, provider, settings, serverDirectory, skills, calibration, barPrefs, preferences, refreshTarget, isWorkspaceTarget }) {
   const close = () => { menu.hidden = true; };
   group.add({ close });
 
@@ -62,7 +62,7 @@ export function createSiteMenu({ document, window, menu, button, group, provider
         onImportAll: calibration.importAll,
       },
     }));
-    on("#zs-skills-settings", () => openSkillsSettings({ document, skills, maxFileBytes: SKILL_MAX_BYTES, loadOnOpen: settings.target() === "vscode" }));
+    on("#zs-skills-settings", () => openSkillsSettings({ document, skills, maxFileBytes: SKILL_MAX_BYTES, loadOnOpen: isWorkspaceTarget && isWorkspaceTarget() }));
   }
 
   /** `toSupport` scrolls the panel to its last section (the support links); otherwise it opens at the top. */

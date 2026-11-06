@@ -8,6 +8,7 @@ import {
   computeBarView, createBarPlacer, createInputCover, createNotifications, createSetupCard, openPreferences, pillHtml, shouldShowSetup, applyTheme,
   computeMenuPlacement, applyMenuPlacement, viewportOf,
 } from "../ui/index.js";
+import { isWorkspaceServer } from "../domain/agent/session-start.js";
 import { createBarMenus } from "./bar-menus.js";
 import { createFilesMenu } from "./files-menu.js";
 import { createMenuGroup } from "./pill-menu.js";
@@ -82,9 +83,10 @@ export function createBar({ document, window, provider, state, settings, serverD
       actions: prefsActions(),
     }),
   });
+  const isWorkspaceTarget = () => isWorkspaceServer(settings.target(), tools.catalogue ? tools.catalogue.active().map((t) => t.name) : []);
   const siteMenu = createSiteMenu({
     document, window, menu: el.menu, button: $("#zs-switch"), group, provider, settings, serverDirectory, skills: tools.skills, calibration, barPrefs, preferences,
-    refreshTarget: () => menus.sync(),
+    refreshTarget: () => menus.sync(), isWorkspaceTarget,
   });
   $("#zs-switch-name").textContent = provider.displayName || provider.id;
 
