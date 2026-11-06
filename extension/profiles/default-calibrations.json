@@ -1,79 +1,78 @@
 {
   "format": "snapgent-calibrations",
   "version": 1,
+  "preferences": {
+    "excludedFolders": [
+      "node_modules",
+      "vendor",
+      "target",
+      "dist",
+      "build",
+      "out",
+      "coverage",
+      "__pycache__",
+      ".venv",
+      "venv",
+      ".git",
+      ".next",
+      ".nuxt",
+      ".svelte-kit",
+      ".turbo",
+      ".cache",
+      ".idea",
+      ".vscode",
+      ".gradle",
+      ".dart_tool",
+      ".terraform",
+      ".rustup",
+      ".cargo",
+      ".npm",
+      ".yarn",
+      ".pnpm-store",
+      "Pods",
+      "DerivedData",
+      "site-packages",
+      ".pytest_cache",
+      ".mypy_cache",
+      ".tox",
+      ".sqlx",
+      "bruno",
+      ".claude"
+    ],
+    "contextFiles": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "GEMINI.md"
+    ]
+  },
   "sites": {
-    "chatgpt": {
-      "name": "ChatGPT",
+    "claude": {
+      "name": "Claude",
       "profiles": {
-        "chatgpt.com": {
+        "claude.ai": {
           "version": 1,
-          "site": "chatgpt.com",
-          "name": "ChatGPT",
+          "site": "claude.ai",
+          "name": "Claude",
           "composer": {
-            "selector": "[role=\"textbox\"]"
+            "selector": "[data-testid=\"chat-input\"]"
           },
           "send": {
             "enter": true
           },
           "assistant": {
-            "turn": "[data-content-search-unit-key$=\":assistant\"]",
+            "turn": "[data-perf-row=\"assistant\"]",
             "body": null
           },
           "user": {
-            "turn": "[data-chatgpt-search-unit-key$=\":user\"]"
+            "turn": "[data-perf-row=\"human\"]"
           },
           "stop": null,
-          "card": null
-        }
-      }
-    },
-    "gemini": {
-      "name": "Gemini",
-      "profiles": {
-        "gemini.google.com": {
-          "version": 1,
-          "site": "gemini.google.com",
-          "name": "Gemini",
-          "composer": {
-            "selector": "[role=\"textbox\"]"
-          },
-          "send": {
-            "enter": true
-          },
-          "assistant": {
-            "turn": "model-response",
-            "body": null
-          },
-          "user": {
-            "turn": "user-query"
-          },
-          "stop": null,
-          "card": null
-        }
-      }
-    },
-    "kimi": {
-      "name": "Kimi",
-      "profiles": {
-        "www.kimi.ai": {
-          "version": 1,
-          "site": "www.kimi.ai",
-          "name": "Kimi",
-          "composer": {
-            "selector": "[role=\"textbox\"]"
-          },
-          "send": {
-            "enter": true
-          },
-          "assistant": {
-            "turn": ".chat-content-item-assistant",
-            "body": null
-          },
-          "user": {
-            "turn": ".chat-content-item-user"
-          },
-          "stop": null,
-          "card": null
+          "card": null,
+          "limits": {
+            "chars": 50000,
+            "calls": 20,
+            "asFile": true
+          }
         }
       }
     },
@@ -85,170 +84,26 @@
           "site": "chat.z.ai",
           "name": "GLM",
           "composer": {
-            "selector": "[placeholder=\"Send a Message\"]"
+            "selector": ".input-scroll"
           },
           "send": {
             "enter": true
           },
           "assistant": {
             "turn": ".gap-4",
-            "body": null
+            "body": null,
+            "thinking": ".thinking-block"
           },
           "user": {
             "turn": ".user-message"
           },
           "stop": null,
-          "card": null
-        }
-      }
-    },
-    "qwen": {
-      "name": "Qwen",
-      "profiles": {
-        "chat.qwen.ai": {
-          "version": 1,
-          "site": "chat.qwen.ai",
-          "name": "Qwen",
-          "composer": {
-            "selector": "[placeholder=\"How can I help you today?\"]"
-          },
-          "send": {
-            "enter": true
-          },
-          "assistant": {
-            "turn": ".qwen-chat-message-assistant",
-            "body": null
-          },
-          "user": {
-            "turn": ".qwen-chat-message-user"
-          },
-          "stop": null,
-          "card": null
-        }
-      }
-    },
-    "arena": {
-      "name": "Arena",
-      "profiles": {
-        "arena.ai": {
-          "version": 1,
-          "site": "arena.ai",
-          "name": "Arena",
-          "composer": {
-            "selector": "[name=\"message\"]"
-          },
-          "send": {
-            "selector": "[aria-label=\"Send message\"]"
-          },
-          "assistant": {
-            "turn": "div.transition-all",
-            "body": null
-          },
-          "user": {
-            "turn": ".justify-end"
-          },
-          "stop": null,
-          "card": null
-        }
-      }
-    },
-    "meta": {
-      "name": "Meta AI",
-      "profiles": {
-        "www.meta.ai": {
-          "version": 1,
-          "site": "www.meta.ai",
-          "name": "Meta AI",
-          "composer": {
-            "selector": "[data-testid=\"composer-input\"]"
-          },
-          "send": {
-            "enter": true
-          },
-          "assistant": {
-            "turn": "[aria-label=\"Meta AI response\"]",
-            "body": null
-          },
-          "user": {
-            "turn": "[aria-label=\"Your message\"]"
-          },
-          "stop": null,
-          "card": null
-        }
-      }
-    },
-    "ptero": {
-      "name": "Ptero",
-      "profiles": {
-        "ptero.pro": {
-          "version": 1,
-          "site": "ptero.pro",
-          "name": "Ptero",
-          "composer": {
-            "selector": "[data-i18n-placeholder=\"input_placeholder\"]"
-          },
-          "send": {
-            "enter": true
-          },
-          "assistant": {
-            "turn": ".assistant",
-            "body": null
-          },
-          "user": {
-            "turn": ".user"
-          },
-          "stop": null,
-          "card": null
-        }
-      }
-    },
-    "grok": {
-      "name": "Grok",
-      "profiles": {
-        "grok.com": {
-          "version": 1,
-          "site": "grok.com",
-          "name": "Grok",
-          "composer": {
-            "selector": "[role=\"textbox\"]"
-          },
-          "send": {
-            "enter": true
-          },
-          "assistant": {
-            "turn": ".items-start",
-            "body": null
-          },
-          "user": {
-            "turn": "div.relative.group.flex.flex-col.justify-center.w-full.max-w-\\(--content-max-width\\).mx-auto.items-end"
-          },
-          "stop": null,
-          "card": null
-        }
-      }
-    },
-    "mistral": {
-      "name": "Mistral",
-      "profiles": {
-        "chat.mistral.ai": {
-          "version": 1,
-          "site": "chat.mistral.ai",
-          "name": "Mistral",
-          "composer": {
-            "selector": "[data-placeholder=\"What do you want to build?\"]"
-          },
-          "send": {
-            "enter": true
-          },
-          "assistant": {
-            "turn": "[data-message-author-role=\"assistant\"]",
-            "body": null
-          },
-          "user": {
-            "turn": "[data-message-author-role=\"user\"]"
-          },
-          "stop": null,
-          "card": null
+          "card": null,
+          "limits": {
+            "chars": 50000,
+            "calls": 20,
+            "asFile": true
+          }
         }
       }
     },
@@ -273,7 +128,282 @@
             "turn": "._9663006"
           },
           "stop": null,
-          "card": null
+          "card": null,
+          "limits": {
+            "chars": 50000,
+            "calls": 20,
+            "asFile": true
+          }
+        }
+      }
+    },
+    "chatgpt": {
+      "name": "ChatGPT",
+      "profiles": {
+        "chatgpt.com": {
+          "version": 1,
+          "site": "chatgpt.com",
+          "name": "ChatGPT",
+          "composer": {
+            "selector": "[role=\"textbox\"]"
+          },
+          "send": {
+            "enter": true
+          },
+          "assistant": {
+            "turn": "[data-content-search-unit-key$=\":assistant\"]",
+            "body": null
+          },
+          "user": {
+            "turn": "[data-chatgpt-search-unit-key$=\":user\"]"
+          },
+          "stop": null,
+          "card": null,
+          "limits": {
+            "chars": 50000,
+            "calls": 20,
+            "asFile": true
+          }
+        }
+      }
+    },
+    "gemini": {
+      "name": "Gemini",
+      "profiles": {
+        "gemini.google.com": {
+          "version": 1,
+          "site": "gemini.google.com",
+          "name": "Gemini",
+          "composer": {
+            "selector": "[role=\"textbox\"]"
+          },
+          "send": {
+            "enter": true
+          },
+          "assistant": {
+            "turn": "model-response",
+            "body": null
+          },
+          "user": {
+            "turn": "user-query"
+          },
+          "stop": null,
+          "card": null,
+          "limits": {
+            "chars": 30000,
+            "calls": 5,
+            "asFile": false
+          }
+        }
+      }
+    },
+    "kimi": {
+      "name": "Kimi",
+      "profiles": {
+        "www.kimi.ai": {
+          "version": 1,
+          "site": "www.kimi.ai",
+          "name": "Kimi",
+          "composer": {
+            "selector": "[role=\"textbox\"]"
+          },
+          "send": {
+            "enter": true
+          },
+          "assistant": {
+            "turn": ".chat-content-item-assistant",
+            "body": null
+          },
+          "user": {
+            "turn": ".chat-content-item-user"
+          },
+          "stop": null,
+          "card": null,
+          "limits": {
+            "chars": 10000,
+            "calls": 10,
+            "asFile": true
+          }
+        }
+      }
+    },
+    "qwen": {
+      "name": "Qwen",
+      "profiles": {
+        "chat.qwen.ai": {
+          "version": 1,
+          "site": "chat.qwen.ai",
+          "name": "Qwen",
+          "composer": {
+            "selector": "[placeholder=\"How can I help you today?\"]"
+          },
+          "send": {
+            "enter": true
+          },
+          "assistant": {
+            "turn": ".qwen-chat-message-assistant",
+            "body": null
+          },
+          "user": {
+            "turn": ".qwen-chat-message-user"
+          },
+          "stop": null,
+          "card": null,
+          "limits": {
+            "chars": 90000,
+            "calls": 10,
+            "asFile": false
+          }
+        }
+      }
+    },
+    "arena": {
+      "name": "Arena",
+      "profiles": {
+        "arena.ai": {
+          "version": 1,
+          "site": "arena.ai",
+          "name": "Arena",
+          "composer": {
+            "selector": "[name=\"message\"]"
+          },
+          "send": {
+            "selector": "[aria-label=\"Send message\"]"
+          },
+          "assistant": {
+            "turn": "div.transition-all",
+            "body": null
+          },
+          "user": {
+            "turn": ".justify-end"
+          },
+          "stop": null,
+          "card": null,
+          "limits": {
+            "chars": 50000,
+            "calls": 10,
+            "asFile": false
+          }
+        }
+      }
+    },
+    "meta": {
+      "name": "Meta AI",
+      "profiles": {
+        "www.meta.ai": {
+          "version": 1,
+          "site": "www.meta.ai",
+          "name": "Meta AI",
+          "composer": {
+            "selector": "[data-testid=\"composer-input\"]"
+          },
+          "send": {
+            "enter": true
+          },
+          "assistant": {
+            "turn": "[aria-label=\"Meta AI response\"]",
+            "body": null
+          },
+          "user": {
+            "turn": "[aria-label=\"Your message\"]"
+          },
+          "stop": null,
+          "card": null,
+          "limits": {
+            "chars": 50000,
+            "calls": 10,
+            "asFile": true
+          }
+        }
+      }
+    },
+    "ptero": {
+      "name": "Ptero",
+      "profiles": {
+        "ptero.pro": {
+          "version": 1,
+          "site": "ptero.pro",
+          "name": "Ptero",
+          "composer": {
+            "selector": "[data-i18n-placeholder=\"input_placeholder\"]"
+          },
+          "send": {
+            "enter": true
+          },
+          "assistant": {
+            "turn": ".assistant",
+            "body": null
+          },
+          "user": {
+            "turn": ".user"
+          },
+          "stop": null,
+          "card": null,
+          "limits": {
+            "chars": 50000,
+            "calls": 10,
+            "asFile": false
+          }
+        }
+      }
+    },
+    "grok": {
+      "name": "Grok",
+      "profiles": {
+        "grok.com": {
+          "version": 1,
+          "site": "grok.com",
+          "name": "Grok",
+          "composer": {
+            "selector": "[role=\"textbox\"]"
+          },
+          "send": {
+            "enter": true
+          },
+          "assistant": {
+            "turn": ".items-start",
+            "body": null
+          },
+          "user": {
+            "turn": "div.relative.group.flex.flex-col.justify-center.w-full.max-w-\\(--content-max-width\\).mx-auto.items-end"
+          },
+          "stop": null,
+          "card": null,
+          "limits": {
+            "chars": 100000,
+            "calls": 20,
+            "asFile": true
+          }
+        }
+      }
+    },
+    "mistral": {
+      "name": "Mistral",
+      "profiles": {
+        "chat.mistral.ai": {
+          "version": 1,
+          "site": "chat.mistral.ai",
+          "name": "Mistral",
+          "composer": {
+            "selector": "[data-placeholder=\"What do you want to build?\"]"
+          },
+          "send": {
+            "enter": true
+          },
+          "assistant": {
+            "turn": "[data-message-author-role=\"assistant\"]",
+            "body": null
+          },
+          "user": {
+            "turn": "[data-message-author-role=\"user\"]"
+          },
+          "stop": null,
+          "card": null,
+          "limits": {
+            "chars": 50000,
+            "calls": 10,
+            "asFile": false
+          }
         }
       }
     }

@@ -18,7 +18,7 @@ describe("message budget: this AI's own values", () => {
 
   test("a value outside what the sliders allow is brought back into range", () => {
     const budget = budgetFor({ limits: { chars: 5000, calls: 99 }, conversationKey: () => "k" });
-    assert.equal(budget.limit(), 20000);
+    assert.equal(budget.limit(), 10000);
     assert.equal(budget.calls(), 30);
   });
 

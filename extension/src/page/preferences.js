@@ -9,14 +9,16 @@ import { clampContextFiles, DEFAULT_CONTEXT_FILES } from "../domain/prompt/conte
 export const KEYS = { chars: "zsMaxPromptChars", calls: "zsMaxBatchCalls", folders: "zsExcludedFolders", contextFiles: "zsContextFiles", asFile: "zsOutputAsFile" };
 
 /** @param {{ storage: object, state: object }} deps  `state.filesChangedAt` is bumped when the excluded folders change: the file list is then out of date */
-export function createPreferences({ storage, state }) {
-  let folders = [...DEFAULT_EXCLUDED_FOLDERS];
-  const load = (saved) => { folders = clampExcludedFolders(saved); };
+export function createPreferences({ storage, state, defaults }) {
+  const defaultFolders = defaults && Array.isArray(defaults.excludedFolders) ? defaults.excludedFolders : DEFAULT_EXCLUDED_FOLDERS;
+  const defaultContextFiles = defaults && Array.isArray(defaults.contextFiles) ? defaults.contextFiles : DEFAULT_CONTEXT_FILES;
+  let folders = [...defaultFolders];
+  const load = (saved) => { folders = clampExcludedFolders(saved, defaultFolders); };
   storage.get(KEYS.folders).then(load);
   storage.watch(KEYS.folders, (saved) => { load(saved); state.filesChangedAt = Date.now(); });
 
-  let contextFiles = [...DEFAULT_CONTEXT_FILES];
-  const loadContext = (saved) => { contextFiles = clampContextFiles(saved); };
+  let contextFiles = [...defaultContextFiles];
+  const loadContext = (saved) => { contextFiles = clampContextFiles(saved, defaultContextFiles); };
   storage.get(KEYS.contextFiles).then(loadContext);
   storage.watch(KEYS.contextFiles, loadContext);
 
@@ -33,21 +35,21 @@ export function createPreferences({ storage, state }) {
     /** What the panel shows. */
     async read() {
       const [chars, calls, saved, savedContext, savedAsFile] = await Promise.all([storage.get(KEYS.chars), storage.get(KEYS.calls), storage.get(KEYS.folders), storage.get(KEYS.contextFiles), storage.get(KEYS.asFile)]);
-      return { chars: clampPromptChars(chars), calls: clampBatchCalls(calls ?? DEFAULT_BATCH_CALLS), asFile: savedAsFile === true, folders: clampExcludedFolders(saved), contextFiles: clampContextFiles(savedContext) };
+      return { chars: clampPromptChars(chars), calls: clampBatchCalls(calls ?? DEFAULT_BATCH_CALLS), asFile: savedAsFile === true, folders: clampExcludedFolders(saved, defaultFolders), contextFiles: clampContextFiles(savedContext, defaultContextFiles) };
     },
     setChars: (value) => storage.set(KEYS.chars, clampPromptChars(value)),
     setCalls: (value) => storage.set(KEYS.calls, clampBatchCalls(value)),
     setFolders(list) {
-      folders = clampExcludedFolders(list);
+      folders = clampExcludedFolders(list, defaultFolders);
       state.filesChangedAt = Date.now();
       storage.set(KEYS.folders, folders);
     },
     setContextFiles(list) {
-      contextFiles = clampContextFiles(list);
+      contextFiles = clampContextFiles(list, defaultContextFiles);
       storage.set(KEYS.contextFiles, contextFiles);
     },
     contextFiles: () => contextFiles,
-    defaultFolders: () => [...DEFAULT_EXCLUDED_FOLDERS],
-    defaultContextFiles: () => [...DEFAULT_CONTEXT_FILES],
+    defaultFolders: () => [...defaultFolders],
+    defaultContextFiles: () => [...defaultContextFiles],
   };
 }

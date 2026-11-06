@@ -59,7 +59,7 @@ describe("preferences", () => {
     assert.ok(state.filesChangedAt > 0);
     preferences.setChars(5);
     preferences.setCalls(500);
-    assert.equal(storage.data[KEYS.chars], 20000, "kept within the slider");
+    assert.equal(storage.data[KEYS.chars], 10000, "kept within the slider");
     assert.equal(storage.data[KEYS.calls], 30);
   });
 

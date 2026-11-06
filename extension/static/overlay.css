@@ -311,6 +311,8 @@ button.zs-site-opt:hover .zs-site-go { opacity: 1; transform: translateX(0); }
 .zs-mcp-check:checked + .zs-mcp-toggle { background: #34d399; }
 .zs-mcp-check:checked + .zs-mcp-toggle::after { transform: translateX(15px); }
 .zs-mcp-check:focus-visible + .zs-mcp-toggle { outline: 2px solid rgba(255, 255, 255, 0.5); outline-offset: 2px; }
+/* The preferences dialog holds sliders, textareas and menus, so it gets a wider card than the other popups. */
+.zs-mcp-pop-card.zs-pref-card { width: min(520px, calc(100vw - 24px)); }
 html.zs-light .zs-mcp-pop-card { background: #ffffff; color: #1f2937; border-color: rgba(0, 0, 0, 0.1); }
 html.zs-light .zs-mcp-pop-head, html.zs-light .zs-mcp-row-name { color: #111827; }
 html.zs-light .zs-mcp-pop-head { border-bottom-color: rgba(0, 0, 0, 0.07); }

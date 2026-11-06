@@ -7,6 +7,9 @@
  * @param {string} host
  * @returns {object|null} the profile shipped for `host`, or null
  */
+import { clampContextFiles } from '../../domain/prompt/context-file.js';
+import { clampExcludedFolders } from '../../domain/prompt/excluded-folders.js';
+
 export function defaultProfile(bundle, host) {
   if (!bundle || bundle.format !== "snapgent-calibrations" || !bundle.sites || typeof bundle.sites !== "object") return null;
   for (const site of Object.values(bundle.sites)) {
@@ -14,4 +17,10 @@ export function defaultProfile(bundle, host) {
     if (profile) return profile;
   }
   return null;
+}
+
+
+export function defaultPreferences(bundle) {
+  if (!bundle || bundle.format !== 'snapgent-calibrations' || !bundle.preferences || typeof bundle.preferences !== 'object') return null;
+  return { excludedFolders: clampExcludedFolders(bundle.preferences.excludedFolders), contextFiles: clampContextFiles(bundle.preferences.contextFiles) };
 }

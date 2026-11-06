@@ -21,6 +21,7 @@ import { createMessageBudget } from "../page/message-budget.js";
 import { startPageWatch } from "../page/page-watch.js";
 import { createPromptResend } from "../page/prompt-resend.js";
 import { createPreferences } from "../page/preferences.js";
+import { defaultPreferences } from "../infrastructure/calibration/defaults.js";
 import { createProvider } from "../page/provider.js";
 import { createSession } from "../page/session.js";
 import { createSettings } from "../page/settings.js";
@@ -62,9 +63,8 @@ const visibility = createVisibility({ document, state, diag, onParkChange: redra
 const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id });
 terminal.setCancel((jobKey, name) => tools.runner.cancelJob(jobKey, name));
 const bridgeStatus = createBridgeStatus({ state, settings, tools, send, bar: () => bar, diag });
-const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, toast: (text) => bar.toast(text) });
-
-const preferences = createPreferences({ storage, state });
+const preferences = createPreferences({ storage, state, defaults: defaultPreferences(defaultCalibrations) });
+const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast: (text) => bar.toast(text) });
 let stop;
 let session;
 let attachments;

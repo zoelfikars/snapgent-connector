@@ -23,6 +23,7 @@ export function parseFolderNames(text) {
 }
 
 /** The saved setting, or the defaults when nothing usable is saved (an empty list is usable: the user may want nothing skipped). */
-export function clampExcludedFolders(value) {
-  return Array.isArray(value) ? parseFolderNames(value.filter((item) => typeof item === "string").join("\n")) : [...DEFAULT_EXCLUDED_FOLDERS];
+export function clampExcludedFolders(value, fallback) {
+  const base = Array.isArray(fallback) ? fallback : DEFAULT_EXCLUDED_FOLDERS;
+  return Array.isArray(value) ? parseFolderNames(value.filter((item) => typeof item === "string").join("\n")) : [...base];
 }

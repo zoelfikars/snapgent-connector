@@ -1,6 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { defaultProfile, learnProfile } from "../src/infrastructure/calibration/index.js";
+import { defaultPreferences } from "../src/infrastructure/calibration/defaults.js";
 import { createProvider } from "../src/page/provider.js";
 import { pageWith } from "./support/jsdom-provider.js";
 
@@ -68,5 +69,21 @@ describe("the provider and the shipped calibrations", () => {
     const provider = await start({ stored: undefined, defaults: bundleOf({ ...learned(), site: "claude.ai" }) });
     assert.equal(provider.calibrationSource, "none");
     assert.equal(provider.id, "uncalibrated");
+  });
+});
+
+
+describe('defaultPreferences', () => {
+  test('reads preferences from the bundle', () => {
+    const out = defaultPreferences({ format: 'snapgent-calibrations', version: 1, preferences: { excludedFolders: ['node_modules', 'dist'], contextFiles: ['AGENTS.md'] }, sites: {} });
+    assert.deepEqual(out, { excludedFolders: ['node_modules', 'dist'], contextFiles: ['AGENTS.md'] });
+  });
+  test('missing or foreign bundle gives null', () => {
+    for (const b of [null, {}, { format: 'other', preferences: {} }, { format: 'snapgent-calibrations' }]) assert.equal(defaultPreferences(b), null);
+  });
+  test('bad preference values fall back to the hardcoded defaults', () => {
+    const out = defaultPreferences({ format: 'snapgent-calibrations', preferences: { excludedFolders: 'nope', contextFiles: [123] } });
+    assert.ok(Array.isArray(out.excludedFolders) && out.excludedFolders.includes('node_modules'));
+    assert.ok(Array.isArray(out.contextFiles) && out.contextFiles.includes('AGENTS.md'));
   });
 });

@@ -10,11 +10,12 @@ import { describeElement } from "../infrastructure/chat/index.js";
 import { loremIpsum } from "../domain/prompt/lorem.js";
 
 /** @param {{ document: Document, location: Location, provider: object, state: object, storage: object, settings: object, toast: (text: string) => void }} deps */
-export function createCalibrationActions({ document, location, provider, state, storage, settings, toast }) {
+export function createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast }) {
   const store = new ProfileStore({
     store: { get: storage.get, set: storage.commit },
     problemsOf: profileProblems,
     siteOf: (host) => { const site = siteFor(host); return site && { id: site.id, name: site.name }; },
+    preferences: preferences ? { readPreferences: async () => { const p = await preferences.read(); return { excludedFolders: p.folders, contextFiles: p.contextFiles }; }, applyPreferences: async (prefs) => { if (prefs.excludedFolders) preferences.setFolders(prefs.excludedFolders); if (prefs.contextFiles) preferences.setContextFiles(prefs.contextFiles); } } : null,
   });
   let wizard = null;
 
@@ -62,14 +63,14 @@ export function createCalibrationActions({ document, location, provider, state, 
     input.addEventListener("change", async () => {
       const files = [...(input.files || [])];
       if (!files.length) return;
-      const { groups, skipped } = await store.read(await Promise.all(files.map((file) => file.text())));
+      const { groups, skipped, preferences: filePrefs } = await store.read(await Promise.all(files.map((file) => file.text())));
       const order = (group) => { const at = SITE_LINKS.findIndex((site) => site.name === group.name); return at < 0 ? SITE_LINKS.length : at; };
       groups.sort((a, b) => order(a) - order(b) || a.name.localeCompare(b.name));
       openCalibrationImport({
         document, groups, skipped,
         onImport: async (ids) => {
           const chosen = groups.filter((group) => ids.includes(group.id));
-          await store.saveAll(chosen.flatMap((group) => group.profiles));
+          await store.saveAll(chosen.flatMap((group) => group.profiles), filePrefs);
           toast(chosen.length ? `Imported ${chosen.map((group) => group.name).join(", ")}.` : "Nothing was imported.");
         },
       });

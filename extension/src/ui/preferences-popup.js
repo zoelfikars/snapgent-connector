@@ -57,7 +57,7 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
       row("zs-cal-import-all", "Import calibrations…", "choose which AIs to take from the files") + `</section>`
     : "";
   pop.innerHTML =
-    `<div class="zs-mcp-pop-card" role="dialog" aria-label="Preferences"><div class="zs-mcp-pop-head"><span>Preferences</span>${closeButton}</div>` +
+    `<div class="zs-mcp-pop-card zs-pref-card" role="dialog" aria-label="Preferences"><div class="zs-mcp-pop-head"><span>Preferences</span>${closeButton}</div>` +
     `<div class="zs-mcp-pop-body">` +
     slider("zs-pref-chars", "Message size", MIN_PROMPT_CHARS, MAX_PROMPT_CHARS, CHARS_STEP,
       "The most one message to the chat may hold. Longer output goes in the next messages (up to 5), the rest is cut in the middle. About 4 characters per token.") +

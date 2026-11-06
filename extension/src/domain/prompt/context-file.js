@@ -5,15 +5,16 @@
 export const DEFAULT_CONTEXT_FILES = ["AGENTS.md", "CLAUDE.md", "GEMINI.md"];
 
 /** Keep the list to the names that are usable: one per line, no slashes, no repeats. */
-export function clampContextFiles(value) {
-  if (!Array.isArray(value)) return [...DEFAULT_CONTEXT_FILES];
+export function clampContextFiles(value, fallback) {
+  const base = Array.isArray(fallback) ? fallback : DEFAULT_CONTEXT_FILES;
+  if (!Array.isArray(value)) return [...base];
   const names = [];
   for (const raw of value) {
-    const name = String(raw || "").trim().replace(/^\.\//, "").replace(/^\/+|\/+$/g, "");
+    const name = (typeof raw === 'string' ? raw : '').trim().replace(/^\.\//, '').replace(/^\/+|\/+$/g, '');
     if (name && name.length <= 100 && !names.includes(name)) names.push(name);
     if (names.length >= 20) break;
   }
-  return names;
+  return names.length ? names : [...base];
 }
 
 /** The file as the model should read it: without the `read_files` wrapping (the `===== name =====` line and the line numbers).

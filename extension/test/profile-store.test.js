@@ -109,3 +109,40 @@ describe("ProfileStore: all sites at once", () => {
     assert.deepEqual(Object.keys(data.zsProfiles).sort(), ["chatgpt.com", "claude.ai", "gemini.google.com"]);
   });
 });
+
+
+describe('ProfileStore preferences', () => {
+  function setupPrefs() {
+    let current = { excludedFolders: ['node_modules'], contextFiles: ['AGENTS.md'] };
+    const applied = [];
+    const prefs = { readPreferences: async () => ({ ...current }), applyPreferences: async (v) => { applied.push(v); current = { ...current, ...v }; } };
+    const data = {};
+    const store = { get: async (k) => data[k], set: async (k, v) => { data[k] = v; } };
+    return { profiles: new ProfileStore({ store, problemsOf: profileProblems, preferences: prefs }), data, applied, getCurrent: () => current };
+  }
+  test('export and import carry preferences, stored profile stays clean', async () => {
+    const a = setupPrefs();
+    await a.profiles.save(PROFILE());
+    const text = await a.profiles.exportText('chatgpt.com');
+    assert.equal(JSON.parse(text).preferences.excludedFolders[0], 'node_modules');
+    const b = setupPrefs();
+    assert.deepEqual(await b.profiles.importText(text, 'chatgpt.com'), { ok: true });
+    assert.equal(b.applied.length, 1);
+    assert.equal((await b.profiles.get('chatgpt.com')).preferences, undefined);
+  });
+  test('old files without preferences leave local settings alone', async () => {
+    const b = setupPrefs();
+    assert.deepEqual(await b.profiles.importText(JSON.stringify(PROFILE()), 'chatgpt.com'), { ok: true });
+    assert.equal(b.applied.length, 0);
+  });
+  test('export-all and read/saveAll carry preferences', async () => {
+    const a = setupPrefs();
+    await a.profiles.save(PROFILE());
+    assert.equal(JSON.parse(await a.profiles.exportAllText()).preferences.contextFiles[0], 'AGENTS.md');
+    const b = setupPrefs();
+    const read = await b.profiles.read([await a.profiles.exportAllText()]);
+    assert.equal(read.preferences.excludedFolders[0], 'node_modules');
+    await b.profiles.saveAll(read.groups[0].profiles, read.preferences);
+    assert.equal(b.applied.length, 1);
+  });
+});
