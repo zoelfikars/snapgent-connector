@@ -25,7 +25,9 @@ export function createMessageBudget({ storage, hostname, provider, diag }) {
   storage.watch(CALLS_KEY, (saved) => { calls = clampBatchCalls(saved); });
   storage.watch(SETTING_KEY, (saved) => { setting = clampPromptChars(saved); learned = Infinity; storage.remove(learnedKey); });
 
-  const limit = () => effectiveLimit(setting, Math.min(provider.sendCharBudget || Infinity, learned));
+  // This AI's own values (from its calibration) win over the general preferences; read on every use, the provider changes without a reload.
+  const siteLimits = () => provider.limits || {};
+  const limit = () => effectiveLimit(siteLimits().chars > 0 ? siteLimits().chars : setting, Math.min(provider.sendCharBudget || Infinity, learned));
 
   async function sent(chars) {
     const key = provider.conversationKey() || "new";
@@ -49,5 +51,5 @@ export function createMessageBudget({ storage, hostname, provider, diag }) {
     diag("budget.learned", { chars, cap: learned });
   }
 
-  return { limit, calls: () => calls, sent, tooLong };
+  return { limit, calls: () => (siteLimits().calls > 0 ? clampBatchCalls(siteLimits().calls) : calls), sent, tooLong };
 }

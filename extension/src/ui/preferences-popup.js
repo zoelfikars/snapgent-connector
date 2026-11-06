@@ -34,6 +34,11 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     `<button class="zs-site-opt" id="${id}" type="button"><span class="zs-site-name"><span>${title}</span>` +
     (note ? `<span class="zs-site-host">${note}</span>` : "") + `</span></button>`;
   const otherCorner = corner === "top" ? "bottom right" : "top right";
+  // Only offered on a calibrated site (`values.site` is undefined otherwise); null means it has no values of its own yet.
+  const siteBox = values.site !== undefined && save.site
+    ? `<label class="zs-pref" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="zs-pref-site" style="margin-top:3px"><span><b>Only for this site</b>` +
+      `<span class="zs-mcp-pop-note" style="display:block">Keep these two values in this AI's calibration: they go with Export calibration, and other sites keep the general values.</span></span></label>`
+    : "";
   const barSection = actions.onToggleCorner
     ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>This bar</span></div>` +
       row("zs-bar-corner", `Move to the ${otherCorner} corner`) +
@@ -55,7 +60,7 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     slider("zs-pref-chars", "Message size", MIN_PROMPT_CHARS, MAX_PROMPT_CHARS, CHARS_STEP,
       "The most one message to the chat may hold. Longer output goes in the next messages (up to 5), the rest is cut in the middle. About 4 characters per token.") +
     slider("zs-pref-calls", "Commands per reply", MIN_BATCH_CALLS, MAX_BATCH_CALLS, 1,
-      "How many commands the AI may send in one reply. They run in order and are answered in one message; any beyond it are reported as not run.") +
+      "How many commands the AI may send in one reply. They run in order and are answered in one message; any beyond it are reported as not run.") + siteBox +
     `<div class="zs-pref"><div style="font-weight:600">Folders left out of attachments</div>` +
     `<textarea id="zs-pref-folders" rows="7" spellcheck="false" style="width:100%;box-sizing:border-box;margin-top:8px;${MONO};background:transparent;color:inherit;${BOX};padding:6px" ` +
     `aria-label="Folders left out of attachments">${esc(values.folders.join("\n"))}</textarea>` +
@@ -78,8 +83,28 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     input.addEventListener("input", () => { label.textContent = show(Number(input.value)); });
     input.addEventListener("change", () => store(Number(input.value)));
   };
-  bind("zs-pref-chars", values.chars, charsText, save.chars);
-  bind("zs-pref-calls", values.calls, callsText, save.calls);
+  // With "Only for this site" ticked the sliders write to this AI's calibration, otherwise to the general preferences.
+  const own = values.site || null;
+  let useSite = !!own;
+  const general = { chars: values.chars, calls: values.calls };
+  const sliderValue = (id) => Number(pop.querySelector(`#${id}`).value);
+  const both = () => ({ chars: sliderValue("zs-pref-chars"), calls: sliderValue("zs-pref-calls") });
+  bind("zs-pref-chars", own && own.chars ? own.chars : values.chars, charsText, (value) => { if (useSite) save.site(both()); else { general.chars = value; save.chars(value); } });
+  bind("zs-pref-calls", own && own.calls ? own.calls : values.calls, callsText, (value) => { if (useSite) save.site(both()); else { general.calls = value; save.calls(value); } });
+  const siteTick = pop.querySelector("#zs-pref-site");
+  if (siteTick) {
+    siteTick.checked = useSite;
+    siteTick.addEventListener("change", () => {
+      useSite = siteTick.checked;
+      if (useSite) { save.site(both()); return; }
+      save.site(null);
+      for (const [id, value] of [["zs-pref-chars", general.chars], ["zs-pref-calls", general.calls]]) {
+        const input = pop.querySelector(`#${id}`);
+        input.value = String(value);
+        input.dispatchEvent(new (document.defaultView.Event)("input"));
+      }
+    });
+  }
 
   const folders = pop.querySelector("#zs-pref-folders");
   // Typing here must not trigger the site's own keyboard shortcuts.

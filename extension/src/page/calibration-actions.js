@@ -89,6 +89,17 @@ export function createCalibrationActions({ document, location, provider, state, 
     input.click();
   }
 
+  /** This AI's message size and commands per reply, kept in its calibration; null goes back to the general preferences. */
+  async function setLimits(limits) {
+    // A site that only has the shipped calibration gets a copy of it as its own, with the limits added.
+    const base = (await store.get(location.hostname)) || (provider.diagnose && provider.diagnose().profile);
+    if (!base) { toast("Calibrate this site first."); return; }
+    const updated = updateProfile(base, "limits", { limits });
+    if (updated.error) { toast(updated.error); return; }
+    const saved = await store.save(updated.profile);
+    if (!saved.ok) toast(saved.error);
+  }
+
   async function remove() {
     await store.remove(location.hostname);
     toast("Calibration removed.");
@@ -113,5 +124,8 @@ export function createCalibrationActions({ document, location, provider, state, 
     try { await navigator.clipboard.writeText(lines.join("\n")); toast("Diagnostics copied."); } catch { toast("Could not copy to the clipboard."); }
   }
 
-  return { open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
+  // undefined: not calibrated, so nothing to keep them in; null: calibrated, no values of its own.
+  const limits = () => (provider.needsCalibration ? undefined : provider.limits || null);
+
+  return { limits, setLimits, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
 }

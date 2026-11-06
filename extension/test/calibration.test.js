@@ -255,6 +255,31 @@ describe("a thinking part inside the same turn as the answer (z.ai)", () => {
   });
 });
 
+describe("limits kept in the calibration (message size, commands per reply)", () => {
+  test("are set on their own, rounded, kept through a JSON round trip and shown by the provider", () => {
+    const { profile, document, window } = calibrated(SITES.gemini);
+    const updated = updateProfile(profile, "limits", { limits: { chars: 60000.4, calls: 4 } });
+    assert.deepEqual(updated.profile.limits, { chars: 60000, calls: 4 });
+    assert.deepEqual(profileProblems(updated.profile), []);
+    assert.deepEqual(updated.profile.composer, profile.composer);
+    const stored = JSON.parse(JSON.stringify(updated.profile));
+    assert.deepEqual(createCalibratedProvider({ document, location: window.location, profile: stored }).limits, { chars: 60000, calls: 4 });
+  });
+
+  test("clearing them removes the field, and a profile without them has none", () => {
+    const { profile } = calibrated(SITES.gemini);
+    const set = updateProfile(profile, "limits", { limits: { calls: 2 } }).profile;
+    assert.deepEqual(set.limits, { calls: 2 });
+    assert.equal("limits" in updateProfile(set, "limits", { limits: null }).profile, false);
+    assert.equal("limits" in profile, false);
+  });
+
+  test("numbers that make no sense are refused when a profile is checked", () => {
+    const { profile } = calibrated(SITES.gemini);
+    for (const bad of [{ chars: -1 }, { calls: "many" }, { chars: 0 }, null]) assert.equal(profileProblems({ ...profile, limits: bad }).length, 1);
+  });
+});
+
 describe("conversation identity", () => {
   test("a chat with no turns has no identity yet, whatever its URL says (Gemini's fresh chat is /app)", () => {
     const { provider, window } = calibrated(SITES.gemini);

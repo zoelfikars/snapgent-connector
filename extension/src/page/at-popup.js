@@ -56,8 +56,8 @@ export function createAtPopup({ document, window, root, state, settings, provide
   async function openPrefs() {
     close(false);
     openPreferences({
-      document, values: await preferences.read(), defaults: { folders: preferences.defaultFolders(), contextFiles: preferences.defaultContextFiles() },
-      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders, contextFiles: preferences.setContextFiles },
+      document, values: { ...(await preferences.read()), site: calibration ? calibration.limits() : undefined }, defaults: { folders: preferences.defaultFolders(), contextFiles: preferences.defaultContextFiles() },
+      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders, contextFiles: preferences.setContextFiles, site: calibration && calibration.setLimits },
       corner: barPrefs ? barPrefs.get().corner : "bottom",
       actions: {
         onCalibrate: () => calibration && calibration.open(null),

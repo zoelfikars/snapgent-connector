@@ -399,6 +399,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     displayName: profile.name,
     timings: TIMINGS,
     supportsVision: false,
+    limits: profile.limits || null,
     sendRetryLimit: 1,
     get reliableCounts() { return !!idOf(lastAssistant()); },
     init() {},
