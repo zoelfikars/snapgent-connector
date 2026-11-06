@@ -41,7 +41,7 @@ export function createBridgeStatus({ state, settings, tools, send, bar, diag }) 
         chrome.runtime.onMessage.addListener((message) => {
           if (!message) return;
           if (message.type === "zs-status") apply({ connected: message.connected, mcpAlive: message.mcpAlive, needsApproval: message.needsApproval, tools: message.tools, servers: message.servers });
-          if (message.type === "zs-open-menu") bar().openMenu(false); // the popup's Settings button
+          if (message.type === "zs-open-preferences") bar().openPreferences(); // the popup's Settings button
         });
       } catch { /* no extension messaging here */ }
       const refresh = () => send({ type: "status" }).then(apply);

@@ -160,6 +160,7 @@ export function createBar({ document, window, provider, state, settings, serverD
     toast: (text) => notifications.toast(text),
     banner: (level, title, text) => notifications.banner(level, title, text),
     openMenu: (toSupport) => { if (el.menu.hidden) siteMenu.toggle(toSupport); },
+    openPreferences: barSettings.openPreferences,
 
     /** Stop is shown while the agent is busy; it stays through the wind-down so it does not blink as the site's signals flicker. */
     showStop(visible) {

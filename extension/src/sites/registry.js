@@ -33,8 +33,8 @@ export const SITES = [
   { id: "mistral", name: "Mistral", url: "https://chat.mistral.ai/code", matches: ["https://chat.mistral.ai/*"] },
 ];
 
-/** The "switch AI" shortcuts. DeepSeek is hidden from the menu (supported, not advertised). */
-export const SITE_LINKS = SITES.filter((site) => site.id !== "deepseek").map(({ name, url }) => ({ name, url }));
+/** The "switch AI" shortcuts: every supported site. */
+export const SITE_LINKS = SITES.map(({ name, url }) => ({ name, url }));
 
 export const BRIDGE_PORT = 17613;
 

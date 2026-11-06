@@ -222,13 +222,13 @@ document.getElementById("restart").addEventListener("click", (e) => {
   });
 });
 document.getElementById("settings").addEventListener("click", () => {
-  // Tries the in-page panel on an already-open supported AI tab first, so
+  // Opens the Preferences dialog on an already-open supported AI tab first, so
   // opening it doesn't require a conversation to already be started there.
   chrome.tabs.query({}, (tabs) => {
     const active = tabs.find((t) => t.active && t.url && SUPPORTED_HOSTS.some((h) => t.url.includes(h)));
     const anySupported = active || tabs.find((t) => t.url && SUPPORTED_HOSTS.some((h) => t.url.includes(h)));
     if (anySupported) {
-      chrome.tabs.sendMessage(anySupported.id, { type: "zs-open-menu" });
+      chrome.tabs.sendMessage(anySupported.id, { type: "zs-open-preferences" });
       chrome.tabs.update(anySupported.id, { active: true });
     } else {
       chrome.tabs.create({ url: DEFAULT_AI_URL });
