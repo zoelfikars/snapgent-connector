@@ -18,6 +18,7 @@ const TEMPLATE = `
     <div class="zs-t-body"></div>
     <div class="zs-t-foot"><span class="zs-t-hint">input is off: a command that asks for an answer waits anyway</span>
     <button type="button" class="zs-t-stop" hidden>■ Stop</button></div>
+    <div class="zs-t-grip" title="Drag to resize" aria-hidden="true"></div>
   </div>`;
 
 /**
@@ -35,6 +36,31 @@ export function createTerminalPanel({ document, onStop = () => {} }) {
   const bodyEl = panel.querySelector(".zs-t-body");
   const stopEl = panel.querySelector(".zs-t-stop");
   const bodies = new Map(); // tab key -> { el, count }
+
+  // The panel is anchored at the top-right, so its bottom-left grip is the only corner that can grow
+  // in both directions: left widens it, down makes it taller. Never larger than the window.
+  const gripEl = panel.querySelector(".zs-t-grip");
+  const MIN_W = 320;
+  const MIN_H = 200;
+  let drag = null;
+  gripEl.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    const rect = panel.getBoundingClientRect();
+    drag = { x: event.clientX, y: event.clientY, w: rect.width, h: rect.height };
+    if (gripEl.setPointerCapture) gripEl.setPointerCapture(event.pointerId);
+    panel.classList.add("zs-t-resizing");
+  });
+  gripEl.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    const view = document.documentElement;
+    const width = Math.min(view.clientWidth - 28, Math.max(MIN_W, drag.w + (drag.x - event.clientX)));
+    const height = Math.min(view.clientHeight - 28, Math.max(MIN_H, drag.h + (event.clientY - drag.y)));
+    panel.style.width = `${Math.round(width)}px`;
+    panel.style.height = `${Math.round(height)}px`;
+  });
+  const endDrag = () => { drag = null; panel.classList.remove("zs-t-resizing"); };
+  gripEl.addEventListener("pointerup", endDrag);
+  gripEl.addEventListener("pointercancel", endDrag);
   let selected = null;
 
   panel.querySelector(".zs-t-close").addEventListener("click", () => close());

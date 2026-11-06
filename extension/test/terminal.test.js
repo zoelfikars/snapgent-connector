@@ -120,4 +120,9 @@ describe("the terminal panel store", () => {
     page.t.ingest({ jobKey: "k1", stream: "stdout", text: "late\n" });
     assert.equal(page.$(".zs-t-line"), null);
   });
+
+  test("the panel has a resize grip in its free corner", () => {
+    const page = setup();
+    assert.ok(page.$(".zs-t-grip"), "the bottom-left grip is drawn");
+  });
 });
