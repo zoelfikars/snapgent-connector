@@ -306,3 +306,28 @@ describe("start preconditions", () => {
     assert.equal(handshakeUnavailable("snapgent commands (2):"), false);
   });
 });
+
+describe("previewing the start message", () => {
+  test("preview returns the exact start message without sending or starting", async () => {
+    const t = setup({ state: { empty: false, responses: [ready], probe: { ok: true, text: "root\n└── a.js" } }, deps: { initialContext: { limit: () => 10000 } } });
+    const submitted = [];
+    t.starter._d.chat.submit = async (text) => { submitted.push(text); return "base"; };
+    const message = await t.starter.preview();
+    assert.ok(message.startsWith("START|snapgent commands (2):"));
+    assert.ok(message.includes("root"));
+    assert.equal(submitted.length, 0, "preview must not send");
+    assert.ok(!t.log.includes("markStarted"), "preview must not mark started");
+    assert.ok(!t.log.some((e) => typeof e === "string" && e.startsWith("next")), "preview must not wait for understood");
+  });
+  test("preview in a non-empty chat still works: no empty-chat check", async () => {
+    const t = setup({ state: { empty: false } });
+    const message = await t.starter.preview();
+    assert.ok(message && message.startsWith("START|"));
+    assert.ok(!t.log.some((e) => typeof e === "string" && e.startsWith("toast:Use an empty chat")));
+  });
+  test("preview with no commands available returns null and sends nothing", async () => {
+    const t = setup({ state: { handshakeFeedback: "» list_commands\nNo commands available - offline" } });
+    assert.equal(await t.starter.preview(), null);
+    assert.ok(!t.log.some((e) => String(e).startsWith("submit")));
+  });
+});

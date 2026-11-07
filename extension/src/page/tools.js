@@ -13,10 +13,10 @@ import { createWorkspaceBinding } from "./workspace-binding.js";
 
 /**
  * @param {{ send: Function, provider: object, state: object, settings: object, serverDirectory: object, visibility: object,
- *           storage: object, diag: Function, banner: Function, terminal?: object, accountKey?: () => string }} deps  `banner(level, title, text)`
- *   shows the user a notice; `terminal` receives the live output of commands (see page/terminal.js)
+ *           storage: object, diag: Function, banner: Function, terminal?: object, accountKey?: () => string, calls?: () => number }} deps  `banner(level, title, text)`
+ *   shows the user a notice; `terminal` receives the live output of commands (see page/terminal.js); `calls` reads the effective Commands per reply (general preference, or this site's own)
  */
-export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner, terminal = null, accountKey = () => "" }) {
+export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner, terminal = null, accountKey = () => "", calls = null }) {
   const bridge = {
     listTools: () => send({ type: "list_tools" }),
     callTool: (request) => send({ type: "call_tool", ...request }),
@@ -111,6 +111,7 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
     targetName: serverDirectory.name(settings.target()),
     customPrompt: serverDirectory.customPrompt,
     skills: skills.enabled,
+    calls: calls ? calls() : undefined,
   });
 
   /** The command list the model is reminded of every so often, scoped to the selected target. */

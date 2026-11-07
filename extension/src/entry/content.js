@@ -60,15 +60,17 @@ const terminal = createTerminal({ document, diag, onChange: redraw });
 terminal.start();
 const serverDirectory = new ServerDirectory({ store: storage, liveServers: () => state.bridge.servers || [], onChange: redraw, log: (...args) => console.warn("[snapgentV3]", ...args) });
 const visibility = createVisibility({ document, state, diag, onParkChange: redraw });
-const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id });
+// The budget before the tools: the system prompt tells the model the effective Commands per reply, so the tools need its `calls` getter.
+const budget = createMessageBudget({ storage, hostname: location.hostname, provider, diag });
+const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id, calls: budget.calls });
 terminal.setCancel((jobKey, name) => tools.runner.cancelJob(jobKey, name));
 terminal.setRunner((call, options) => tools.manual.run(call, options));
 const bridgeStatus = createBridgeStatus({ state, settings, tools, send, bar: () => bar, diag });
 const preferences = createPreferences({ storage, state, defaults: defaultPreferences(defaultCalibrations) });
-const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast: (text) => bar.toast(text) });
 let stop;
 let session;
 let attachments;
+const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast: (text) => bar.toast(text), previewStartMessage: () => session?.previewStartMessage?.() });
 bar = createBar({
   document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, preferences, send, calibration, terminal,
   files: { list: () => attachments.listFiles(), refresh: () => attachments.refresh(), insert: (paths) => attachments.insert(paths), canList: () => attachments.canList() },
@@ -76,7 +78,6 @@ bar = createBar({
   onStop: () => stop.stopLoop(),
 });
 
-const budget = createMessageBudget({ storage, hostname: location.hostname, provider, diag });
 const chat = createChat({ document, provider, state, visibility, catalogue: tools.catalogue, diag, cover: bar.cover, banner: notify, progress: (text) => bar.coverLabel(text), budget });
 const { turnKey, executed } = createTurns({ provider });
 const resend = createPromptResend({ provider, state, storage, systemPrompt: tools.systemPrompt, limit: budget.limit, chat, diag });

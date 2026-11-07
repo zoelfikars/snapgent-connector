@@ -70,6 +70,11 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
         (actions.onFillTest ? `<button id="zs-pref-lorem-fill" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block" style="margin-top:6px">Fill the text box</button>` : "") +
         (actions.onAttachTest ? `<select id="zs-pref-lorem-method" aria-label="How to attach the file" style="margin-top:6px;width:100%"><option value="paste">as a pasted file</option><option value="input">through the file input</option><option value="drop">as a dropped file</option></select><button id="zs-pref-lorem-file" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block" style="margin-top:6px">Fill the text box with a .txt file</button>` : "") + `</div>`
       : "") +
+    (actions.onFillStartMessage
+      ? `<div class="zs-pref"><div style="font-weight:600">Test the Start message</div>` +
+        `<div class="zs-mcp-pop-note">Writes the exact message the Start button would send (instructions, commands, project tree) into the text box, without sending it or starting a session. Check it there, then press Start in a new chat to send it for real.</div>` +
+        `<button id="zs-pref-start-fill" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block" style="margin-top:6px">Fill the text box with the start message</button></div>`
+      : "") +
     `<div class="zs-pref"><div style="font-weight:600">Folders left out of attachments</div>` +
     `<textarea id="zs-pref-folders" rows="7" spellcheck="false" style="width:100%;box-sizing:border-box;margin-top:8px;${MONO};background:transparent;color:inherit;${BOX};padding:6px" ` +
     `aria-label="Folders left out of attachments">${esc(values.folders.join("\n"))}</textarea>` +
@@ -116,6 +121,8 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     const fill = pop.querySelector("#zs-pref-lorem-fill");
     if (fill) fill.addEventListener("click", () => { const size = Number(loremSize.value); close(); actions.onFillTest(size); });
   }
+  const startFill = pop.querySelector("#zs-pref-start-fill");
+  if (startFill) startFill.addEventListener("click", () => { close(); actions.onFillStartMessage(); });
   const siteTick = pop.querySelector("#zs-pref-site");
   if (siteTick) {
     siteTick.checked = useSite;

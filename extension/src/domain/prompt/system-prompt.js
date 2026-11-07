@@ -6,9 +6,11 @@ import { SESSION_PHRASE } from "../constants.js";
 
 /**
  * @param {{ workspace?: { name?: string, path?: string, git?: boolean }|null, targetName?: string, customPrompt?: string,
- *           providerNotes?: string, skills?: { name: string, description: string, path?: string }[] }} opts
+ *           providerNotes?: string, skills?: { name: string, description: string, path?: string }[], calls?: number }} opts
+ *   `calls` is the effective Commands per reply (the general preference, or this site's own when it has one); without it the prompt keeps the old "several" wording.
  */
-export function buildSystemPrompt({ workspace = null, targetName = "Snapgent MCP", customPrompt = "", providerNotes = "", skills = [] } = {}) {
+export function buildSystemPrompt({ workspace = null, targetName = "Snapgent MCP", customPrompt = "", providerNotes = "", skills = [], calls } = {}) {
+  const batch = Number.isFinite(calls) && calls > 0 ? `at most ${Math.round(calls)} command${Math.round(calls) === 1 ? "" : "s"}` : "several commands";
   const name = (workspace && workspace.name) || "This folder";
   const where = workspace && workspace.path ? ` It is at ${workspace.path}${workspace.git ? " and it is a git repository" : ""}.` : "";
   const prompt = `${name} ${SESSION_PHRASE}.${where} It is a project on my computer, and you work in it through ${targetName}. You and I are working on it together: I say what I want, and you look at the files, change them and run commands there for me, through a small tool that runs in my browser; nothing else of yours reaches my machine (your own built-in tools and code execution do not), so everything you know about the project comes from the commands below.
@@ -20,7 +22,7 @@ Whenever you want something done, write the command as its own fenced JSON block
 It runs here in ${name}, and what it returned comes back in my next message, each result starting with "» command_name". Use only the commands and parameters listed for you. If one you need is missing, or something is offline, say so plainly instead of claiming the task is done.
 
 Some habits that keep this quick and cheap:
-- You may write several commands in one reply, each in its own fenced JSON block. They run in order and you get ONE message back with every result. Group commands that do not depend on each other (for example \`tree\` and a \`read_files\` of files you already know you need). If a command needs the result of an earlier one, wait for that result instead. A failing command stops the rest of the group.
+- You may write ${batch} in one reply, each in its own fenced JSON block. They run in order and you get ONE message back with every result. Group commands that do not depend on each other (for example \`tree\` and a \`read_files\` of files you already know you need). If a command needs the result of an earlier one, wait for that result instead. A failing command stops the rest of the group.
 - Everything sent back to you shares one size limit. Output that is too long is cut in the middle (the start and the end are kept); files or commands that do not fit are listed as not read / not run, so ask for them in your next reply. Prefer a few targeted commands over reading everything.
 - A command's cut output has a run_id: use \`get_command_output\` with it to read more, rather than running the command again.
 - When my message ends with "Attached files" and \`===== path =====\` blocks, those are files I tagged, with line numbers, as they are right now: use them directly and do not read them again unless you need more than is shown.

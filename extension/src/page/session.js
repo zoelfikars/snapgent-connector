@@ -114,5 +114,5 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
 
   tracker.ready.then(sync);
 
-  return { start: () => starter.start(), sync };
+  return { start: () => starter.start(), previewStartMessage: () => starter.preview(), sync };
 }

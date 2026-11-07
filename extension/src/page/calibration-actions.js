@@ -9,8 +9,8 @@ import { learnProfile, profileProblems, updateProfile, createCalibratedProvider 
 import { describeElement } from "../infrastructure/chat/index.js";
 import { loremIpsum } from "../domain/prompt/lorem.js";
 
-/** @param {{ document: Document, location: Location, provider: object, state: object, storage: object, settings: object, toast: (text: string) => void }} deps */
-export function createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast }) {
+/** @param {{ document: Document, location: Location, provider: object, state: object, storage: object, settings: object, toast: (text: string) => void, previewStartMessage?: () => Promise<string|null> }} deps */
+export function createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast, previewStartMessage = null }) {
   const store = new ProfileStore({
     store: { get: storage.get, set: storage.commit },
     problemsOf: profileProblems,
@@ -121,6 +121,18 @@ export function createCalibrationActions({ document, location, provider, state, 
     } catch (error) { toast(String((error && error.message) || error)); }
   }
 
+  /** The exact start message, written into the text box the way the extension writes its own messages, and not sent: so the user can check what Start would send without starting a session. */
+  async function fillStartMessage() {
+    if (provider.needsCalibration) { toast("Calibrate this site first."); return; }
+    if (!previewStartMessage) { toast("Start is not ready."); return; }
+    const text = await previewStartMessage();
+    if (!text) return;
+    try {
+      const via = await provider.writeText(text);
+      toast(`Wrote ${text.length.toLocaleString("en-US")} characters of start message into the text box (via ${via}). Not sent: check it, then press Start in a new chat to send it.`);
+    } catch (error) { toast(String((error && error.message) || error)); }
+  }
+
   /** Filler text as a .txt file given to the page by `method` (paste, input or drop), and not sent. */
   async function attachTestFile(chars, method) {
     if (provider.needsCalibration) { toast("Calibrate this site first."); return; }
@@ -158,5 +170,5 @@ export function createCalibrationActions({ document, location, provider, state, 
   // undefined: not calibrated, so nothing to keep them in; null: calibrated, no values of its own.
   const limits = () => (provider.needsCalibration ? undefined : provider.limits || null);
 
-  return { limits, setLimits, copyTestText, fillTestText, attachTestFile, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
+  return { limits, setLimits, copyTestText, fillTestText, fillStartMessage, attachTestFile, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
 }

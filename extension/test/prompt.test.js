@@ -43,3 +43,11 @@ test("an @ that is not a path is still defused, an address is left alone", () =>
 test("the read_files wrapping is removed", () => assert.equal(clean("===== AGENTS.md =====\n1: use pnpm\n2: @docs/x.md"), "use pnpm\ndocs/x.md"));
 
 test("parse-error falls back to malformed", () => assert.ok(ZS.FEEDBACK.parseError("nope").includes("could not be parsed")));
+
+test("the prompt tells the model the effective Commands per reply when given", () => {
+  assert.ok(ZS.buildSystemPrompt({ calls: 5 }).includes("at most 5 commands"));
+  assert.ok(ZS.buildSystemPrompt({ calls: 1 }).includes("at most 1 command in one reply"));
+  assert.ok(!ZS.buildSystemPrompt({ calls: 1 }).includes("at most 1 commands"));
+});
+test("without a Commands per reply value the prompt keeps the old several wording", () => assert.ok(ZS.buildSystemPrompt().includes("several commands")));
+test("an unusable Commands per reply value falls back to several", () => assert.ok(ZS.buildSystemPrompt({ calls: 0 }).includes("several commands")));

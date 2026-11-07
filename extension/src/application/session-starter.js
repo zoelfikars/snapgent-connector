@@ -60,6 +60,17 @@ export class SessionStarter {
     }
   }
 
+  /** The exact message Start would send, without sending it or starting a session: for the Preferences test that fills the text box so the user can check it. Null when Start itself would refuse (banner already shown). No empty-chat check: a preview must work in the chat already open. */
+  async preview() {
+    const alive = () => true;
+    if (!(await this._ready(alive))) return null;
+    const { runner, target, view, workspace } = this._d;
+    await workspace.refresh();
+    const listed = await runner.run({ tool: "list_commands", arguments: { server: target.id() } });
+    if (handshakeUnavailable(listed)) { view.banner("warn", `${target.name()} unavailable`, "Is the server online?"); return null; }
+    return this._d.startMessage({ commands: withoutResultHeader(listed), tree: this._treeBlock(), context: this._context });
+  }
+
   /** Target usable, composer ready, skills loaded. Reports why (banner) and returns false when not. */
   async _ready(alive) {
     const { catalogue, target, view, page, callTool, skills } = this._d;
