@@ -155,3 +155,15 @@ tidak terlalu penting, secara default memilih mcp yang sudah dijalankan di Prasy
 @gambar(1794052220202.png, width=200) @gambar(1794052232818.png, width=200)
 
 provider AI yang aktif di halaman yang sedang dibuka. jika dipilih nanti akan membuka tab baru. untuk shortcut saja.
+
+## Multi Akun
+
+@gambar(1794061821278.png, width=300)
+
+multi akun hanya berlaku pada Provider Deepseek dan Claude.
+
+Save untuk menyimpan sesi login akun saat ini (wajib mengisi nama di field Name this login...).
+
+Sign in with another account untuk menambah akun. kemudian login ulang menggunakan akun berbeda.
+
+Switch untuk pindah ke sesi akun tersebut.

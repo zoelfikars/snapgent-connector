@@ -155,3 +155,15 @@ not very important, by default it picks the MCP already running in Prerequisites
 @gambar(1794052220202.png, width=200) @gambar(1794052232818.png, width=200)
 
 the AI provider active on the page currently open. If selected it will open a new tab. Just a shortcut.
+
+## Multiple Account
+
+@gambar(1794061821278.png, width=300)
+
+multiple account only work on Deepsek and Claude provider.
+
+Save to store the current login session (required to fill Name this login... field).
+
+Sign in with another account for adding account. then login with another account.
+
+Switch to switch the session of selected account.
