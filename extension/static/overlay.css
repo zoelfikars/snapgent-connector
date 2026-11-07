@@ -336,7 +336,9 @@ button.zs-site-opt:hover .zs-site-go { opacity: 1; transform: translateX(0); }
 .zs-tut ul, .zs-tut ol { padding-left: 18px; }
 .zs-tut code, .zs-tut pre { font: 11px ui-monospace, Consolas, monospace; }
 .zs-tut pre { padding: 8px; border: 1px solid rgba(128, 128, 128, 0.4); border-radius: 6px; white-space: pre-wrap; }
-.zs-tut img { display: block; max-width: 100%; height: auto; border-radius: 8px; border: 1px solid rgba(128, 128, 128, 0.3); }
+.zs-tut img { display: block; max-width: 100%; height: auto; object-fit: contain; border-radius: 8px; border: 1px solid rgba(128, 128, 128, 0.3); }
+.zs-tut-lang { display: flex; gap: 4px; margin-left: auto; margin-right: 6px; }
+.zs-tut-lang .zs-mcp-pop-btn[aria-pressed="true"] { background: #eab308; border-color: rgba(234, 179, 8, 0.75); color: #111; }
 html.zs-light .zs-mcp-pop-card { background: #ffffff; color: #1f2937; border-color: rgba(0, 0, 0, 0.1); }
 html.zs-light .zs-mcp-pop-head, html.zs-light .zs-mcp-row-name { color: #111827; }
 html.zs-light .zs-mcp-pop-head { border-bottom-color: rgba(0, 0, 0, 0.07); }
@@ -912,7 +914,7 @@ html.zs-light #zs-prefs-btn, html.zs-light #zs-files-btn, html.zs-light #zs-skil
 }
 .zs-t-stop:hover { background: rgba(239, 68, 68, 0.22); }
 .zs-t-stop[hidden] { display: none; }
-.zs-t-entry { display: flex; align-items: flex-end; gap: 8px; flex: none; padding: 8px 12px 0; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.zs-t-entry { display: flex; align-items: flex-end; gap: 8px; flex: none; padding: 8px 12px 8px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
 .zs-t-input { flex: 1; min-width: 0; box-sizing: border-box; resize: none; max-height: 120px; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); color: inherit; font: inherit; font-size: 11.5px; line-height: 1.4; outline: none; }
 .zs-t-input:focus { border-color: rgba(129, 140, 248, 0.6); }
 .zs-t-run, .zs-t-copy { flex: none; padding: 5px 11px; border-radius: 8px; border: 1px solid rgba(129, 140, 248, 0.5); background: rgba(99, 102, 241, 0.18); color: inherit; font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; }

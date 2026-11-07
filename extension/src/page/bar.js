@@ -75,7 +75,7 @@ export function createBar({ document, window, provider, state, settings, serverD
   // Skills, MCP servers and Preferences live in their own buttons; the Files window opens the same Preferences dialog.
   const isWorkspaceTarget = () => isWorkspaceServer(settings.target(), tools.catalogue ? tools.catalogue.active().map((t) => t.name) : []);
   const barSettings = createBarSettings({
-    document, root, settings, serverDirectory, tools, preferences, calibration, barPrefs, isWorkspaceTarget,
+    document, root, settings, serverDirectory, tools, preferences, calibration, barPrefs, isWorkspaceTarget, storage,
     syncMenus: () => menus.sync(),
   });
   const filesMenu = createFilesMenu({

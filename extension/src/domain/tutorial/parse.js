@@ -4,11 +4,24 @@
 
 const IMAGE = /^@gambar\(\s*([^)]+?)\s*\)\s*$/;
 const HEADING = /^(#{1,3})\s+(.+?)\s*$/;
+const SIZE_OPTION = /^(width|height|w|h)\s*=\s*(\d{1,4}%?)$/i;
+
+// `@gambar(file.png, width=300, height=50%)`: the name comes first; a side that is not given stays automatic.
+function imageBlock(inner) {
+  const [name, ...options] = inner.split(",").map((part) => part.trim());
+  const block = { type: "image", name };
+  for (const option of options) {
+    const match = SIZE_OPTION.exec(option);
+    if (!match || parseInt(match[2], 10) <= 0) continue;
+    block[match[1][0].toLowerCase() === "w" ? "width" : "height"] = match[2];
+  }
+  return block;
+}
 const ITEM = /^\s*(?:[-*]|\d+[.)])\s+(.*)$/;
 
 /**
  * @typedef {{type: "heading", level: number, text: string} | {type: "paragraph", text: string} | {type: "list", ordered: boolean, items: string[]}
- *   | {type: "code", text: string} | {type: "image", name: string}} TutorialBlock
+ *   | {type: "code", text: string} | {type: "image", name: string, width?: string, height?: string}} TutorialBlock
  */
 
 /** @param {string} markdown @returns {TutorialBlock[]} */
@@ -35,7 +48,7 @@ export function parseTutorial(markdown) {
     }
     if (!line.trim()) { flush(); continue; }
     const image = IMAGE.exec(line.trim());
-    if (image) { flush(); blocks.push({ type: "image", name: image[1] }); continue; }
+    if (image) { flush(); blocks.push(imageBlock(image[1])); continue; }
     const heading = HEADING.exec(line);
     if (heading) { flush(); blocks.push({ type: "heading", level: heading[1].length, text: heading[2] }); continue; }
     const item = ITEM.exec(line);

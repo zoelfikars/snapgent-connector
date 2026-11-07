@@ -4,7 +4,10 @@
 
 import { SKILL_MAX_BYTES } from "../domain/skills/skill-text.js";
 import { openMcpSettings, openPreferences, openSkillsSettings, openTutorial } from "../ui/index.js";
-import { TUTORIAL_IMAGES, TUTORIAL_MARKDOWN } from "./tutorial-content.js";
+import { pickLanguage } from "../domain/tutorial/language.js";
+import { TUTORIAL_IMAGES, TUTORIAL_TEXTS } from "./tutorial-content.js";
+
+const TUTORIAL_LANG_KEY = "zsTutorialLang";
 
 /**
  * @param {{ document: Document, root: HTMLElement, settings: object, serverDirectory: object, tools: object, preferences: object,
@@ -12,7 +15,7 @@ import { TUTORIAL_IMAGES, TUTORIAL_MARKDOWN } from "./tutorial-content.js";
  *           syncMenus: () => void }} deps
  * @returns {{ openPreferences: () => Promise<void> }} the Preferences dialog, usable from other parts of the bar
  */
-export function createBarSettings({ document, root, settings, serverDirectory, tools, preferences, calibration, barPrefs, isWorkspaceTarget, syncMenus }) {
+export function createBarSettings({ document, root, settings, serverDirectory, tools, preferences, calibration, barPrefs, isWorkspaceTarget, syncMenus, storage }) {
   const $ = (selector) => root.querySelector(selector);
 
   const actions = () => ({
@@ -64,9 +67,11 @@ export function createBarSettings({ document, root, settings, serverDirectory, t
     });
   });
 
-  $("#zs-info-btn").addEventListener("click", (event) => {
+  // The language is the one the user picked in the dialog; until then it follows the browser's.
+  $("#zs-info-btn").addEventListener("click", async (event) => {
     event.stopPropagation();
-    openTutorial({ document, markdown: TUTORIAL_MARKDOWN, images: TUTORIAL_IMAGES });
+    const lang = pickLanguage(await storage.get(TUTORIAL_LANG_KEY), document.defaultView && document.defaultView.navigator.language);
+    openTutorial({ document, texts: TUTORIAL_TEXTS, images: TUTORIAL_IMAGES, lang, onLang: (next) => storage.set(TUTORIAL_LANG_KEY, next) });
   });
 
   $("#zs-prefs-btn").addEventListener("click", (event) => {
