@@ -85,14 +85,14 @@ bar = createBar({
 });
 
 const chat = createChat({ document, provider, state, visibility, catalogue: tools.catalogue, diag, cover: bar.cover, banner: notify, progress: (text) => bar.coverLabel(text), budget });
-const { turnKey, executed } = createTurns({ provider });
+const { turnKey, executed, progress } = createTurns({ provider });
 const resend = createPromptResend({ provider, state, storage, systemPrompt: tools.systemPrompt, limit: budget.limit, chat, diag });
 const parts = new PartQueue();
-const loop = createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs: createBatchJobs({ storage, provider, turnKey }), resend, parts, diag });
+const loop = createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs: createBatchJobs({ storage, provider, turnKey }), progress, resend, parts, diag });
 session = createSession({ state, provider, tools, chat, bar, reminder: loop.reminder, limit: budget.limit, storage, settings, serverDirectory, preferences, diag });
 stop = createStop({ document, state, provider, bar, diag });
 agentMode = createAgentMode({ state, provider, storage, onStop: () => stop.stopLoop(), onChange: redraw, diag });
-replay = createReplay({ state, provider, executed, loop, bar, diag });
+replay = createReplay({ state, provider, executed, progress, loop, bar, diag });
 
 let userInput;
 attachments = createAttachments({ provider, state, tools, chat, bar, budget, parts, preferences, startTurn: (base) => userInput.startTurn(base), diag });

@@ -12,6 +12,8 @@ import { DEFAULT_BATCH_CALLS, MAX_RESULT_PARTS, MIN_CALL_CHARS, callShare, compo
 import { partMessages } from "../domain/prompt/parts.js";
 import { FEEDBACK } from "../domain/prompt/feedback.js";
 
+const RERUN_NOTE = "(This command was interrupted by Stop earlier and has been run again.)";
+
 export class BatchRunner {
   /** @param {object} deps  the AgentLoop's deps, plus `park(scope, extra)` (wait while the tab is hidden) and `diag` */
   constructor(deps) {
@@ -45,6 +47,9 @@ export class BatchRunner {
     // All the messages together may hold this much; the output of one command may run over from one message into the next.
     const room = this._d.parts ? messageRoom * MAX_RESULT_PARTS : messageRoom;
     const batchId = this._d.jobs ? await this._d.jobs.begin(item) : null;
+    const progress = this._d.progress;
+    // Commands that finished before a Stop: their answers are reused and they are not run again (see BatchProgress).
+    const prior = progress ? progress.resume(item, batch) : [];
     let used = 0;
     let failed = false;
     let last = batch[0];
@@ -52,14 +57,16 @@ export class BatchRunner {
     for (let index = 0; index < batch.length; index++) {
       const call = batch[index];
       const remaining = room - used;
+      const reused = index < prior.length;
       // `from` is the first command that did NOT run: this one when it was skipped, the next one when it ran and failed.
       const skipRest = (why, from = index) => notRun.unshift(...batch.slice(from).map((c) => ({ tool: c.tool, why })));
-      if (index > 0 && remaining < MIN_CALL_CHARS) { skipRest("the message size limit was reached"); break; }
+      if (!reused && index > 0 && remaining < MIN_CALL_CHARS) { skipRest("the message size limit was reached"); break; }
 
-      const step = await this._runCall(item, call, {
+      const step = reused ? prior[index] : await this._runCall(item, call, {
         jobKey: batchId && jobKey(batchId, index, call), budgetChars: callShare(remaining, batch.length - index), step: { index, total: batch.length },
       });
       if (step.halted) {
+        if (progress) progress.interrupt(item, index); // the next run says so for this command
         // Stopped before ANY command gave a result: forget that this reply "ran", so Play may run it again. Once a command has
         // finished the record stays, because running the whole reply again could run that command twice.
         if (!results.length && this._d.memory.forget) this._d.memory.forget(item);
@@ -67,8 +74,11 @@ export class BatchRunner {
         return { halted: true };
       }
       last = call;
-      const text = step.feedback.length > remaining ? trimMiddle(step.feedback, remaining, "the results") : step.feedback;
+      const rerun = !reused && !!progress && progress.wasInterrupted(item, index);
+      const answer = rerun ? `${step.feedback}\n${RERUN_NOTE}` : step.feedback;
+      const text = answer.length > remaining ? trimMiddle(answer, remaining, "the results") : answer;
       results.push(text);
+      if (!reused && progress) progress.record(item, index, call, text, step.isErr);
       used += text.length + 2;
       failed = failed || step.isErr;
       this._diag("batch.step", { name: call.tool, index, of: batch.length, chars: text.length, left: room - used });
@@ -98,6 +108,7 @@ export class BatchRunner {
     if (this._budget.sent && sessionIsLarge(this._budget.sent(composed.length), this._budget.limit())) this._d.view.toast("This chat is getting large. A new chat will be cheaper.");
     if (this._d.view.progress) this._d.view.progress(`${said} · sending the results to the AI…`);
     const base = await this._d.chat.submit(messages[0]);
+    if (progress) progress.clear(item); // answered: a later run of this reply starts over
     this._end(item);
     return { base };
   }

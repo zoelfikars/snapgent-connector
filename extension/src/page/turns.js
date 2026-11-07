@@ -3,7 +3,7 @@
 // turns are identified by the site's own id when it has one, else by position, and "this turn's command already ran" is
 // remembered off the page in a TurnMemory.
 
-import { TurnMemory } from "../application/index.js";
+import { BatchProgress, TurnMemory } from "../application/index.js";
 
 export function createTurns({ provider }) {
   const position = (item) => provider.allItems().filter(provider.isAssistantItem).indexOf(item);
@@ -17,5 +17,7 @@ export function createTurns({ provider }) {
     isRendered: (item) => position(item) >= 0,
     textOf: (item) => provider.itemText(item),
   });
-  return { turnKey, executed };
+  // What a batch that Stop ended already did, so Play can carry on from there.
+  const progress = new BatchProgress({ conversationKey: () => provider.conversationKey(), keyOf: turnKey });
+  return { turnKey, executed, progress };
 }

@@ -25,6 +25,9 @@ describe("planReplay", () => {
 
   test("a command that has not run is run", () => assert.deepEqual(planReplay({ text, generating: false, alreadyRan: false }), { type: "run" }));
   test("a command that already ran is skipped, never run twice", () => assert.equal(planReplay({ text, generating: false, alreadyRan: true }).type, "already-ran"));
+  test("a batch that Stop ended part-way is carried on, even though it already ran in part", () => {
+    assert.deepEqual(planReplay({ text, generating: false, alreadyRan: true, pending: 2 }), { type: "resume", done: 2 });
+  });
   test("plain text holds nothing to run", () => assert.equal(planReplay({ text: "Just talking.", generating: false, alreadyRan: false }).type, "none"));
   test("nothing is read while the AI is still writing", () => assert.equal(planReplay({ text, generating: true, alreadyRan: false }).type, "generating"));
 });
@@ -118,7 +121,7 @@ describe("agent mode: the switch", () => {
   });
 });
 
-function replayWorld({ text = `Let me look.\n${COMMAND}`, tail = [], generating = false, ran = false, flags = {} } = {}) {
+function replayWorld({ text = `Let me look.\n${COMMAND}`, tail = [], generating = false, ran = false, progress = null, flags = {} } = {}) {
   const reply = { dataset: { zResume: "1", zResumeLen: "9", zloop: "1" }, text };
   const items = [reply, ...tail];
   const toasts = [];
@@ -128,6 +131,7 @@ function replayWorld({ text = `Let me look.\n${COMMAND}`, tail = [], generating 
     state,
     provider: { lastAssistant: () => reply, allItems: () => items, isUserItem: (item) => !!item.user, itemText: (item) => item.text, isGenerating: () => generating, assistantCount: () => 3 },
     executed: { has: () => ran },
+    progress,
     loop: { run: (base) => runs.push(base) },
     bar: { toast: (message) => toasts.push(message) },
     diag: () => {},
@@ -169,6 +173,21 @@ describe("Play: read the last reply again", () => {
     w.play();
     assert.equal(w.runs.length, 0);
     assert.equal(w.toasts.length, 1);
+  });
+
+  test("a batch that Stop ended part-way is carried on, and Play says how much was already done", () => {
+    const w = replayWorld({ ran: true, progress: { count: () => 1, clear: () => {} } });
+    w.play();
+    assert.deepEqual(w.runs, [2]);
+    assert.deepEqual(w.toasts, ["Continuing · 1 command already done"]);
+  });
+
+  test("a batch that was answered has no pending work, and the old record is dropped", () => {
+    let cleared = 0;
+    const w = replayWorld({ tail: [{ user: true, text: "» tree\nsrc/\n" }], progress: { count: () => 3, clear: () => { cleared++; } } });
+    w.play();
+    assert.equal(w.runs.length, 0);
+    assert.equal(cleared, 1);
   });
 
   test("in Discussion, while busy, or without a session Play does nothing at all", () => {

@@ -17,10 +17,12 @@ export function controlFace({ discuss, busy, started, starting, stale }) {
 
 /**
  * What Play does with the latest reply. A reply that already ran is never run again: that would repeat its side effects.
- * @returns {{ type: "generating"|"none"|"already-ran"|"run" }}
+ * A batch that Stop ended part-way (`pending` commands finished) is carried on instead: only the rest runs.
+ * @returns {{ type: "generating"|"none"|"already-ran"|"run" } | { type: "resume", done: number }}
  */
-export function planReplay({ text, generating, alreadyRan }) {
+export function planReplay({ text, generating, alreadyRan, pending = 0 }) {
   if (generating) return { type: "generating" };
   if (!hasToolSignature(text || "")) return { type: "none" };
+  if (pending > 0) return { type: "resume", done: pending };
   return { type: alreadyRan ? "already-ran" : "run" };
 }

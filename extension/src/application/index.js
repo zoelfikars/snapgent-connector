@@ -15,6 +15,7 @@ export { SkillsService } from "./skills-service.js";
 export { SessionStarter } from "./session-starter.js";
 export { ServerDirectory } from "./server-directory.js";
 export { TurnMemory } from "./turn-memory.js";
+export { BatchProgress } from "./batch-progress.js";
 export { SessionTracker, textShowsSession } from "./session-tracker.js";
 export { BridgeMonitor } from "./bridge-monitor.js";
 export { ProfileStore } from "./profile-store.js";

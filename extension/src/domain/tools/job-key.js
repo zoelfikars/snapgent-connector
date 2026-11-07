@@ -13,9 +13,14 @@ function hash(text) {
   return h.toString(16);
 }
 
-/** @param {string} batchId @param {number} index @param {{ tool: string, arguments?: object }} call */
-export function jobKey(batchId, index, call) {
+/** What tells one command of a reply from another: its tool and its arguments. A stopped batch also knows its own commands by it. */
+export function callSignature(call) {
   let body = "";
   try { body = JSON.stringify(call.arguments || {}); } catch { /* unserialisable: the name and place still tell it apart */ }
-  return `${batchId}:${index}:${hash(`${call.tool}\n${body}`)}`;
+  return hash(`${call.tool}\n${body}`);
+}
+
+/** @param {string} batchId @param {number} index @param {{ tool: string, arguments?: object }} call */
+export function jobKey(batchId, index, call) {
+  return `${batchId}:${index}:${callSignature(call)}`;
 }

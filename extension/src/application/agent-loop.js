@@ -27,7 +27,8 @@ export class AgentLoop {
    *   outbox: { prepare: (text: string) => string, reserve?: () => number },
    *   budget?: { limit: () => number, calls?: () => number, sent?: (chars: number) => number, tooLong?: (chars: number) => void },
    *   parts?: import("./part-queue.js").PartQueue,   // the rest of an answer that did not fit in one message
-   *   jobs?: { begin: (item: object) => Promise<string>, end: (item: object) => void },  // names a batch, so a reload can pick it up again
+   *   jobs?: { begin: (item: object) => Promise<string>, end: (item: object) => void },
+   *   progress?: import("./batch-progress.js").BatchProgress,  // what a batch that Stop ended already did: Play carries on from there  // names a batch, so a reload can pick it up again
    *   reminder: import("./tool-reminder.js").ToolReminder,
    *   activity: { signature: () => string, isPaused: () => boolean },
    *   timers: import("./ports.js").Timers,
