@@ -30,6 +30,19 @@ test("a found instruction file goes into the start message, before the commands"
 });
 test("without one, the start message says nothing about project instructions", () => assert.ok(!ZS.buildStartMessage({ prompt: "P", commands: "c" }).includes("Project instructions")));
 
+const reminderTools = [{ name: "read_files", description: "Read files", inputSchema: { properties: { paths: { type: "array" } } } }];
+test("the reminder lists the commands and, when given, how many one reply may carry", () => {
+  const reminder = ZS.toolsReminder(reminderTools, "VS Code", "snapgent", 5);
+  assert.ok(reminder.includes("read_files(paths)"));
+  assert.ok(reminder.includes("at most 5 commands in one reply"));
+  assert.ok(ZS.toolsReminder(reminderTools, "VS Code", "snapgent", 1).includes("at most 1 command in one reply"));
+  assert.ok(!ZS.toolsReminder(reminderTools, "VS Code", "snapgent", 1).includes("1 commands"));
+});
+test("without a Commands per reply value the reminder says nothing about a limit", () => {
+  assert.ok(!ZS.toolsReminder(reminderTools).includes("in one reply"));
+  assert.ok(!ZS.toolsReminder(reminderTools, "VS Code", "snapgent", 0).includes("in one reply"));
+});
+
 const skilled = ZS.buildSystemPrompt({ skills: [{ name: "commit", description: "write commits" }] });
 test("skills listed", () => assert.ok(skilled.includes("- commit: write commits")));
 

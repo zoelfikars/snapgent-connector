@@ -70,6 +70,7 @@ export function createAtPopup({ document, window, root, state, settings, provide
         onCopyTest: calibration && calibration.copyTestText,
         onFillTest: calibration && calibration.fillTestText,
         onFillStartMessage: calibration && calibration.fillStartMessage,
+        onFillReminder: calibration && calibration.fillReminderMessage,
         onAttachTest: calibration && calibration.attachTestFile,
       },
     });

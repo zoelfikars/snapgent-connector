@@ -114,8 +114,8 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
     calls: calls ? calls() : undefined,
   });
 
-  /** The command list the model is reminded of every so often, scoped to the selected target. */
-  const reminderText = () => toolsReminder(catalogue.active(), serverDirectory.name(settings.target()), settings.target());
+  /** The command list the model is reminded of every so often, scoped to the selected target, with the Commands per reply it may carry. */
+  const reminderText = () => toolsReminder(catalogue.active(), serverDirectory.name(settings.target()), settings.target(), calls ? calls() : undefined);
 
   return { bridge, session, catalogue, confirm, runner, manual, skills, workspace, systemPrompt, reminderText };
 }

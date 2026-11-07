@@ -70,7 +70,7 @@ const preferences = createPreferences({ storage, state, defaults: defaultPrefere
 let stop;
 let session;
 let attachments;
-const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast: (text) => bar.toast(text), previewStartMessage: () => session?.previewStartMessage?.() });
+const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast: (text) => bar.toast(text), previewStartMessage: () => session?.previewStartMessage?.(), previewReminderMessage: async () => { await tools.catalogue.ensure(); return tools.catalogue.active().length ? tools.reminderText() : null; } });
 bar = createBar({
   document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, preferences, send, calibration, terminal,
   files: { list: () => attachments.listFiles(), refresh: () => attachments.refresh(), insert: (paths) => attachments.insert(paths), canList: () => attachments.canList() },

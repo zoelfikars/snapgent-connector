@@ -157,6 +157,18 @@ describe("preferences panel", () => {
     assert.deepEqual(saved, [["AGENTS.md", "CLAUDE.md"], ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]]);
   });
 
+  test("the reminder test is offered and writes the reminder through its action", () => {
+    const w = new JSDOM("<!doctype html><body></body>").window;
+    const called = [];
+    openPreferences({
+      document: w.document, values: { chars: 100000, calls: 8, folders: [] }, defaults: { folders: [] },
+      save: { chars() {}, calls() {}, folders() {} }, actions: { onFillReminder: () => called.push("reminder") },
+    });
+    assert.match(w.document.querySelector(".zs-pref-card").textContent, /Test the reminder message/);
+    w.document.querySelector("#zs-pref-reminder-fill").click();
+    assert.deepEqual(called, ["reminder"]);
+  });
+
   test("bar and calibration actions are offered and wired", () => {
     const w = new JSDOM("<!doctype html><body></body>").window;
     const called = [];

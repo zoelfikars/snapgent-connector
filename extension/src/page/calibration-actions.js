@@ -9,8 +9,8 @@ import { learnProfile, profileProblems, updateProfile, createCalibratedProvider 
 import { describeElement } from "../infrastructure/chat/index.js";
 import { loremIpsum } from "../domain/prompt/lorem.js";
 
-/** @param {{ document: Document, location: Location, provider: object, state: object, storage: object, settings: object, toast: (text: string) => void, previewStartMessage?: () => Promise<string|null> }} deps */
-export function createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast, previewStartMessage = null }) {
+/** @param {{ document: Document, location: Location, provider: object, state: object, storage: object, settings: object, toast: (text: string) => void, previewStartMessage?: () => Promise<string|null>, previewReminderMessage?: () => Promise<string|null> }} deps */
+export function createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast, previewStartMessage = null, previewReminderMessage = null }) {
   const store = new ProfileStore({
     store: { get: storage.get, set: storage.commit },
     problemsOf: profileProblems,
@@ -133,6 +133,18 @@ export function createCalibrationActions({ document, location, provider, state, 
     } catch (error) { toast(String((error && error.message) || error)); }
   }
 
+  /** The exact reminder the model gets under a result now and then (the command list and the Commands per reply), written into the text box and not sent: so the user can check it without waiting for one to become due. */
+  async function fillReminderMessage() {
+    if (provider.needsCalibration) { toast("Calibrate this site first."); return; }
+    if (!previewReminderMessage) { toast("The reminder is not ready."); return; }
+    const text = await previewReminderMessage();
+    if (!text) { toast("No commands to remind of yet."); return; }
+    try {
+      const via = await provider.writeText(text);
+      toast(`Wrote ${text.length.toLocaleString("en-US")} characters of reminder into the text box (via ${via}). Not sent.`);
+    } catch (error) { toast(String((error && error.message) || error)); }
+  }
+
   /** Filler text as a .txt file given to the page by `method` (paste, input or drop), and not sent. */
   async function attachTestFile(chars, method) {
     if (provider.needsCalibration) { toast("Calibrate this site first."); return; }
@@ -170,5 +182,5 @@ export function createCalibrationActions({ document, location, provider, state, 
   // undefined: not calibrated, so nothing to keep them in; null: calibrated, no values of its own.
   const limits = () => (provider.needsCalibration ? undefined : provider.limits || null);
 
-  return { limits, setLimits, copyTestText, fillTestText, fillStartMessage, attachTestFile, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
+  return { limits, setLimits, copyTestText, fillTestText, fillStartMessage, fillReminderMessage, attachTestFile, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
 }

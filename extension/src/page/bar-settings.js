@@ -27,6 +27,7 @@ export function createBarSettings({ document, root, settings, serverDirectory, t
     onCopyTest: calibration.copyTestText,
     onFillTest: calibration.fillTestText,
     onFillStartMessage: calibration.fillStartMessage,
+    onFillReminder: calibration.fillReminderMessage,
     onAttachTest: calibration.attachTestFile,
   });
 
