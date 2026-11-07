@@ -10,7 +10,7 @@
 
 [![License](https://img.shields.io/badge/LICENSE-GPL--3.0-FACC15?style=flat-square&labelColor=111111&logo=opensourceinitiative&logoColor=FACC15)](LICENSE)
 [![Manifest](https://img.shields.io/badge/MANIFEST-V3-FACC15?style=flat-square&labelColor=111111&logo=googlechrome&logoColor=FACC15)](https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3/)
-[![Release](https://img.shields.io/badge/RELEASE-V3.9.3-FACC15?style=flat-square&labelColor=111111&logo=semanticrelease&logoColor=FACC15)](https://github.com/zoelfikarshomelab/snapgent-connector/releases/tag/V3.9.3)
+[![Release](https://img.shields.io/badge/RELEASE-V3.9.4-FACC15?style=flat-square&labelColor=111111&logo=semanticrelease&logoColor=FACC15)](https://github.com/zoelfikarshomelab/snapgent-connector/releases/tag/V3.9.4)
 [![MCP](https://img.shields.io/badge/PROTOCOL-MCP-FACC15?style=flat-square&labelColor=111111&logo=modelcontextprotocol&logoColor=FACC15)](https://modelcontextprotocol.io/)
 
 </div>
@@ -113,7 +113,7 @@ VS Code's MCP server is configured by `snapgent` itself; it detects the open VS 
 
 **① Load the extension**
 
-1. Download and extract the [latest SnapgentV3 release](https://github.com/zoelfikarshomelab/snapgent-connector/releases/tag/V3.9.3).
+1. Download and extract the [latest SnapgentV3 release](https://github.com/zoelfikarshomelab/snapgent-connector/releases/tag/V3.9.4).
 2. Open `edge://extensions` (Edge) or `chrome://extensions` (Chrome).
 3. Enable **Developer mode**.
 4. Click **Load unpacked** and select the `chrome` folder of the release (or `extension/dist/chrome` if you built from source).
@@ -306,7 +306,7 @@ The dialog keeps the dangerous one-liners visible to you.
 
 **Built for creators who want to spend more time making.**
 
-[Latest release V3.9.3](https://github.com/zoelfikarshomelab/snapgent-connector/releases/tag/V3.9.3) · [Issues](https://github.com/zoelfikarshomelab/snapgent-connector/issues) · [License](LICENSE)
+[Latest release V3.9.4](https://github.com/zoelfikarshomelab/snapgent-connector/releases/tag/V3.9.4) · [Issues](https://github.com/zoelfikarshomelab/snapgent-connector/issues) · [License](LICENSE)
 
 Based on [snapgent-connector](https://github.com/herdodp/snapgent-connector) by [herdodp](https://github.com/herdodp), the original project. Released under the same GPL-3.0 license.
 

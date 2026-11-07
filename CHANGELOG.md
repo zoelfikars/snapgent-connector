@@ -4,6 +4,8 @@ All notable changes to snapgentV3 Free are documented here.
 
 ## [Unreleased]
 
+## [V3.9.4] - 2026-11-07
+
 ### Terminal
 - **Command examples**: an Examples button in the terminal opens a list of every command the selected MCP server offers, each with a ready JSON call (required parameters filled with placeholders, the optional ones named) that can be copied, or put in the terminal's input to edit and run.
 
