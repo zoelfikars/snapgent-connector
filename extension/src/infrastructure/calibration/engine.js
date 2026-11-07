@@ -8,6 +8,7 @@ import { StreamSampler } from "../chat/stream-sampler.js";
 import { waitFor } from "../chat/wait.js";
 import { alternativeSelectors, shown, visible } from "./dom-signals.js";
 import { readText } from "./page-text.js";
+import { showRawViews } from "./raw-view.js";
 import { profileProblems } from "./profile.js";
 
 const TIMINGS = { GEN_IDLE_MS: 2000, REASON_IDLE_MS: 15000, WARMUP_MS: 60000, REASON_NOREPLY_MS: 120000, STABLE_MS: 10000, RESPONSE_TIMEOUT_MS: 300000 };
@@ -96,6 +97,8 @@ export function createCalibratedProvider({ document, location, profile, diag = (
   const itemText = (item) => (item ? (isAssistantItem(item) ? bodyText(item) : readText(item)) : "");
   const readAssistant = () => {
     const item = lastAssistant();
+    // A JSON block drawn as a collapsed tree hides its content; its Raw view is switched on first (the page then changes, so what was read is dropped).
+    if (item) { try { const pressed = showRawViews(item); if (pressed) diag("reply.rawView", { pressed }); } catch { /* reading goes on */ } }
     return { present: !!item, reply: item ? bodyText(item).trim() : "", thinking: item ? thinkingText(item).trim() : "", item };
   };
   // A chat has begun when a message of the user's is on the page: the home page's cards, a greeting or an overlay that happens

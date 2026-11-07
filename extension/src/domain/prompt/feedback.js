@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Messages sent back to the model so it can self-correct. Pure data.
 
+import { closestName } from "../tools/closest-name.js";
+
 // Feedback strings sent back to the model so it can self-correct.
 export const FEEDBACK = {
   // A command-shaped reply that could not be turned into a runnable call.
@@ -57,7 +59,9 @@ export const FEEDBACK = {
     `ERROR: no project folder is open in the user's editor right now, so no command can run${folder ? ` (this chat works in ${folder})` : ""}. ` +
     "Do NOT retry. Tell the user to open that folder in their editor (VS Code or Antigravity), then continue.",
   unknownTool: (name, valid) =>
-    `ERROR: unknown command "${name}". It does not exist. Valid commands are: ` +
+    `ERROR: unknown command "${name}". It does not exist. ` +
+    (closestName(valid, name) ? `Did you mean "${closestName(valid, name)}"? Its parameter names may differ too, so check them. ` : "") +
+    "Valid commands are: " +
     valid.join(", ") +
     ". Use an exact name and parameter keys from the system prompt.",
   // The page outlived the extension build it was running (reload / auto-update
