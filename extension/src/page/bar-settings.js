@@ -3,7 +3,8 @@
 // Files window can open the very same Preferences dialog.
 
 import { SKILL_MAX_BYTES } from "../domain/skills/skill-text.js";
-import { openMcpSettings, openPreferences, openSkillsSettings } from "../ui/index.js";
+import { openMcpSettings, openPreferences, openSkillsSettings, openTutorial } from "../ui/index.js";
+import { TUTORIAL_IMAGES, TUTORIAL_MARKDOWN } from "./tutorial-content.js";
 
 /**
  * @param {{ document: Document, root: HTMLElement, settings: object, serverDirectory: object, tools: object, preferences: object,
@@ -61,6 +62,11 @@ export function createBarSettings({ document, root, settings, serverDirectory, t
         syncMenus();
       },
     });
+  });
+
+  $("#zs-info-btn").addEventListener("click", (event) => {
+    event.stopPropagation();
+    openTutorial({ document, markdown: TUTORIAL_MARKDOWN, images: TUTORIAL_IMAGES });
   });
 
   $("#zs-prefs-btn").addEventListener("click", (event) => {

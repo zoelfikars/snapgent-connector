@@ -4,6 +4,9 @@ All notable changes to snapgentV3 Free are documented here.
 
 ## [Unreleased]
 
+### Tutorial
+- **An Info button opens a tutorial** beside the other tool buttons of the bar. The tutorial is written in Markdown (`extension/tutorial/tutorial.md`), and a line `@gambar(file.png)` places an image from `extension/tutorial/images/`. The build embeds the images in the extension, so nothing is fetched from the page, and it stops with a clear message when a named image is missing.
+
 ### Workspace per chat
 - **A chat works in the folder it was started in.** The server used to follow VS Code's active window on every command, so a second chat (or a window switch, or a server restart that dropped the pin) moved a running chat into another project: `read_files` of `vue/src/...` failed because the root had silently become another folder. The folder is now kept per conversation, survives reloads, and is sent with every command (an argument only the extension can set).
 - When VS Code has more than one folder open, starting a session asks which one; a pinned folder is the default and is used without asking. Choosing a folder in the bar's workspace menu sets it for the current chat.

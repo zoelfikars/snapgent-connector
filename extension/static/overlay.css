@@ -327,6 +327,16 @@ button.zs-site-opt:hover .zs-site-go { opacity: 1; transform: translateX(0); }
 .zs-mcp-check:focus-visible + .zs-mcp-toggle { outline: 2px solid rgba(255, 255, 255, 0.5); outline-offset: 2px; }
 /* The preferences dialog holds sliders, textareas and menus, so it gets a wider card than the other popups. */
 .zs-mcp-pop-card.zs-pref-card { width: min(520px, calc(100vw - 24px)); }
+
+/* Tutorial popup */
+.zs-tut { font-size: 12px; line-height: 1.5; }
+.zs-tut h3, .zs-tut h4, .zs-tut h5 { margin: 4px 0 0; font-size: 13px; }
+.zs-tut h3 { font-size: 15px; }
+.zs-tut p, .zs-tut ul, .zs-tut ol { margin: 0; }
+.zs-tut ul, .zs-tut ol { padding-left: 18px; }
+.zs-tut code, .zs-tut pre { font: 11px ui-monospace, Consolas, monospace; }
+.zs-tut pre { padding: 8px; border: 1px solid rgba(128, 128, 128, 0.4); border-radius: 6px; white-space: pre-wrap; }
+.zs-tut img { display: block; max-width: 100%; height: auto; border-radius: 8px; border: 1px solid rgba(128, 128, 128, 0.3); }
 html.zs-light .zs-mcp-pop-card { background: #ffffff; color: #1f2937; border-color: rgba(0, 0, 0, 0.1); }
 html.zs-light .zs-mcp-pop-head, html.zs-light .zs-mcp-row-name { color: #111827; }
 html.zs-light .zs-mcp-pop-head { border-bottom-color: rgba(0, 0, 0, 0.07); }
@@ -832,14 +842,14 @@ html.zs-light .zs-file-active { background: rgba(234, 179, 8, 0.28); }
 html #zs-bar #zs-tools {
   order: 1; flex: none; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px;
 }
-#zs-term-btn, #zs-files-btn, #zs-skills-btn, #zs-mcp-btn, #zs-prefs-btn, #zs-discuss {
+#zs-term-btn, #zs-files-btn, #zs-skills-btn, #zs-mcp-btn, #zs-prefs-btn, #zs-info-btn, #zs-discuss {
   flex: none; position: relative; display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; box-sizing: border-box; padding: 0;
   border-radius: 9px; border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.07); color: #c7d2fe; cursor: pointer;
   transition: background 0.15s ease;
 }
-#zs-term-btn:hover, #zs-files-btn:hover, #zs-skills-btn:hover, #zs-mcp-btn:hover, #zs-prefs-btn:hover, #zs-discuss:hover { background: rgba(255, 255, 255, 0.13); }
+#zs-term-btn:hover, #zs-files-btn:hover, #zs-skills-btn:hover, #zs-mcp-btn:hover, #zs-prefs-btn:hover, #zs-info-btn:hover, #zs-discuss:hover { background: rgba(255, 255, 255, 0.13); }
 #zs-files-btn[hidden] { display: none; }
 #zs-term-badge, #zs-files-badge {
   position: absolute; top: -4px; right: -4px;

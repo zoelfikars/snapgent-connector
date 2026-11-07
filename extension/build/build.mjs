@@ -5,6 +5,7 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TARGETS, buildManifest } from "./manifest.mjs";
+import { tutorialPlugin } from "./tutorial.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
@@ -29,6 +30,7 @@ for (const target of targets) {
     format: "iife",
     target: ["chrome110", "firefox128"],
     legalComments: "none",
+    plugins: [tutorialPlugin(root)],
     logLevel: "warning",
   });
 

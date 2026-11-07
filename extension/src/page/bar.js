@@ -24,6 +24,7 @@ const FILES = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" strok
 const STAR = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
 const MCP = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>`;
 const CHAT = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+const INFO = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
 const pill = (id, nameId, label, title = "", popup) => pillHtml({ id, nameId, label, title, popup });
 const TEMPLATE = `
   <div id="zs-bar">
@@ -35,6 +36,7 @@ const TEMPLATE = `
       <button id="zs-skills-btn" type="button" aria-label="Skills" title="Skills">${STAR}</button>
       <button id="zs-mcp-btn" type="button" aria-label="MCP settings" title="MCP settings">${MCP}</button>
       <button id="zs-prefs-btn" type="button" aria-label="Preferences" title="Preferences">${GEAR}</button>
+      <button id="zs-info-btn" type="button" aria-label="Tutorial" title="Tutorial">${INFO}</button>
       <button id="zs-discuss" type="button" hidden aria-pressed="false" aria-label="Agent or Discussion mode" title="Discussion mode">${CHAT}</button>
       <button id="zs-play" type="button" hidden aria-label="Read the last reply and run its command" title="Read the last reply and run its command">▶</button>
       <button id="zs-stop" type="button" hidden aria-label="Stop" title="Stop">■</button>
