@@ -52,25 +52,32 @@ export function createFloatingWindow({ document, title = "", className = "", wid
   dragEl.addEventListener("pointerup", endDrag);
   dragEl.addEventListener("pointercancel", endDrag);
 
-  // Resizing: the grip at the opposite corner grows the window, never past the window's own edges.
+  // Resizing: like the terminal's, the grip is the bottom-left corner. The top and right edges stay where they are, so dragging left
+  // widens the window and dragging down makes it taller, whether it still sits where it opened or was moved by its handle.
   let size = null;
   gripEl.addEventListener("pointerdown", (event) => {
     event.preventDefault();
     const rect = root.getBoundingClientRect();
-    size = { x: event.clientX, y: event.clientY, w: rect.width, h: rect.height, left: rect.left, top: rect.top };
+    const view = document.documentElement;
+    size = { x: event.clientX, y: event.clientY, w: rect.width, h: rect.height, right: rect.right, top: rect.top };
+    root.style.left = "auto";
+    root.style.bottom = "auto";
+    root.style.right = `${Math.round(view.clientWidth - rect.right)}px`;
+    root.style.top = `${Math.round(rect.top)}px`;
+    root.classList.add("zs-fw-resizing");
     if (gripEl.setPointerCapture) gripEl.setPointerCapture(event.pointerId);
   });
   gripEl.addEventListener("pointermove", (event) => {
     if (!size) return;
     const view = document.documentElement;
-    const maxW = view.clientWidth - size.left;
+    const maxW = size.right;
     const maxH = view.clientHeight - size.top;
-    const w = Math.min(maxW, Math.max(MIN_W, size.w + (event.clientX - size.x)));
+    const w = Math.min(maxW, Math.max(MIN_W, size.w + (size.x - event.clientX)));
     const h = Math.min(maxH, Math.max(MIN_H, size.h + (event.clientY - size.y)));
     root.style.width = `${Math.round(w)}px`;
     root.style.height = `${Math.round(h)}px`;
   });
-  const endResize = () => { size = null; };
+  const endResize = () => { size = null; root.classList.remove("zs-fw-resizing"); };
   gripEl.addEventListener("pointerup", endResize);
   gripEl.addEventListener("pointercancel", endResize);
 

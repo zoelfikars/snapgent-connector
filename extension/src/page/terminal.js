@@ -7,6 +7,8 @@
 // reload starts empty, and the output that arrived before is not replayed.
 
 import { createTerminalPanel } from "../ui/terminal-panel.js";
+import { openCommandExamples } from "../ui/command-examples.js";
+import { exampleCall } from "../domain/tools/example-call.js";
 import { feed, state as freshState } from "../ui/ansi.js";
 import { parseToolCalls } from "../domain/parser/index.js";
 import { jobKey } from "../domain/tools/job-key.js";
@@ -45,10 +47,11 @@ async function copyToClipboard(document, text) {
  *             runningCount: () => number, start: () => void }}
  */
 export function createTerminal({ document, diag, onChange = () => {}, copy = (text) => copyToClipboard(document, text) }) {
-  const panel = createTerminalPanel({ document, onStop: (key) => stop(key), onCopy: (key) => copyTab(key), onRun: (text) => submit(text) });
+  const panel = createTerminalPanel({ document, onStop: (key) => stop(key), onCopy: (key) => copyTab(key), onRun: (text) => submit(text), onExamples: () => showExamples() });
   const tabs = new Map(); // key -> { key, name, label, status, state, lines, streamed, result }
   let cancel = null;
   let runner = null;
+  let toolList = () => [];
 
   function running() {
     return [...tabs.values()].filter((tab) => tab.status === "running");
@@ -120,6 +123,12 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
 
   function setCancel(handler) { cancel = handler; }
   function setRunner(run) { runner = run; }
+  /** `list` gives the commands the selected server offers right now. */
+  function setTools(list) { toolList = list; }
+
+  function showExamples() {
+    openCommandExamples({ document, examples: toolList().map(exampleCall), copy, onUse: (text) => panel.setInput(text) });
+  }
 
   function stop(key) {
     const tab = tabs.get(key);
@@ -178,5 +187,5 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
     draw();
   }
 
-  return { toggle, begin, ingest, finish, setCancel, setRunner, stop, runningCount, start };
+  return { toggle, begin, ingest, finish, setCancel, setRunner, setTools, stop, runningCount, start };
 }

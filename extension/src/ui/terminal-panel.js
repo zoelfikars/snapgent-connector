@@ -25,6 +25,7 @@ const TEMPLATE = `
       <button type="button" class="zs-t-run" title="Run (Ctrl+Enter)">Run</button>
     </div>
     <div class="zs-t-foot"><span class="zs-t-hint"></span>
+    <button type="button" class="zs-t-examples" title="Example commands you can copy">Examples</button>
     <button type="button" class="zs-t-copy" hidden title="Copy the output of the selected command">Copy</button>
     <button type="button" class="zs-t-stop" hidden>■ Stop</button></div>
     <div class="zs-t-grip" title="Drag to resize" aria-hidden="true"></div>
@@ -38,7 +39,7 @@ const TEMPLATE = `
  *             setTabs: (tabs: object[]) => void, appendLine: (key: string, segments: object[]) => void,
  *             select: (key: string) => void, forget: (key: string) => void, flashCopy: (ok: boolean) => void }}
  */
-export function createTerminalPanel({ document, onStop = () => {}, onCopy = () => {}, onRun = () => ({ ok: true }) }) {
+export function createTerminalPanel({ document, onStop = () => {}, onCopy = () => {}, onRun = () => ({ ok: true }), onExamples = () => {} }) {
   const root = document.createElement("div");
   root.innerHTML = TEMPLATE;
   const panel = root.firstElementChild;
@@ -83,6 +84,7 @@ export function createTerminalPanel({ document, onStop = () => {}, onCopy = () =
   stopEl.addEventListener("click", () => { if (selected) onStop(selected); });
   copyEl.addEventListener("click", () => { if (selected) onCopy(selected); });
   runEl.addEventListener("click", () => submit());
+  panel.querySelector(".zs-t-examples").addEventListener("click", () => onExamples());
   inputEl.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); submit(); }
   });
@@ -110,6 +112,13 @@ export function createTerminalPanel({ document, onStop = () => {}, onCopy = () =
     copyEl.textContent = ok ? "Copied ✓" : "Copy failed";
     clearTimeout(copyTimer);
     copyTimer = setTimeout(() => { copyEl.textContent = "Copy"; }, 1500);
+  }
+
+  /** Text for the input (an example command), ready to edit and run. */
+  function setInput(text) {
+    inputEl.value = text;
+    setHint();
+    inputEl.focus();
   }
 
   function open() { panel.hidden = false; }
@@ -184,5 +193,5 @@ export function createTerminalPanel({ document, onStop = () => {}, onCopy = () =
     if (nearBottom) el.scrollTop = el.scrollHeight;
   }
 
-  return { root: panel, open, close, toggle, isOpen, setTabs, appendLine, select, forget, flashCopy };
+  return { root: panel, open, close, toggle, isOpen, setTabs, appendLine, select, forget, flashCopy, setInput };
 }

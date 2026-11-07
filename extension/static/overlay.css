@@ -304,6 +304,7 @@ button.zs-site-opt:hover .zs-site-go { opacity: 1; transform: translateX(0); }
 .zs-mcp-pop-btn-primary:hover { background: #facc15; }
 .zs-mcp-pop-btn-block { width: 100%; flex: 1 1 auto; }
 .zs-mcp-pop-btn-small { flex: none; min-height: 0; padding: 5px 10px; font-size: 11px; border-radius: 7px; }
+.zs-mcp-pop-btn:disabled { opacity: 0.45; cursor: default; }
 .zs-mcp-row-actions { display: flex; gap: 6px; flex: none; }
 .zs-mcp-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -327,17 +328,22 @@ button.zs-site-opt:hover .zs-site-go { opacity: 1; transform: translateX(0); }
 .zs-mcp-check:focus-visible + .zs-mcp-toggle { outline: 2px solid rgba(255, 255, 255, 0.5); outline-offset: 2px; }
 /* The preferences dialog holds sliders, textareas and menus, so it gets a wider card than the other popups. */
 .zs-mcp-pop-card.zs-pref-card { width: min(520px, calc(100vw - 24px)); }
+/* The tutorial carries screenshots, so its card is the widest of the popups. */
+.zs-mcp-pop-card.zs-tut-card { width: min(760px, calc(100vw - 24px)); }
 
 /* Tutorial popup */
-.zs-tut { font-size: 12px; line-height: 1.5; }
-.zs-tut h3, .zs-tut h4, .zs-tut h5 { margin: 4px 0 0; font-size: 13px; }
-.zs-tut h3 { font-size: 15px; }
+/* The text size is a variable the dialog sets from its A-/A+ buttons; everything else is in em, so the whole tutorial grows together. */
+.zs-tut { font-size: var(--zs-tut-size, 14px); line-height: 1.6; }
+.zs-tut h3, .zs-tut h4, .zs-tut h5 { margin: 0.55em 0 0; font-size: 1.07em; }
+.zs-tut h3 { font-size: 1.2em; }
 .zs-tut p, .zs-tut ul, .zs-tut ol { margin: 0; }
-.zs-tut ul, .zs-tut ol { padding-left: 18px; }
-.zs-tut code, .zs-tut pre { font: 11px ui-monospace, Consolas, monospace; }
+.zs-tut ul, .zs-tut ol { padding-left: 1.4em; }
+.zs-tut code, .zs-tut pre { font: 0.93em ui-monospace, Consolas, monospace; }
 .zs-tut pre { padding: 8px; border: 1px solid rgba(128, 128, 128, 0.4); border-radius: 6px; white-space: pre-wrap; }
 .zs-tut img { display: block; max-width: 100%; height: auto; object-fit: contain; border-radius: 8px; border: 1px solid rgba(128, 128, 128, 0.3); }
-.zs-tut-lang { display: flex; gap: 4px; margin-left: auto; margin-right: 6px; }
+.zs-tut-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+.zs-tut-size { display: flex; gap: 4px; margin-left: auto; }
+.zs-tut-lang { display: flex; gap: 4px; margin-right: 6px; }
 .zs-tut-lang .zs-mcp-pop-btn[aria-pressed="true"] { background: #eab308; border-color: rgba(234, 179, 8, 0.75); color: #111; }
 html.zs-light .zs-mcp-pop-card { background: #ffffff; color: #1f2937; border-color: rgba(0, 0, 0, 0.1); }
 html.zs-light .zs-mcp-pop-head, html.zs-light .zs-mcp-row-name { color: #111827; }
@@ -917,9 +923,18 @@ html.zs-light #zs-prefs-btn, html.zs-light #zs-files-btn, html.zs-light #zs-skil
 .zs-t-entry { display: flex; align-items: flex-end; gap: 8px; flex: none; padding: 8px 12px 8px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
 .zs-t-input { flex: 1; min-width: 0; box-sizing: border-box; resize: none; max-height: 120px; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); color: inherit; font: inherit; font-size: 11.5px; line-height: 1.4; outline: none; }
 .zs-t-input:focus { border-color: rgba(129, 140, 248, 0.6); }
-.zs-t-run, .zs-t-copy { flex: none; padding: 5px 11px; border-radius: 8px; border: 1px solid rgba(129, 140, 248, 0.5); background: rgba(99, 102, 241, 0.18); color: inherit; font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; }
-.zs-t-run:hover, .zs-t-copy:hover { background: rgba(99, 102, 241, 0.3); }
+.zs-t-run, .zs-t-copy, .zs-t-examples { flex: none; padding: 5px 11px; border-radius: 8px; border: 1px solid rgba(129, 140, 248, 0.5); background: rgba(99, 102, 241, 0.18); color: inherit; font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; }
+.zs-t-run:hover, .zs-t-copy:hover, .zs-t-examples:hover { background: rgba(99, 102, 241, 0.3); }
 .zs-t-copy[hidden] { display: none; }
+
+/* Command examples popup (opened from the terminal) */
+.zs-ex { display: flex; flex-direction: column; gap: 6px; padding-bottom: 10px; border-bottom: 1px solid rgba(128, 128, 128, 0.25); }
+.zs-ex-head { display: flex; flex-direction: column; gap: 2px; }
+.zs-ex-name { font: 700 12px ui-monospace, Consolas, monospace; }
+.zs-ex-desc { opacity: 0.65; font-size: 11px; }
+.zs-ex-json { padding: 8px; border: 1px solid rgba(128, 128, 128, 0.4); border-radius: 6px; white-space: pre-wrap; word-break: break-all; font: 11px ui-monospace, Consolas, monospace; }
+.zs-ex-foot { display: flex; align-items: center; gap: 6px; }
+.zs-ex-opt { flex: 1; min-width: 0; opacity: 0.6; font-size: 10.5px; }
 .zs-t-hint.zs-t-bad { opacity: 1; color: #fca5a5; }
 html.zs-light .zs-t-input { border-color: rgba(0, 0, 0, 0.18); background: rgba(0, 0, 0, 0.04); }
 /* resize grip: the panel is anchored at the top-right, so the bottom-left corner is where both free
@@ -962,11 +977,12 @@ html.zs-light .zs-t-input { border-color: rgba(0, 0, 0, 0.18); background: rgba(
 }
 .zs-fw-drag:hover { opacity: 0.9; background: rgba(255, 255, 255, 0.1); }
 .zs-fw-grip {
-  position: absolute; left: 1px; bottom: 1px; width: 13px; height: 13px;
+  position: absolute; left: 6px; bottom: 6px; width: 12px; height: 12px;
   cursor: nesw-resize; touch-action: none; opacity: 0.65;
-  border-left: 2px solid rgba(255, 255, 255, 0.3); border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+  border-left: 3px solid rgba(255, 255, 255, 0.3); border-bottom: 3px solid rgba(255, 255, 255, 0.3);
   border-bottom-left-radius: 12px; transition: border-color 0.15s ease, opacity 0.15s ease;
 }
+.zs-float-win.zs-fw-resizing { user-select: none; }
 .zs-fw-grip:hover { opacity: 1; border-color: rgba(129, 140, 248, 0.9); }
 html.zs-light .zs-float-win { background: rgba(252, 252, 253, 0.99); color: #26282f; border-color: rgba(99, 102, 241, 0.3); box-shadow: 0 18px 50px rgba(15, 23, 42, 0.2); }
 html.zs-light .zs-fw-head { border-bottom-color: rgba(0, 0, 0, 0.08); }
@@ -982,7 +998,7 @@ html.zs-light .zs-fw-drag:hover { background: rgba(0, 0, 0, 0.06); }
 .zs-files-refresh:hover, .zs-files-gear:hover { background: rgba(255,255,255,0.12); }
 .zs-files-clear { cursor: pointer; text-decoration: underline dotted; }
 .zs-files-ignored { flex: none; padding: 5px 10px 0; font-size: 10px; opacity: 0.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.zs-files-win .zs-files-toggle { flex: none; padding: 4px 10px 8px; }
+.zs-files-win .zs-files-toggle { flex: none; padding: 4px 10px 8px 28px; } /* room for the resize grip in the corner */
 html.zs-light .zs-files-win .zs-files-foot { border-top-color: rgba(0,0,0,0.08); }
 html.zs-light .zs-files-refresh, html.zs-light .zs-files-gear { border-color: rgba(0,0,0,0.14); background: rgba(0,0,0,0.05); }
 

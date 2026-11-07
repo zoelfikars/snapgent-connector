@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Reads the tutorial's Markdown into plain blocks. Pure: text in, data out. It knows only what a tutorial needs (headings, paragraphs,
-// lists, code blocks, bold and inline code) plus one line of its own, `@gambar(file.png)`, which marks where an image goes.
+// lists, code blocks, bold and inline code) plus one line of its own, `@gambar(file.png)`, which marks where an image goes. A line may
+// hold several of those markers separated by spaces, which puts the pictures side by side.
 
-const IMAGE = /^@gambar\(\s*([^)]+?)\s*\)\s*$/;
+const MARKER = /@gambar\(\s*([^)]+?)\s*\)/g;
 const HEADING = /^(#{1,3})\s+(.+?)\s*$/;
 const SIZE_OPTION = /^(width|height|w|h)\s*=\s*(\d{1,4}%?)$/i;
 
@@ -19,9 +20,23 @@ function imageBlock(inner) {
 }
 const ITEM = /^\s*(?:[-*]|\d+[.)])\s+(.*)$/;
 
+// The insides of every marker on a line, or null when the line is not only markers: one marker alone marks an image, several mark a row.
+function markerList(line) {
+  const inners = [];
+  let last = 0;
+  MARKER.lastIndex = 0;
+  for (let match = MARKER.exec(line); match; match = MARKER.exec(line)) {
+    if (line.slice(last, match.index).trim()) return null;
+    inners.push(match[1]);
+    last = match.index + match[0].length;
+  }
+  return inners.length && !line.slice(last).trim() ? inners : null;
+}
+
 /**
  * @typedef {{type: "heading", level: number, text: string} | {type: "paragraph", text: string} | {type: "list", ordered: boolean, items: string[]}
- *   | {type: "code", text: string} | {type: "image", name: string, width?: string, height?: string}} TutorialBlock
+ *   | {type: "code", text: string} | {type: "image", name: string, width?: string, height?: string}
+ *   | {type: "images", items: Array<{type: "image", name: string, width?: string, height?: string}>}} TutorialBlock
  */
 
 /** @param {string} markdown @returns {TutorialBlock[]} */
@@ -47,8 +62,12 @@ export function parseTutorial(markdown) {
       continue;
     }
     if (!line.trim()) { flush(); continue; }
-    const image = IMAGE.exec(line.trim());
-    if (image) { flush(); blocks.push(imageBlock(image[1])); continue; }
+    const markers = markerList(line.trim());
+    if (markers) {
+      flush();
+      blocks.push(markers.length === 1 ? imageBlock(markers[0]) : { type: "images", items: markers.map(imageBlock) });
+      continue;
+    }
     const heading = HEADING.exec(line);
     if (heading) { flush(); blocks.push({ type: "heading", level: heading[1].length, text: heading[2] }); continue; }
     const item = ITEM.exec(line);
@@ -69,7 +88,11 @@ export function parseTutorial(markdown) {
 
 /** The image file names a tutorial refers to, each once, in order of appearance. */
 export function imageNames(markdown) {
-  return [...new Set(parseTutorial(markdown).filter((block) => block.type === "image").map((block) => block.name))];
+  const found = parseTutorial(markdown).flatMap((block) => {
+    if (block.type === "image") return [block.name];
+    return block.type === "images" ? block.items.map((item) => item.name) : [];
+  });
+  return [...new Set(found)];
 }
 
 /** Splits a line of text into plain, **bold** and `code` pieces. @returns {Array<{t: "text"|"b"|"code", v: string}>} */

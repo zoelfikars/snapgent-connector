@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { JSDOM } from "jsdom";
 import { imageNames, parseInline, parseTutorial } from "../src/domain/tutorial/parse.js";
 import { pickLanguage } from "../src/domain/tutorial/language.js";
+import { clampTutorialSize } from "../src/domain/tutorial/size.js";
 import { openTutorial } from "../src/ui/tutorial-popup.js";
 import { tutorialModuleSource } from "../build/tutorial.mjs";
 
@@ -23,6 +24,14 @@ describe("tutorial parser", () => {
 
   test("only images outside a code fence count, each once", () => {
     assert.deepEqual(imageNames(`${MD}\n@gambar(one.png)\n@gambar( two.jpg , width=20 )\n`), ["one.png", "two.jpg"]);
+  });
+
+  test("several markers on one line become one row of images", () => {
+    const [row] = parseTutorial("@gambar(a.png) @gambar(b.png, width=30)");
+    assert.deepEqual(row, { type: "images", items: [{ type: "image", name: "a.png" }, { type: "image", name: "b.png", width: "30" }] });
+    const mixed = parseTutorial("teks @gambar(a.png)");
+    assert.equal(mixed[0].type, "paragraph");
+    assert.deepEqual(imageNames("@gambar(a.png) @gambar(b.png)\n\n@gambar(b.png)"), ["a.png", "b.png"]);
   });
 
   test("an image may give a width, a height or both; what is left out stays automatic", () => {
@@ -55,6 +64,19 @@ describe("tutorial language", () => {
   });
 });
 
+describe("tutorial size", () => {
+  test("a whole number inside the range is kept, anything else becomes the default", () => {
+    assert.equal(clampTutorialSize(16), 16);
+    assert.equal(clampTutorialSize("18"), 18);
+    assert.equal(clampTutorialSize(16.4), 16);
+    assert.equal(clampTutorialSize(5), 10);
+    assert.equal(clampTutorialSize(99), 22);
+    assert.equal(clampTutorialSize(undefined), 14);
+    assert.equal(clampTutorialSize(null), 14);
+    assert.equal(clampTutorialSize("abc"), 14);
+  });
+});
+
 describe("tutorial popup", () => {
   const open = (texts, images, extra = {}) => {
     const w = new JSDOM("<!doctype html><body></body>").window;
@@ -78,6 +100,35 @@ describe("tutorial popup", () => {
     const tall = open({ id: "@gambar(a.png, height=50%)", en: "" }, images, { lang: "id" }).querySelector("img");
     assert.equal(tall.style.height, "50%");
     assert.equal(tall.style.width, "");
+  });
+
+  test("a row of images is drawn side by side", () => {
+    const images = { "a.png": "data:image/png;base64,AAAA", "b.png": "data:image/png;base64,BBBB" };
+    const doc = open({ id: "@gambar(a.png) @gambar(b.png, width=30)", en: "" }, images, { lang: "id" });
+    const row = doc.querySelector(".zs-tut-row");
+    assert.equal(row.querySelectorAll("img").length, 2);
+    assert.equal(row.querySelectorAll("img")[1].style.width, "30px");
+  });
+
+  test("the A- and A+ buttons change the text size and report the choice", () => {
+    const sizes = [];
+    const doc = open({ id: "Halo", en: "" }, {}, { lang: "id", size: 14, onSize: (size) => sizes.push(size) });
+    const body = doc.querySelector(".zs-tut");
+    doc.querySelector('[data-size="1"]').click();
+    assert.equal(body.style.getPropertyValue("--zs-tut-size"), "15px");
+    doc.querySelector('[data-size="-1"]').click();
+    doc.querySelector('[data-size="-1"]').click();
+    assert.equal(body.style.getPropertyValue("--zs-tut-size"), "13px");
+    assert.deepEqual(sizes, [15, 14, 13]);
+  });
+
+  test("a saved size is kept inside the range the buttons allow", () => {
+    const big = open({ id: "Halo", en: "" }, {}, { lang: "id", size: 99 });
+    assert.equal(big.querySelector(".zs-tut").style.getPropertyValue("--zs-tut-size"), "22px");
+    assert.equal(big.querySelector('[data-size="1"]').disabled, true);
+    const small = open({ id: "Halo", en: "" }, {}, { lang: "id", size: 2 });
+    assert.equal(small.querySelector(".zs-tut").style.getPropertyValue("--zs-tut-size"), "10px");
+    assert.equal(small.querySelector('[data-size="-1"]').disabled, true);
   });
 
   test("text never becomes markup and only embedded images are shown", () => {

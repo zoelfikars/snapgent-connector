@@ -67,6 +67,7 @@ const budget = createMessageBudget({ storage, hostname: location.hostname, provi
 const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id, calls: budget.calls });
 terminal.setCancel((jobKey, name) => tools.runner.cancelJob(jobKey, name));
 terminal.setRunner((call, options) => tools.manual.run(call, options));
+terminal.setTools(() => tools.catalogue.active());
 const bridgeStatus = createBridgeStatus({ state, settings, tools, send, bar: () => bar, diag });
 const preferences = createPreferences({ storage, state, defaults: defaultPreferences(defaultCalibrations) });
 let stop;

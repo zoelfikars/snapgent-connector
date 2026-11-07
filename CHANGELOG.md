@@ -4,6 +4,9 @@ All notable changes to snapgentV3 Free are documented here.
 
 ## [Unreleased]
 
+### Terminal
+- **Command examples**: an Examples button in the terminal opens a list of every command the selected MCP server offers, each with a ready JSON call (required parameters filled with placeholders, the optional ones named) that can be copied, or put in the terminal's input to edit and run.
+
 ### Tutorial
 - **An Info button opens a tutorial** beside the other tool buttons of the bar. The tutorial is written in Markdown, one file per language (`extension/tutorial/id/tutorial.md` and `extension/tutorial/en/tutorial.md`); the dialog follows the browser's language and has an ID/EN switch that is remembered. A line `@gambar(file.png)` places an image from `extension/tutorial/images/`, and `@gambar(file.png, width=300)`, `height=50%` or both set its size, the side left out staying automatic. The build embeds the images in the extension, so nothing is fetched from the page, and it stops with a clear message when a named image is missing.
 

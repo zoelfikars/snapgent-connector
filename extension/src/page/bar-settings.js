@@ -5,9 +5,11 @@
 import { SKILL_MAX_BYTES } from "../domain/skills/skill-text.js";
 import { openMcpSettings, openPreferences, openSkillsSettings, openTutorial } from "../ui/index.js";
 import { pickLanguage } from "../domain/tutorial/language.js";
+import { clampTutorialSize } from "../domain/tutorial/size.js";
 import { TUTORIAL_IMAGES, TUTORIAL_TEXTS } from "./tutorial-content.js";
 
 const TUTORIAL_LANG_KEY = "zsTutorialLang";
+const TUTORIAL_SIZE_KEY = "zsTutorialSize";
 
 /**
  * @param {{ document: Document, root: HTMLElement, settings: object, serverDirectory: object, tools: object, preferences: object,
@@ -67,11 +69,16 @@ export function createBarSettings({ document, root, settings, serverDirectory, t
     });
   });
 
-  // The language is the one the user picked in the dialog; until then it follows the browser's.
+  // The language and the text size are the ones the user picked in the dialog; until then the language follows the browser's.
   $("#zs-info-btn").addEventListener("click", async (event) => {
     event.stopPropagation();
     const lang = pickLanguage(await storage.get(TUTORIAL_LANG_KEY), document.defaultView && document.defaultView.navigator.language);
-    openTutorial({ document, texts: TUTORIAL_TEXTS, images: TUTORIAL_IMAGES, lang, onLang: (next) => storage.set(TUTORIAL_LANG_KEY, next) });
+    const size = clampTutorialSize(await storage.get(TUTORIAL_SIZE_KEY));
+    openTutorial({
+      document, texts: TUTORIAL_TEXTS, images: TUTORIAL_IMAGES, lang, size,
+      onLang: (next) => storage.set(TUTORIAL_LANG_KEY, next),
+      onSize: (next) => storage.set(TUTORIAL_SIZE_KEY, next),
+    });
   });
 
   $("#zs-prefs-btn").addEventListener("click", (event) => {
