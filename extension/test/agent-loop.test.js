@@ -150,6 +150,33 @@ describe("AgentLoop: terminal and truncated replies", () => {
   });
 });
 
+describe("AgentLoop: a reply that was stopped can be run again", () => {
+  const twoCommands = { kind: "tool", item: { id: "two" }, calls: [{ tool: "a" }, { tool: "b" }] };
+
+  test("Stop before any command gave a result: the turn is forgotten, so Play may run it again", async () => {
+    const h = await run({
+      responses: [toolTurn("git_status"), textTurn],
+      runner: { run: async (_c, state) => { state.stopped = true; return "(stopped by user)"; } },
+    });
+    assert.deepEqual(h.events("memory:executed", "memory:forget"), [["memory:executed", "turn"], ["memory:forget", "turn"]]);
+  });
+
+  test("Stop after a command already finished: the turn stays remembered, so it is never run twice", async () => {
+    const h = await run({
+      responses: [twoCommands, textTurn],
+      runner: { run: async (call, state) => { if (call.tool === "b") state.stopped = true; return `» ${call.tool}\nok`; } },
+    });
+    assert.deepEqual(h.events("run"), [["run", "a"], ["run", "b"]]);
+    assert.equal(h.events("memory:forget").length, 0);
+  });
+
+  test("a batch that completes is not forgotten", async () => {
+    const h = await run({ responses: [twoCommands, textTurn] });
+    assert.equal(h.events("memory:forget").length, 0);
+    assert.equal(h.state.submitted.length, 1);
+  });
+});
+
 describe("AgentLoop: reminders", () => {
   test("the command list rides along every Nth successful result", async () => {
     const h = await run({ responses: [toolTurn("a"), toolTurn("b"), toolTurn("c"), textTurn], reminderEvery: 2 });

@@ -36,7 +36,10 @@ export function createLoopHarness({ responses = [], runner, hidden = false, hasC
     hasCatalogue: () => hasCatalogue,
     reminderText: () => "\n[REMINDER]",
   };
-  const memory = { executed: (item) => log.push(["memory:executed", item && item.id]) };
+  const memory = {
+    executed: (item) => log.push(["memory:executed", item && item.id]),
+    forget: (item) => log.push(["memory:forget", item && item.id]),
+  };
   const outbox = { prepare: (text) => text };
   const runnerImpl = runner || { run: async (call) => `» ${call.tool}\nok` };
 

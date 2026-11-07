@@ -8,6 +8,7 @@ import {
   computeBarView, createBarPlacer, createInputCover, createNotifications, createSetupCard, pillHtml, shouldShowSetup, applyTheme,
   computeMenuPlacement, applyMenuPlacement, viewportOf,
 } from "../ui/index.js";
+import { controlFace } from "../domain/agent/agent-mode.js";
 import { isWorkspaceServer } from "../domain/agent/session-start.js";
 import { createBarMenus } from "./bar-menus.js";
 import { createBarSettings } from "./bar-settings.js";
@@ -22,6 +23,7 @@ const GEAR = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke
 const FILES = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`;
 const STAR = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
 const MCP = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>`;
+const CHAT = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
 const pill = (id, nameId, label, title = "", popup) => pillHtml({ id, nameId, label, title, popup });
 const TEMPLATE = `
   <div id="zs-bar">
@@ -33,6 +35,8 @@ const TEMPLATE = `
       <button id="zs-skills-btn" type="button" aria-label="Skills" title="Skills">${STAR}</button>
       <button id="zs-mcp-btn" type="button" aria-label="MCP settings" title="MCP settings">${MCP}</button>
       <button id="zs-prefs-btn" type="button" aria-label="Preferences" title="Preferences">${GEAR}</button>
+      <button id="zs-discuss" type="button" hidden aria-pressed="false" aria-label="Agent or Discussion mode" title="Discussion mode">${CHAT}</button>
+      <button id="zs-play" type="button" hidden aria-label="Read the last reply and run its command" title="Read the last reply and run its command">▶</button>
       <button id="zs-stop" type="button" hidden aria-label="Stop" title="Stop">■</button>
     </div>
     ${pill("zs-mode-btn", "zs-mode-name", "Choose how risky actions are approved", "Plan: read only. Manual: asks first. Auto: never asks.")}
@@ -48,14 +52,14 @@ const TEMPLATE = `
  * @param {{ document: Document, window: Window, provider: object, state: object, settings: object, serverDirectory: object, tools: object,
  *           monitor: object, storage: object, preferences: object, send: Function, calibration: object, files: object, onStart: () => void, onStop: () => void }} deps
  */
-export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, preferences, send, calibration, terminal, files, onStart, onStop }) {
+export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, preferences, send, calibration, terminal, files, onStart, onStop, onPlay, onToggleMode }) {
   const root = document.createElement("div");
   root.id = "zs-root";
   const notifications = createNotifications({ root });
   root.innerHTML = TEMPLATE;
   document.documentElement.appendChild(root);
   const $ = (selector) => root.querySelector(selector);
-  const el = { bar: $("#zs-bar"), state: $("#zs-state"), action: $("#zs-action"), stop: $("#zs-stop"), stopFloat: $("#zs-stop-float"), toggle: $("#zs-toggle"), menu: $("#zs-menu") };
+  const el = { bar: $("#zs-bar"), state: $("#zs-state"), action: $("#zs-action"), stop: $("#zs-stop"), play: $("#zs-play"), discuss: $("#zs-discuss"), stopFloat: $("#zs-stop-float"), toggle: $("#zs-toggle"), menu: $("#zs-menu") };
 
   // Where the bar sits and whether it is shown: the user's choice, the same on every site.
   let prefs = { corner: "bottom", hidden: false };
@@ -117,8 +121,15 @@ export function createBar({ document, window, provider, state, settings, serverD
       workspaceReady: monitor.workspaceReady, workspaceProbePending: monitor.workspaceProbePending, workspaceFolder: tools.workspace.bound(),
       modeWarning: !state.started && !state.starting && provider.modeWarning ? provider.modeWarning() : null,
       needsCalibration: !!provider.needsCalibration,
+      discuss: !!state.discuss,
     });
     const busy = !el.stop.hidden;
+    // The Stop slot has a second face, Play, while the agent is idle in a live session (see domain/agent/agent-mode.js).
+    el.play.hidden = controlFace({ discuss: state.discuss, busy, started: state.started, starting: state.starting, stale: state.staleExtension }) !== "play";
+    el.discuss.hidden = !state.started || state.starting || state.staleExtension;
+    el.discuss.dataset.on = state.discuss ? "1" : "0";
+    el.discuss.setAttribute("aria-pressed", state.discuss ? "true" : "false");
+    el.discuss.title = state.discuss ? "Discussion: the agent is off. Click to turn it on" : "Agent is on. Click for Discussion: no command is read or run";
     // Only touch the DOM when something changed: rewriting the status restarts the spinner's CSS animation.
     const signature = [view.tone, view.spinner, view.message, view.label, view.kind, view.disabled, view.warn, busy].join("|");
     if (signature === lastSignature) return;
@@ -144,6 +155,8 @@ export function createBar({ document, window, provider, state, settings, serverD
   el.term = $("#zs-term-btn");
   el.term.addEventListener("click", (event) => { event.stopPropagation(); if (terminal) terminal.toggle(); });
   el.stop.addEventListener("click", onStop);
+  el.play.addEventListener("click", () => { if (onPlay) onPlay(); });
+  el.discuss.addEventListener("click", () => { if (onToggleMode) onToggleMode(); });
   el.stopFloat.addEventListener("click", (event) => { event.stopPropagation(); el.stop.click(); }); // the same Stop, reachable while the bar is hidden
 
   applyTheme(document);

@@ -23,6 +23,7 @@ export const createState = () => ({
   injecting: false,
   toolRunning: false,
   parked: false, // waiting for the tab to come back to the foreground
+  discuss: false, // Discussion mode: no reply is read and nothing runs (kept per conversation by page/agent-mode.js)
 
   // What the site is doing.
   lastGenAt: 0,

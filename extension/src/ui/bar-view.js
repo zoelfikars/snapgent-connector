@@ -22,6 +22,7 @@ import { escapeHtml } from "./html.js";
  * @property {string|null} [workspaceFolder] the folder this chat works in (so "open it in VS Code" can name it)
  * @property {string|null} modeWarning  Why this page cannot be used as it is (shown as the message).
  * @property {boolean} [needsCalibration]  The site is not calibrated, or part of its calibration no longer matches the page.
+ * @property {boolean} [discuss]  Discussion mode: the agent is switched off in this chat.
  *
  * @typedef {Object} BarView
  * @property {"standby"|"active"|"warn"|"noagent"|"starting"} tone
@@ -78,6 +79,9 @@ export function computeBarView(state) {
   else if (state.started) result = whileStarted(state);
   else if (state.blankChat) result = beforeStart(state);
   else result = view("noagent", "No agent. Open a new chat.");
+
+  // Discussion mode: the agent is off in this chat, so "Active" would be untrue.
+  if (state.discuss && state.started && !state.starting) result = view("standby", "<b>Discussion</b> · agent off");
 
   // The loop is alive but frozen because this tab is in the background: say so, or it reads as a hang.
   if (state.parked && (state.running || state.starting)) {

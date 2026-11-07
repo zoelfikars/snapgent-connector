@@ -6,14 +6,15 @@ const EVERY_MS = 2500;
 const HIDDEN_DELAY_MS = 100;
 const MIN_GAP_MS = 250; // a streaming reply changes the page every frame; the bar does not need to follow it that closely
 
-/** @param {{ document: Document, window: Window, provider: object, session: object, bar: object }} deps */
-export function startPageWatch({ document, window, provider, session, bar }) {
+/** @param {{ document: Document, window: Window, provider: object, session: object, bar: object, agentMode?: { sync: () => void } }} deps */
+export function startPageWatch({ document, window, provider, session, bar, agentMode }) {
   let scheduled = false;
   let lastRefreshAt = 0;
   function refresh() {
     scheduled = false;
     lastRefreshAt = Date.now();
     session.sync();
+    if (agentMode) agentMode.sync(); // each conversation has its own Agent / Discussion switch
     provider.enforceComposer(); // keep the composer in the modes the profile needs
     bar.render();
   }

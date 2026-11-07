@@ -15,6 +15,7 @@ export function createAutoResume({ document, state, provider, executed, loop, di
 
   setInterval(() => {
     if (!state.started || state.running || state.starting || state.injecting) return skip(`state started=${state.started} running=${state.running} starting=${state.starting} injecting=${state.injecting}`);
+    if (state.discuss) return skip("discuss");
     if (document.hidden) return skip("hidden");
     if (state.userStopped) return skip("userStopped");
     if (provider.isGenerating()) return skip("generating");

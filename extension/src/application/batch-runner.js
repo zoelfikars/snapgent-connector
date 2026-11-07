@@ -59,7 +59,13 @@ export class BatchRunner {
       const step = await this._runCall(item, call, {
         jobKey: batchId && jobKey(batchId, index, call), budgetChars: callShare(remaining, batch.length - index), step: { index, total: batch.length },
       });
-      if (step.halted) { this._end(item); return { halted: true }; }
+      if (step.halted) {
+        // Stopped before ANY command gave a result: forget that this reply "ran", so Play may run it again. Once a command has
+        // finished the record stays, because running the whole reply again could run that command twice.
+        if (!results.length && this._d.memory.forget) this._d.memory.forget(item);
+        this._end(item);
+        return { halted: true };
+      }
       last = call;
       const text = step.feedback.length > remaining ? trimMiddle(step.feedback, remaining, "the results") : step.feedback;
       results.push(text);

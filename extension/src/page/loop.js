@@ -57,7 +57,7 @@ export function createLoop({ state, provider, tools, chat, bar, visibility, exec
     visibility,
     runner: tools.runner,
     tools: { hasCatalogue: () => tools.catalogue.hasAny(), reminderText: tools.reminderText },
-    memory: { executed: (item) => executed.remember(item) },
+    memory: { executed: (item) => executed.remember(item), forget: (item) => executed.forget(item) },
     outbox: {
       // A result is a turn: it counts toward the system-prompt re-statement budget and may carry it.
       prepare: (text) => { resend.bump("results"); return resend.attach(text); },
@@ -82,6 +82,7 @@ export function createLoop({ state, provider, tools, chat, bar, visibility, exec
     /** Start the loop on the reply after `base`, unless it is already running. */
     run(base) {
       if (state.running) return undefined;
+      if (state.discuss) { diag("loop.discuss"); return undefined; } // Discussion mode: no reply is read and nothing runs
       return loop.run(base).catch((error) => diag("loop.crash", { msg: String((error && error.message) || error) }));
     },
   };

@@ -23,7 +23,7 @@ export class AgentLoop {
    *   visibility: import("./ports.js").VisibilityPort,
    *   runner: { run: (call: object, options?: { budgetChars?: number, jobKey?: string }) => Promise<string> },
    *   tools: import("./ports.js").LoopToolsPort,
-   *   memory: { executed: (item: object) => void },
+   *   memory: { executed: (item: object) => void, forget?: (item: object) => void },
    *   outbox: { prepare: (text: string) => string, reserve?: () => number },
    *   budget?: { limit: () => number, calls?: () => number, sent?: (chars: number) => number, tooLong?: (chars: number) => void },
    *   parts?: import("./part-queue.js").PartQueue,   // the rest of an answer that did not fit in one message

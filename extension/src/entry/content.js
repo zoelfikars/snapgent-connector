@@ -7,6 +7,7 @@ import defaultCalibrations from "../../profiles/default-calibrations.json";
 import { createAccountScope } from "../page/account-scope.js";
 import { createAccountStorage } from "../page/account-storage.js";
 import { createAttachments } from "../page/attachments.js";
+import { createAgentMode } from "../page/agent-mode.js";
 import { createAtPopup } from "../page/at-popup.js";
 import { createAutoResume } from "../page/auto-resume.js";
 import { createBar } from "../page/bar.js";
@@ -20,6 +21,7 @@ import { createLoop } from "../page/loop.js";
 import { createMessageBudget } from "../page/message-budget.js";
 import { startPageWatch } from "../page/page-watch.js";
 import { createPromptResend } from "../page/prompt-resend.js";
+import { createReplay } from "../page/replay.js";
 import { createPreferences } from "../page/preferences.js";
 import { defaultPreferences } from "../infrastructure/calibration/defaults.js";
 import { createProvider } from "../page/provider.js";
@@ -70,12 +72,16 @@ const preferences = createPreferences({ storage, state, defaults: defaultPrefere
 let stop;
 let session;
 let attachments;
+let agentMode;
+let replay;
 const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast: (text) => bar.toast(text), previewStartMessage: () => session?.previewStartMessage?.(), previewReminderMessage: async () => { await tools.catalogue.ensure(); return tools.catalogue.active().length ? tools.reminderText() : null; } });
 bar = createBar({
   document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, preferences, send, calibration, terminal,
   files: { list: () => attachments.listFiles(), refresh: () => attachments.refresh(), insert: (paths) => attachments.insert(paths), canList: () => attachments.canList() },
   onStart: () => session.start(),
   onStop: () => stop.stopLoop(),
+  onPlay: () => replay.play(),
+  onToggleMode: () => { if (!agentMode.toggle()) bar.toast("Send a message first · this chat has no id yet"); },
 });
 
 const chat = createChat({ document, provider, state, visibility, catalogue: tools.catalogue, diag, cover: bar.cover, banner: notify, progress: (text) => bar.coverLabel(text), budget });
@@ -85,13 +91,15 @@ const parts = new PartQueue();
 const loop = createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs: createBatchJobs({ storage, provider, turnKey }), resend, parts, diag });
 session = createSession({ state, provider, tools, chat, bar, reminder: loop.reminder, limit: budget.limit, storage, settings, serverDirectory, preferences, diag });
 stop = createStop({ document, state, provider, bar, diag });
+agentMode = createAgentMode({ state, provider, storage, onStop: () => stop.stopLoop(), onChange: redraw, diag });
+replay = createReplay({ state, provider, executed, loop, bar, diag });
 
 let userInput;
 attachments = createAttachments({ provider, state, tools, chat, bar, budget, parts, preferences, startTurn: (base) => userInput.startTurn(base), diag });
 userInput = installUserInput({ document, state, provider, bar, resend, loop, takeOver: attachments.takeOver, diag });
 createAtPopup({ document, window, root: bar.root, state, settings, provider, attachments, preferences, calibration, toast: bar.toast, diag });
 createAutoResume({ document, state, provider, executed, loop, diag });
-startPageWatch({ document, window, provider, session, bar });
+startPageWatch({ document, window, provider, session, bar, agentMode });
 // The popup asks before it switches logins: a running agent would be left talking to a session that is no longer there.
 try {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
