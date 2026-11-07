@@ -132,6 +132,13 @@ describe("DeepSeek DSML markup", () => {
     assert.equal(calls[0].arguments.x, "line 1\n  line 2");
   });
 
+  test("a string parameter drops only the indentation that belongs to the tags", () => {
+    const text = '<|DSML|>invoke name="a">\n    <|DSML|>parameter name="content" string="true">\nhello\n    </|DSML|>parameter>\n</|DSML|>invoke>';
+    assert.equal(P.parseToolCalls(text)[0].arguments.content, "hello");
+    const inline = '<|DSML|>invoke name="b">\n<|DSML|>parameter name="x" string="true">  spaced  </|DSML|>parameter>\n</|DSML|>invoke>';
+    assert.equal(P.parseToolCalls(inline)[0].arguments.x, "  spaced  ");
+  });
+
   test("still being written: open until the invoke and the calls around it are closed", () => {
     assert.equal(P.hasOpenToolBlock(seen), false);
     assert.equal(P.hasOpenToolBlock(seen.replace(/\n<\/｜｜DSML｜｜ calls>/, "")), true);

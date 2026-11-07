@@ -17,7 +17,9 @@ const tagsOf = (text) => [...text.matchAll(/<\s*(\/?)\s*[|｜][\s|｜]*DSML[\s|�
 }));
 
 function valueOf(raw, string) {
-  if (string === "true") return raw.replace(/^\r?\n/, "").replace(/\r?\n$/, "");
+  // A string parameter is the text as written, minus the newline and indentation that
+  // only exist because the tag was written on its own line. Inner lines stay untouched.
+  if (string === "true") return raw.replace(/^[ \t]*\r?\n/, "").replace(/\r?\n[ \t]*$/, "");
   const text = raw.trim();
   try { return JSON.parse(text); } catch { /* not strict JSON */ }
   try { return parseLoose(text); } catch { return text; }
