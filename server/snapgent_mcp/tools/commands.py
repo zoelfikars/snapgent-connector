@@ -10,7 +10,7 @@ from typing import List, Optional
 from ..context import Context
 from ..limits import COMMAND_TIMEOUT_SECONDS, MAX_OUTPUT_CHARS, SAFE_PROJECT_SCRIPTS, SCRIPT_TIMEOUT_SECONDS
 from ..outputs import CACHE
-from ..paths import find_outside_root
+from ..paths import find_outside_root, resolve_inside
 from ..process import run_process_streaming
 from ..security.commands import unsafe_for_cmd
 from .registry import EXECUTE, READ, tool
@@ -71,41 +71,55 @@ def run_command(ctx: Context, command: str, args: Optional[List[str]] = None, ma
                                  max_output_chars=max_output_chars, on_chunk=ctx.stream)
 
 
-def script_command(script: str, root: Path) -> List[str]:
+def resolve_directory(directory, root: Path) -> Path:
+    """The directory a script runs in: the workspace root unless `directory` names a folder inside it."""
+    if directory is None or str(directory).strip() in ("", "."):
+        return root
+    target = resolve_inside(str(directory), root)
+    if not target.is_dir():
+        raise NotADirectoryError(f"Not a directory: {directory}")
+    return target
+
+
+def script_command(script: str, directory: Path) -> List[str]:
     if script not in SAFE_PROJECT_SCRIPTS:
         raise ValueError(f"Script must be one of: {', '.join(sorted(SAFE_PROJECT_SCRIPTS))}.")
-    package_path = root / "package.json"
+    package_path = directory / "package.json"
     if not package_path.is_file():
-        raise FileNotFoundError("No package.json found in the workspace root.")
+        raise FileNotFoundError(f"No package.json found in {directory}.")
     try:
         package = json.loads(package_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise RuntimeError(f"Could not read package.json: {error}") from error
     if script not in (package.get("scripts") or {}):
         raise ValueError(f"package.json does not define the '{script}' script.")
-    return shell_wrap([package_manager(root), "run", script])
+    return shell_wrap([package_manager(directory), "run", script])
 
 
-@tool("run_project_script", "Run a named safe script (build, check, format, lint, test, typecheck) from package.json.",
-      {"script": STR, "max_output_chars": OUTPUT_CHARS}, ["script"], risk=EXECUTE)
-def run_project_script(ctx: Context, script: str, max_output_chars: Optional[int] = None) -> str:
-    return run_process_streaming(script_command(script, ctx.root), ctx.root, timeout=SCRIPT_TIMEOUT_SECONDS,
+@tool("run_project_script", "Run a named safe script (build, check, format, lint, test, typecheck) from package.json in a directory (default: workspace root).",
+      {"script": STR, "directory": STR, "max_output_chars": OUTPUT_CHARS}, ["script"], risk=EXECUTE)
+def run_project_script(ctx: Context, script: str, directory: Optional[str] = None, max_output_chars: Optional[int] = None) -> str:
+    target = resolve_directory(directory, ctx.root)
+    return run_process_streaming(script_command(script, target), target, timeout=SCRIPT_TIMEOUT_SECONDS,
                                  max_output_chars=max_output_chars, on_chunk=ctx.stream)
 
 
-@tool("run_tests", "Run the workspace test script, pytest, or .NET tests when configured.",
-      {"max_output_chars": OUTPUT_CHARS}, risk=EXECUTE)
-def run_tests(ctx: Context, max_output_chars: Optional[int] = None) -> str:
-    root = ctx.root
-    if (root / "package.json").is_file():
-        return run_project_script(ctx, "test", max_output_chars)
-    if (root / "pyproject.toml").is_file() or (root / "pytest.ini").is_file():
-        return run_process_streaming([python_interpreter(), "-m", "pytest"], root, timeout=SCRIPT_TIMEOUT_SECONDS,
+@tool("run_tests", "Run the test script, pytest, unittest, or .NET tests configured in a directory (default: workspace root).",
+      {"directory": STR, "max_output_chars": OUTPUT_CHARS}, risk=EXECUTE)
+def run_tests(ctx: Context, directory: Optional[str] = None, max_output_chars: Optional[int] = None) -> str:
+    target = resolve_directory(directory, ctx.root)
+    if (target / "package.json").is_file():
+        return run_project_script(ctx, "test", directory=str(target), max_output_chars=max_output_chars)
+    if (target / "pyproject.toml").is_file() or (target / "pytest.ini").is_file():
+        return run_process_streaming([python_interpreter(), "-m", "pytest"], target, timeout=SCRIPT_TIMEOUT_SECONDS,
                                      max_output_chars=max_output_chars, on_chunk=ctx.stream)
-    if any(root.glob("*.sln")) or any(root.glob("*.csproj")):
-        return run_process_streaming(["dotnet", "test"], root, timeout=SCRIPT_TIMEOUT_SECONDS,
+    if any(target.glob("test_*.py")) or any((target / "tests").glob("test_*.py")):
+        return run_process_streaming([python_interpreter(), "-m", "unittest", "discover"], target, timeout=SCRIPT_TIMEOUT_SECONDS,
                                      max_output_chars=max_output_chars, on_chunk=ctx.stream)
-    raise FileNotFoundError("No supported test setup found (package.json, pytest, or .NET project).")
+    if any(target.glob("*.sln")) or any(target.glob("*.csproj")):
+        return run_process_streaming(["dotnet", "test"], target, timeout=SCRIPT_TIMEOUT_SECONDS,
+                                     max_output_chars=max_output_chars, on_chunk=ctx.stream)
+    raise FileNotFoundError(f"No supported test setup found in {target} (package.json, pytest, unittest, or .NET project).")
 
 
 @tool("get_command_output", "Read more of an earlier command's output that was shortened (its run_id is in the omitted-output note), "

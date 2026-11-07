@@ -342,6 +342,53 @@ class CommandTests(WorkspaceCase):
         with self.assertRaisesRegex(FileNotFoundError, "No supported test setup"):
             commands.run_tests(self.ctx)
 
+    def test_script_command_uses_the_subdirectory_lockfile(self):
+        self.write("extension/package.json", json.dumps({"scripts": {"lint": "x"}}))
+        self.write("extension/pnpm-lock.yaml", "")
+        self.assertEqual(commands.script_command("lint", self.root / "extension")[-3:], ["pnpm", "run", "lint"])
+
+    def test_run_project_script_in_a_subdirectory(self):
+        self.write("extension/package.json", json.dumps({"scripts": {"test": "x"}}))
+        with mock.patch.object(commands, "run_process_streaming", return_value="ok") as run:
+            self.assertEqual(commands.run_project_script(self.ctx, "test", directory="extension"), "ok")
+        self.assertEqual(run.call_args.args[1], self.root / "extension")
+        self.assertEqual(run.call_args.args[0][-3:], ["npm", "run", "test"])
+
+    def test_script_directory_must_stay_inside_the_workspace(self):
+        with self.assertRaisesRegex(ValueError, "escapes workspace"):
+            commands.run_project_script(self.ctx, "test", directory="../outside")
+        self.write("a.txt", "x")
+        with self.assertRaises(NotADirectoryError):
+            commands.run_project_script(self.ctx, "test", directory="a.txt")
+        with self.assertRaises(NotADirectoryError):
+            commands.run_tests(self.ctx, directory="missing")
+
+    def test_run_tests_uses_the_subdirectory_package_json(self):
+        self.write("extension/package.json", json.dumps({"scripts": {"test": "x"}}))
+        with mock.patch.object(commands, "run_process_streaming", return_value="ok") as run:
+            self.assertEqual(commands.run_tests(self.ctx, directory="extension"), "ok")
+        self.assertEqual(run.call_args.args[1], self.root / "extension")
+        self.assertEqual(run.call_args.args[0][-3:], ["npm", "run", "test"])
+
+    def test_run_tests_falls_back_to_unittest(self):
+        self.write("tests/test_sample.py", "import unittest\n")
+        with mock.patch.object(commands, "run_process_streaming", return_value="ok") as run:
+            self.assertEqual(commands.run_tests(self.ctx), "ok")
+        self.assertEqual(run.call_args.args[0][:3], [sys.executable, "-m", "unittest"])
+        self.assertEqual(run.call_args.args[1], self.root)
+
+    def test_run_tests_prefers_pytest_over_unittest(self):
+        self.write("pyproject.toml", "")
+        self.write("tests/test_sample.py", "")
+        with mock.patch.object(commands, "run_process_streaming", return_value="ok") as run:
+            commands.run_tests(self.ctx)
+        self.assertEqual(run.call_args.args[0][2:], ["pytest"])
+
+    def test_run_tests_without_any_setup_in_a_subdirectory(self):
+        (self.root / "empty").mkdir()
+        with self.assertRaisesRegex(FileNotFoundError, "No supported test setup"):
+            commands.run_tests(self.ctx, directory="empty")
+
 
 if __name__ == "__main__":
     unittest.main()
