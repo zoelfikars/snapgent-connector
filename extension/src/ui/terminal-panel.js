@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The terminal panel: one overlay in the corner of the page with a tab per command (running ones
-// first), and the output of the selected tab drawn by page/terminal.js into the body it owns.
-// Pure drawing: the tabs' data comes in, clicks go out through the callbacks.
+// first), the output of the selected tab drawn by page/terminal.js into the body it owns, and an
+// input where the user types a command by hand (for when the agent was interrupted midway).
+// Pure drawing: the tabs' data comes in, clicks and typed text go out through the callbacks.
 
 import { lineHtml } from "./ansi.js";
 
 const MAX_BODY_LINES = 2000; // per tab; the oldest are dropped
+const DEFAULT_HINT = "Ctrl+Enter runs the command · Copy gives what the AI would receive";
+
+const escapeHtml = (text) => String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const TEMPLATE = `
   <div id="zs-term" hidden role="dialog" aria-label="Terminal">
@@ -16,18 +20,25 @@ const TEMPLATE = `
     </div>
     <div class="zs-t-tabs" role="tablist"></div>
     <div class="zs-t-body"></div>
-    <div class="zs-t-foot"><span class="zs-t-hint">input is off: a command that asks for an answer waits anyway</span>
+    <div class="zs-t-entry">
+      <textarea class="zs-t-input" rows="2" spellcheck="false" aria-label="Command to run" placeholder='{"command":"git_status","params":{}}'></textarea>
+      <button type="button" class="zs-t-run" title="Run (Ctrl+Enter)">Run</button>
+    </div>
+    <div class="zs-t-foot"><span class="zs-t-hint"></span>
+    <button type="button" class="zs-t-copy" hidden title="Copy the output of the selected command">Copy</button>
     <button type="button" class="zs-t-stop" hidden>■ Stop</button></div>
     <div class="zs-t-grip" title="Drag to resize" aria-hidden="true"></div>
   </div>`;
 
 /**
- * @param {{ document: Document, onStop?: (key: string) => void }} deps  Stop on the selected tab.
+ * @param {{ document: Document, onStop?: (key: string) => void, onCopy?: (key: string) => void,
+ *           onRun?: (text: string) => ({ ok: boolean, error?: string } | void) }} deps
+ *   Stop and Copy act on the selected tab; `onRun` gets the typed text and says whether it was accepted.
  * @returns {{ root: HTMLElement, open: () => void, close: () => void, toggle: () => void, isOpen: () => boolean,
  *             setTabs: (tabs: object[]) => void, appendLine: (key: string, segments: object[]) => void,
- *             select: (key: string) => void }}
+ *             select: (key: string) => void, forget: (key: string) => void, flashCopy: (ok: boolean) => void }}
  */
-export function createTerminalPanel({ document, onStop = () => {} }) {
+export function createTerminalPanel({ document, onStop = () => {}, onCopy = () => {}, onRun = () => ({ ok: true }) }) {
   const root = document.createElement("div");
   root.innerHTML = TEMPLATE;
   const panel = root.firstElementChild;
@@ -35,6 +46,10 @@ export function createTerminalPanel({ document, onStop = () => {} }) {
   const tabsEl = panel.querySelector(".zs-t-tabs");
   const bodyEl = panel.querySelector(".zs-t-body");
   const stopEl = panel.querySelector(".zs-t-stop");
+  const copyEl = panel.querySelector(".zs-t-copy");
+  const inputEl = panel.querySelector(".zs-t-input");
+  const runEl = panel.querySelector(".zs-t-run");
+  const hintEl = panel.querySelector(".zs-t-hint");
   const bodies = new Map(); // tab key -> { el, count }
 
   // The panel is anchored at the top-right, so its bottom-left grip is the only corner that can grow
@@ -62,10 +77,40 @@ export function createTerminalPanel({ document, onStop = () => {} }) {
   gripEl.addEventListener("pointerup", endDrag);
   gripEl.addEventListener("pointercancel", endDrag);
   let selected = null;
+  let copyTimer = null;
 
   panel.querySelector(".zs-t-close").addEventListener("click", () => close());
   stopEl.addEventListener("click", () => { if (selected) onStop(selected); });
-  panel.addEventListener("keydown", (event) => event.stopPropagation()); // the site's shortcuts must not fire while typing here
+  copyEl.addEventListener("click", () => { if (selected) onCopy(selected); });
+  runEl.addEventListener("click", () => submit());
+  inputEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); submit(); }
+  });
+  // The site's shortcuts must not fire while typing here, whichever key event they listen to.
+  for (const type of ["keydown", "keyup", "keypress"]) panel.addEventListener(type, (event) => event.stopPropagation());
+  setHint();
+
+  /** The line under the output: the usual hint, or why the typed text was refused. */
+  function setHint(text = "", bad = false) {
+    hintEl.textContent = text || DEFAULT_HINT;
+    hintEl.title = text || "";
+    hintEl.classList.toggle("zs-t-bad", !!text && bad);
+  }
+
+  /** The typed text is kept when it is refused, so a typo can be fixed instead of retyped. */
+  function submit() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+    const verdict = onRun(text) || { ok: true };
+    if (verdict.ok) { inputEl.value = ""; setHint(); } else setHint(verdict.error || "That was not run.", true);
+  }
+
+  /** The Copy button says how it went for a moment. */
+  function flashCopy(ok) {
+    copyEl.textContent = ok ? "Copied ✓" : "Copy failed";
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => { copyEl.textContent = "Copy"; }, 1500);
+  }
 
   function open() { panel.hidden = false; }
   function close() { panel.hidden = true; }
@@ -76,8 +121,8 @@ export function createTerminalPanel({ document, onStop = () => {} }) {
   function setTabs(tabs) {
     tabsEl.innerHTML = tabs.map((tab) => {
       const marker = tab.status === "running" ? "●" : tab.status === "success" ? "✓" : tab.status === "stopped" ? "⏹" : "✕";
-      return `<button type="button" class="zs-t-tab zs-t-${tab.status}${tab.key === selected ? " zs-t-sel" : ""}" data-key="${tab.key}" role="tab">` +
-        `<span class="zs-t-dot">${marker}</span><span class="zs-t-name">${tab.name}</span></button>`;
+      return `<button type="button" class="zs-t-tab zs-t-${tab.status}${tab.key === selected ? " zs-t-sel" : ""}" data-key="${escapeHtml(tab.key)}" role="tab">` +
+        `<span class="zs-t-dot">${marker}</span><span class="zs-t-name">${escapeHtml(tab.name)}</span></button>`;
     }).join("") || '<span class="zs-t-empty">No command has run yet.</span>';
     for (const el of tabsEl.querySelectorAll(".zs-t-tab")) {
       el.addEventListener("click", () => select(el.dataset.key));
@@ -90,9 +135,10 @@ export function createTerminalPanel({ document, onStop = () => {} }) {
     selected = key;
     bodyEl.querySelectorAll(".zs-t-term").forEach((el) => { el.hidden = el.dataset.key !== key; });
     tabsEl.querySelectorAll(".zs-t-tab").forEach((el) => el.classList.toggle("zs-t-sel", el.dataset.key === key));
-    const tab = tabsEl.querySelector(`.zs-t-tab[data-key="${key}"]`);
+    const tab = [...tabsEl.querySelectorAll(".zs-t-tab")].find((el) => el.dataset.key === key);
     const running = !!(tab && tab.classList.contains("zs-t-running"));
     stopEl.hidden = !running;
+    copyEl.hidden = !tab;
     scrollToEnd(key);
   }
 
@@ -109,6 +155,14 @@ export function createTerminalPanel({ document, onStop = () => {} }) {
       bodies.set(key, tab);
     }
     return tab;
+  }
+
+  /** A tab that was dropped from the list takes its scrollback with it. */
+  function forget(key) {
+    const tab = bodies.get(key);
+    if (!tab) return;
+    tab.el.remove();
+    bodies.delete(key);
   }
 
   function appendLine(key, segments) {
@@ -130,5 +184,5 @@ export function createTerminalPanel({ document, onStop = () => {} }) {
     if (nearBottom) el.scrollTop = el.scrollHeight;
   }
 
-  return { root: panel, open, close, toggle, isOpen, setTabs, appendLine, select };
+  return { root: panel, open, close, toggle, isOpen, setTabs, appendLine, select, forget, flashCopy };
 }

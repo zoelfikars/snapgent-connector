@@ -158,10 +158,10 @@ export class ToolRunner {
     } catch { /* the panel must never break a command */ }
   }
 
-  _terminalEnd(jobKey, status) {
+  _terminalEnd(jobKey, status, text) {
     if (!jobKey) return;
     try {
-      this._sink.terminal && this._sink.terminal.finish(jobKey, status);
+      this._sink.terminal && this._sink.terminal.finish(jobKey, status, text);
     } catch { /* ditto */ }
   }
 
@@ -177,12 +177,12 @@ export class ToolRunner {
     if (result && result.kind === "stopped") { this._terminalEnd(jobKey, "stopped"); this._cancelJob(name, target, jobKey); return "(stopped by user)"; }
     if (needsApproval(result)) {
       const refusal = await this._askUser(result.confirmation);
-      if (refusal) { this._terminalEnd(jobKey, "failed"); return refusal; }
+      if (refusal) { this._terminalEnd(jobKey, "failed", refusal); return refusal; }
       // Repeat the very same call, now carrying the one-time token only the extension was given.
       result = await this._callBridge(name, { ...args, [RESERVED_ARGUMENT]: result.confirmation.token }, target, jobKey);
       if (result && result.kind === "stopped") { this._terminalEnd(jobKey, "stopped"); this._cancelJob(name, target, jobKey); return "(stopped by user)"; }
     }
-    this._terminalEnd(jobKey, result && result.ok ? "success" : (result && result.kind === "cancelled" ? "stopped" : "failed"));
+    const status = result && result.ok ? "success" : (result && result.kind === "cancelled" ? "stopped" : "failed");
 
     const feedback = toFeedback(result, {
       name,
@@ -197,6 +197,8 @@ export class ToolRunner {
       this._sink.staleExtension(result.error, name);
       this._sink.diag("bridge.staleExtension", { name, error: result.error });
     }
+    // The tab keeps the very text the model is given, so Copy hands over what a manual reply would need.
+    this._terminalEnd(jobKey, status, feedback.text);
     return feedback.text;
   }
 }

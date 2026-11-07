@@ -43,6 +43,9 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
   const bindings = createWorkspaceBinding({ storage, provider, accountKey });
   const choice = createChoiceDialog();
   const runner = new ToolRunner({ bridge, catalogue, session, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current });
+  // Commands the user types into the terminal run apart from the agent loop: a Stop that ended the loop leaves
+  // `state.stop` set, and that must not cancel what the user runs by hand afterwards.
+  const manual = new ToolRunner({ bridge, catalogue, session: { ...session, isStopped: () => false }, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current });
   const skills = new SkillsService({
     store: storage,
     findTool: (bareName) => catalogue.active().find((tool) => bareToolName(tool.name) === bareName),
@@ -113,5 +116,5 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
   /** The command list the model is reminded of every so often, scoped to the selected target. */
   const reminderText = () => toolsReminder(catalogue.active(), serverDirectory.name(settings.target()), settings.target());
 
-  return { bridge, session, catalogue, confirm, runner, skills, workspace, systemPrompt, reminderText };
+  return { bridge, session, catalogue, confirm, runner, manual, skills, workspace, systemPrompt, reminderText };
 }

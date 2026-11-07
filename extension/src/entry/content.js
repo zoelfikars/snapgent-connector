@@ -62,6 +62,7 @@ const serverDirectory = new ServerDirectory({ store: storage, liveServers: () =>
 const visibility = createVisibility({ document, state, diag, onParkChange: redraw });
 const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id });
 terminal.setCancel((jobKey, name) => tools.runner.cancelJob(jobKey, name));
+terminal.setRunner((call, options) => tools.manual.run(call, options));
 const bridgeStatus = createBridgeStatus({ state, settings, tools, send, bar: () => bar, diag });
 const preferences = createPreferences({ storage, state, defaults: defaultPreferences(defaultCalibrations) });
 const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast: (text) => bar.toast(text) });
